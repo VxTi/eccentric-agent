@@ -9,6 +9,7 @@ declare namespace EccentricAgent {
     inputSchema: z.ZodType<TIn>;
     outputSchema: z.ZodType<TOut>;
     handler: (input: TIn) => Promise<TOut>;
+    requiresPermission?: boolean;
   }
 
   export interface Context<T extends Record<string, Tool<any, any>>> {

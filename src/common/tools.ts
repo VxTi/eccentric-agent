@@ -7,7 +7,8 @@ export function createTool<TName extends string, TIn, TOut>(
   description: string,
   inputSchema: z.ZodType<TIn>,
   outputSchema: z.ZodType<TOut>,
-  callback: (...input: any[]) => Promise<any>
+  callback: (...input: any[]) => Promise<any>,
+  options: { requiresPermission?: boolean } = {}
 ): EccentricAgent.Tool<TName, TIn, TOut> {
   return {
     name,
@@ -16,5 +17,6 @@ export function createTool<TName extends string, TIn, TOut>(
     inputSchema,
     outputSchema,
     handler: callback,
+    requiresPermission: options.requiresPermission ?? false,
   };
 }
