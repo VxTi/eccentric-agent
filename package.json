@@ -7,17 +7,25 @@
     "build": "esbuild ./src/index.ts --bundle --packages=external --minify --platform=node --format=esm --outfile=./dist/index.js"
   },
   "devDependencies": {
-    "typescript": "^5.2.2",
-    "prettier": "^3.3.1",
-    "vite": "^5.2.0",
-    "typescript-eslint": "^8.47.0",
+    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^25.6.0",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-prettier": "^5.5.4",
     "eslint-plugin-unused-imports": "^4.3.0",
     "jiti": "^2.6.1",
-    "@eslint/eslintrc": "^3.3.1",
-    "@eslint/js": "^9.39.1"
+    "prettier": "^3.3.1",
+    "typescript": "^5.2.2",
+    "typescript-eslint": "^8.47.0"
+  },
+  "dependencies": {
+    "ai": "^6.0.175",
+    "chalk": "^5.6.2",
+    "cli-highlight": "^2.1.11",
+    "glob": "^13.0.6",
+    "ora": "^9.4.0",
+    "zod": "^4.4.3"
   }
 }
