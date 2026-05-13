@@ -35,6 +35,21 @@ export interface ManagedUserInputQueue extends UserInputQueue {
   size(): number;
 }
 
+export type TaskStatus = 'pending' | 'in_progress' | 'completed';
+
+export interface Task {
+  id: string;
+  description: string;
+  status: TaskStatus;
+}
+
+export interface TaskUpdate {
+  id: string;
+  status: TaskStatus;
+}
+
+const MAX_TASK_CONTINUATION_TURNS = 10;
+
 export class AgentContext extends EventEmitter {
   private readonly _tools: ToolSet;
   private readonly _model: LanguageModel;
@@ -42,6 +57,7 @@ export class AgentContext extends EventEmitter {
   private _systemMessageFragments: string[];
   private _messageQueue: string[];
   private _isStreaming: boolean;
+  private _taskList: Task[] | null;
 
   public readonly cwd: string;
   public readonly renderer: RendererInstance;
@@ -56,6 +72,7 @@ export class AgentContext extends EventEmitter {
     this._isStreaming = false;
     this._messageQueue = [];
     this._messages = [];
+    this._taskList = null;
     this._systemMessageFragments = this.constructInitialSystemPromptFragments();
 
     this.renderer = new RendererInstance(this);
@@ -83,13 +100,100 @@ export class AgentContext extends EventEmitter {
 
       await this.makeRequest([
         {
-          content: this._systemMessageFragments.join('\n'),
+          content: this.composeSystemPrompt(),
           role: 'system',
         },
         ...this._messages,
       ]);
+
+      let continuations = 0;
+      while (
+        this._messageQueue.length === 0 &&
+        this.hasIncompleteTasks() &&
+        continuations < MAX_TASK_CONTINUATION_TURNS
+      ) {
+        continuations += 1;
+        this._messages.push({
+          content:
+            'The task list still has incomplete tasks. Continue working on the' +
+            ' next pending or in-progress task and update the task list as you' +
+            ' make progress. Do not wait for further user input.',
+          role: 'user',
+        });
+
+        await this.makeRequest([
+          {
+            content: this.composeSystemPrompt(),
+            role: 'system',
+          },
+          ...this._messages,
+        ]);
+      }
     }
     return this;
+  }
+
+  private composeSystemPrompt(): string {
+    const fragments = [...this._systemMessageFragments];
+    const taskFragment = this.renderTaskListFragment();
+    if (taskFragment) fragments.push(taskFragment);
+    return fragments.join('\n');
+  }
+
+  private renderTaskListFragment(): string | null {
+    if (!this._taskList || this._taskList.length === 0) return null;
+
+    const lines = this._taskList.map(task => {
+      const marker =
+        task.status === 'completed'
+          ? '[x]'
+          : task.status === 'in_progress'
+            ? '[~]'
+            : '[ ]';
+      return `  ${marker} (${task.id}) ${task.description}`;
+    });
+
+    return [
+      'Current task list (markers: [ ] pending, [~] in_progress, [x] completed):',
+      ...lines,
+      'While any task is not completed you MUST keep working autonomously.' +
+        ' Use `update_task_list` to mark tasks "in_progress" before starting' +
+        ' and "completed" when done. Only stop once every task is completed.',
+    ].join('\n');
+  }
+
+  public getTaskList(): Task[] | null {
+    return this._taskList ? this._taskList.map(task => ({ ...task })) : null;
+  }
+
+  public setTaskList(tasks: Task[]): Task[] {
+    this._taskList = tasks.map(task => ({ ...task }));
+    return this.getTaskList()!;
+  }
+
+  public updateTasks(updates: TaskUpdate[]): Task[] {
+    if (!this._taskList) {
+      throw new Error('No task list exists.');
+    }
+
+    for (const update of updates) {
+      const task = this._taskList.find(t => t.id === update.id);
+      if (!task) {
+        throw new Error(`No task with id "${update.id}" exists in the task list.`);
+      }
+      task.status = update.status;
+    }
+
+    return this.getTaskList()!;
+  }
+
+  public clearTaskList(): void {
+    this._taskList = null;
+  }
+
+  public hasIncompleteTasks(): boolean {
+    if (!this._taskList || this._taskList.length === 0) return false;
+    return this._taskList.some(task => task.status !== 'completed');
   }
 
   private async makeRequest(messages: ModelMessage[]) {
