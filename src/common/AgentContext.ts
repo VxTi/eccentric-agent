@@ -66,7 +66,7 @@ export class AgentContext extends EventEmitter {
 
   constructor() {
     super();
-    const MODEL_ID = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
+    const MODEL_ID = process.env.OPENAI_MODEL ?? 'gpt-5-mini';
     this._model = openai(MODEL_ID);
     this.cwd = process.cwd();
     this._isStreaming = false;

@@ -43,6 +43,7 @@ export default class InsertInFileTool extends ToolBase<Input, Output> {
 
     const edits = this.normalizeEdits(input);
 
+    this.reanchorEdits(edits, lines);
     this.validateEdits(edits, lines, totalLines);
     this.assertNoCollisions(edits);
 
@@ -99,6 +100,55 @@ export default class InsertInFileTool extends ToolBase<Input, Output> {
       'No edits provided. Pass either `edits` or the single-edit fields' +
         ' (`startLine`, `endLine`, `content`).'
     );
+  }
+
+  /**
+   * If an edit's `expectedContent` does not match at the supplied
+   * `[startLine, endLine]`, attempt to find that exact block elsewhere in the
+   * file and silently re-anchor the edit to its true location. The model often
+   * miscounts lines by ±1; trusting the content over the line numbers makes
+   * the tool resilient to that. When there are multiple candidates we pick the
+   * one closest to the hinted `startLine`. If no candidate exists we leave the
+   * edit alone — validation will then surface a clear error.
+   */
+  private reanchorEdits(edits: NormalizedEdit[], lines: string[]): void {
+    for (const edit of edits) {
+      if (edit.expectedContent === undefined) continue;
+      const isPureInsertion = edit.endLine === edit.startLine - 1;
+      if (isPureInsertion) continue;
+
+      const expectedLines = edit.expectedContent
+        .replace(/\r\n/g, '\n')
+        .split('\n');
+      const span = expectedLines.length;
+
+      const actualSlice = lines
+        .slice(edit.startLine - 1, edit.startLine - 1 + span)
+        .join('\n');
+      if (actualSlice === expectedLines.join('\n')) continue;
+
+      const matches: number[] = [];
+      for (let i = 0; i + span <= lines.length; i += 1) {
+        let ok = true;
+        for (let j = 0; j < span; j += 1) {
+          if (lines[i + j] !== expectedLines[j]) {
+            ok = false;
+            break;
+          }
+        }
+        if (ok) matches.push(i + 1);
+      }
+
+      if (matches.length === 0) continue;
+
+      const hinted = edit.startLine;
+      const chosen = matches.reduce((best, candidate) =>
+        Math.abs(candidate - hinted) < Math.abs(best - hinted) ? candidate : best
+      );
+
+      edit.startLine = chosen;
+      edit.endLine = chosen + span - 1;
+    }
   }
 
   private validateEdits(

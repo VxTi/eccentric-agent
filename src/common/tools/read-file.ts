@@ -9,7 +9,9 @@ export default class ReadFileTool extends ToolBase<Input, Output> {
     super(
       'read_file',
       'Read file',
-      'Reads the entire UTF-8 text content of a file from disk and returns it as a single string.' +
+      'Reads the entire UTF-8 text content of a file from disk and returns it as a single string with' +
+        ' each line prefixed by its 1-based line number and a tab (`<n>\\t<line>`). Use these line' +
+        ' numbers verbatim when calling `insert_in_file` — do NOT count lines yourself.' +
         ' Accepts either an absolute path or a path relative to the working directory. Use this tool' +
         ' when you need to inspect the full contents of a known file — for example to understand its' +
         ' structure, extract information, or prepare for an edit. Do NOT use this tool to discover' +
@@ -27,9 +29,22 @@ export default class ReadFileTool extends ToolBase<Input, Output> {
       ? filePath
       : path.join(process.cwd(), filePath);
 
-    const content = await fs.readFile(resolved, 'utf8');
+    const raw = await fs.readFile(resolved, 'utf8');
+    const newlineMatch = raw.match(/\r?\n/);
+    const newline = newlineMatch ? newlineMatch[0] : '\n';
+    const lines = raw.split(/\r?\n/);
 
-    return { content };
+    // Drop the trailing empty string that split produces when the file ends
+    // with a newline — it is not a real line for numbering purposes.
+    const hasTrailingNewline = lines.length > 0 && lines[lines.length - 1] === '';
+    if (hasTrailingNewline) lines.pop();
+
+    const width = String(lines.length).length;
+    const numbered = lines
+      .map((line, i) => `${String(i + 1).padStart(width, ' ')}\t${line}`)
+      .join(newline);
+
+    return { content: numbered };
   }
 
   public override inputToString(input: Input): string {
