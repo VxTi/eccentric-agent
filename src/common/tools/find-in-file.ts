@@ -56,7 +56,7 @@ export default class FindInFile extends ToolBase<Input, Output> {
   public override outputToString(output: Output): string {
     const { matches } = output;
 
-    return `Found ${matches.length === 0 ? 'no' : matches.length} matches.`;
+    return `Found \`${matches.length === 0 ? 'no' : matches.length}\` matches.`;
   }
 }
 
