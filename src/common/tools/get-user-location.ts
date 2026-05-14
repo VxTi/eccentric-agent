@@ -1,7 +1,42 @@
+import * as https from 'node:https';
 import { z } from 'zod';
 import { ToolBase } from '../tools';
 
 const GEO_ENDPOINT = 'https://ipwho.is/';
+
+// Node's built-in `fetch` (undici) unconditionally adds `Sec-Fetch-Mode: cors`
+// to outgoing requests, which ipwho.is's free plan interprets as a browser
+// CORS request and rejects with `{"success":false,"message":"CORS is not
+// supported on the Free plan"}`. The header is on undici's forbidden list so
+// it can't be overridden from headers. Using `node:https` directly bypasses
+// undici and the service responds normally.
+function httpsGetJson(url: string): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      url,
+      {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'eccentric-agent/1.0 (+server-side)',
+        },
+      },
+      res => {
+        const chunks: Buffer[] = [];
+        res.on('data', chunk => chunks.push(chunk as Buffer));
+        res.on('end', () =>
+          resolve({
+            status: res.statusCode ?? 0,
+            body: Buffer.concat(chunks).toString('utf8'),
+          })
+        );
+        res.on('error', reject);
+      }
+    );
+    req.on('error', reject);
+    req.end();
+  });
+}
 
 export default class GetUserLocationTool extends ToolBase<Input, Output> {
   constructor() {
@@ -20,16 +55,23 @@ export default class GetUserLocationTool extends ToolBase<Input, Output> {
   }
 
   public override async handle(): Promise<Output> {
-    const response = await fetch(GEO_ENDPOINT, {
-      headers: { Accept: 'application/json' },
-    });
-    if (!response.ok) {
+    const { status, body } = await httpsGetJson(GEO_ENDPOINT);
+
+    if (status < 200 || status >= 300) {
       throw new Error(
-        `Geolocation lookup failed: HTTP ${response.status} ${response.statusText}`
+        `Geolocation lookup failed: HTTP ${status} — ${body.slice(0, 200)}`
       );
     }
 
-    const data = (await response.json()) as Record<string, unknown>;
+    let data: Record<string, unknown>;
+    try {
+      data = JSON.parse(body) as Record<string, unknown>;
+    } catch {
+      throw new Error(
+        `Geolocation lookup returned non-JSON response: ${body.slice(0, 200)}`
+      );
+    }
+
     if (data.success === false) {
       throw new Error(
         `Geolocation lookup failed: ${String(data.message ?? 'unknown reason')}`

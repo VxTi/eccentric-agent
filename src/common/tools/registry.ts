@@ -6,6 +6,7 @@ import FindInFile from './find-in-file';
 import GetUserLocation from './get-user-location';
 import GetUserTime from './get-user-time';
 import InsertInFile from './insert-in-file';
+import PromptUserOptions from './prompt-user-options';
 import ReadFile from './read-file';
 import Shell from './shell';
 import UpdateTaskList from './update-task-list';
@@ -25,4 +26,5 @@ export const allTools: ToolBase[] = [
   new UpdateTaskList(),
   new GetUserTime(),
   new GetUserLocation(),
+  new PromptUserOptions(),
 ];

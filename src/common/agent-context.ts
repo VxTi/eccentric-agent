@@ -9,7 +9,8 @@ import {
   type ToolSet,
 } from 'ai';
 import chalk from 'chalk';
-import { EventEmitter } from 'node:events';
+import { glob } from 'node:fs/promises';
+
 import ora from 'ora';
 import { createFileSelector, type FileSelector } from '../file-selector';
 import { InputHandler } from '../input/input';
@@ -20,14 +21,16 @@ import { TaskList } from './task-list';
 import { type ToolBase, ToolSelectionOption } from './tools';
 import { allTools } from './tools/registry';
 import { type IO, type UserInputQueue, type UserInputRequest } from './types';
+import compact from 'lodash/compact';
+import first from 'lodash/first';
 
-export class AgentContext extends EventEmitter {
-  private readonly _tools: ToolSet;
-  private readonly _model: LanguageModel;
-  private readonly _messages: ModelMessage[];
-  private _systemMessageFragments: string[];
-  private _messageQueue: string[];
-  private _isStreaming: boolean;
+export class AgentContext {
+  private readonly tools: ToolSet;
+  private readonly model: LanguageModel;
+  private readonly messages: ModelMessage[];
+  private _systemPrompt: string | undefined;
+  private messageQueue: string[];
+  private isStreaming: boolean;
 
   public taskList: TaskList;
   public abortController: AbortController;
@@ -47,16 +50,14 @@ export class AgentContext extends EventEmitter {
   public readonly fileModificationCache: Map<string, number> = new Map();
 
   constructor(io: IO, abortController: AbortController) {
-    super();
     this.abortController = abortController;
-    const MODEL_ID = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
-    this._model = openai(MODEL_ID);
     this.cwd = process.cwd();
-    this._isStreaming = false;
-    this._messageQueue = [];
-    this._messages = [];
+
+    this.model = openai(process.env.OPENAI_MODEL ?? 'gpt-4o-mini');
+    this.isStreaming = false;
+    this.messageQueue = [];
+    this.messages = [];
     this.taskList = new TaskList();
-    this._systemMessageFragments = this.constructInitialSystemPromptFragments();
 
     this.shellBuffer = new ShellBuffer(io.outputStream);
     this.shellBuffer.push(
@@ -71,7 +72,7 @@ export class AgentContext extends EventEmitter {
     this.inputHandler = new InputHandler(this, io.inputStream);
     this.fileSelector = createFileSelector(this);
 
-    this._tools = this.constructToolset();
+    this.tools = this.constructToolset();
   }
 
   // eslint-disable-next-line
@@ -82,20 +83,22 @@ export class AgentContext extends EventEmitter {
   }
 
   public async queueUserMessage(message: string): Promise<AgentContext> {
-    this._messageQueue.push(message);
+    this.messageQueue.push(message);
 
-    if (this._isStreaming) return this;
+    if (this.isStreaming) return this;
 
-    while (this._messageQueue.length > 0) {
-      const next = this._messageQueue.shift()!;
-      this._messages.push({ content: next, role: 'user' });
+    while (this.messageQueue.length > 0) {
+      const next = this.messageQueue.shift()!;
+      this.messages.push({ content: next, role: 'user' });
+
+      const systemPrompt = await this.composeSystemPrompt();
 
       await this.makeRequest([
         {
-          content: this.composeSystemPrompt(),
+          content: systemPrompt,
           role: 'system',
         },
-        ...this._messages,
+        ...this.messages,
       ]);
 
       await this.pollTaskCompletion();
@@ -106,12 +109,12 @@ export class AgentContext extends EventEmitter {
   private async pollTaskCompletion() {
     let continuations = 0;
     while (
-      this._messageQueue.length === 0 &&
+      this.messageQueue.length === 0 &&
       this.taskList.hasIncompleteTasks() &&
       continuations < MAX_TASK_CONTINUATION_TURNS
     ) {
       continuations += 1;
-      this._messages.push({
+      this.messages.push({
         content:
           'The task list still has incomplete tasks. Continue working on the' +
           ' next pending or in-progress task and update the task list as you' +
@@ -119,21 +122,25 @@ export class AgentContext extends EventEmitter {
         role: 'user',
       });
 
+      const systemPrompt = await this.composeSystemPrompt();
+
       await this.makeRequest([
         {
-          content: this.composeSystemPrompt(),
+          content: systemPrompt,
           role: 'system',
         },
-        ...this._messages,
+        ...this.messages,
       ]);
     }
   }
 
-  private composeSystemPrompt(): string {
-    const fragments = [...this._systemMessageFragments];
+  private async composeSystemPrompt(): Promise<string> {
+    if (!this._systemPrompt) {
+      this._systemPrompt = await this.constructSystemPrompt();
+    }
     const taskFragment = this.renderTaskListFragment();
-    if (taskFragment) fragments.push(taskFragment);
-    return fragments.join('\n');
+
+    return compact([this._systemPrompt, taskFragment]).join('\n');
   }
 
   private renderTaskListFragment(): string | null {
@@ -172,14 +179,14 @@ export class AgentContext extends EventEmitter {
       spinner: 'dots',
       stream: this.shellBuffer.outputStream,
     }).start();
-    this._isStreaming = true;
+    this.isStreaming = true;
 
     const result = streamText({
       allowSystemInMessages: true,
       abortSignal: this.abortController.signal,
-      model: this._model,
+      model: this.model,
       messages,
-      tools: this._tools,
+      tools: this.tools,
       stopWhen: stepCountIs(20),
     });
 
@@ -190,7 +197,7 @@ export class AgentContext extends EventEmitter {
     } catch (err) {
       this.shellBuffer.pushText(chalk.red(`Stream error: ${String(err)}\n`));
     } finally {
-      this._isStreaming = false;
+      this.isStreaming = false;
       spinner.stop();
     }
 
@@ -202,7 +209,7 @@ export class AgentContext extends EventEmitter {
 
     try {
       const finalMessages = (await result.response).messages;
-      this._messages.push(...finalMessages);
+      this.messages.push(...finalMessages);
     } catch (err) {
       this.shellBuffer.pushText(
         chalk.red(`Failed to record assistant turn: ${String(err)}\n`)
@@ -318,13 +325,41 @@ export class AgentContext extends EventEmitter {
     });
   }
 
-  private constructInitialSystemPromptFragments(): string[] {
-    return [
-      'You are a professional coding assistant with a variety of skills.',
-      `Your current working directory is '${this.cwd}'`,
+  private async constructSystemPrompt(): Promise<string> {
+    const supportedFileNames: string[] = [
+      'AGENTS',
+      'AGENT',
+      'SKILL',
+      'CLAUDE',
+      'claude',
+      'copilot-instructions',
     ];
+    const agentFile = await Array.fromAsync(
+      glob(`**/{${supportedFileNames.join(',')}}.md`, {
+        cwd: this.cwd,
+      })
+    );
+
+    return first(agentFile) ?? DEFAULT_SYSTEM_PROMPT;
   }
 }
+
+const DEFAULT_SYSTEM_PROMPT = `You are an expert at writing, navigating and refactoring codebases.
+You've been in the industry for more than 15 years, and have experienced all frameworks of all kinds.
+You have a ton of experience with languages such as TypeScript, JavaScript, Java, Kotlin, C++, C and Go.
+
+Whenever the task is unable to be executed due to ambiguity, don't be afraid to prompt the user with questions.
+If the task is deemed too complex to execute in one go, make a task list for it and execute it in steps.
+
+A few things to absolutely NEVER do:
+
+- Do not ever delete files without explicit user permissions.
+- Whenever simpler tools exist to perform certain actions with, use those. 
+  If you can read a file without commands, then do so.
+- Don't write redundant comments for things that don't demand so. You should
+  make your output speak for itself. Whenever the user requests code to be generated,
+  the code should be understandable enough so that a comment is not necessary.
+`;
 
 interface PendingRequest {
   request: UserInputRequest;
