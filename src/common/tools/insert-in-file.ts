@@ -39,13 +39,11 @@ export default class InsertInFileTool extends ToolBase<Input, Output> {
 
     const stats = await stat(filePath);
     const cachedMtime = context.fileModificationCache.get(filePath);
-    if (cachedMtime === undefined) {
-      throw new Error(
-        `File '${filePath}' has not been read via 'read_file' in this session.` +
-          ` Read it first so its line numbers and modification time can be verified.`
-      );
-    }
-    if (stats.mtimeMs > cachedMtime) {
+    // Only reject when we have *positive* evidence of an external change: a
+    // cached mtime that is now older than the on-disk mtime. A cache miss is
+    // allowed — `expectedContent` on each edit still catches stale line
+    // numbers, and we populate the cache below.
+    if (cachedMtime !== undefined && stats.mtimeMs > cachedMtime) {
       throw new Error(
         `File '${filePath}' was modified on disk since it was last read` +
           ` (cached mtime ${cachedMtime}, actual ${stats.mtimeMs}).` +
@@ -60,6 +58,7 @@ export default class InsertInFileTool extends ToolBase<Input, Output> {
       lines.length > 0 && lines[lines.length - 1] === '';
     if (hasTrailingNewline) lines.pop();
 
+    this.reanchor(input.edits, lines);
     this.validate(input.edits, lines, newline);
     this.assertNoOverlap(input.edits);
 
@@ -90,6 +89,46 @@ export default class InsertInFileTool extends ToolBase<Input, Output> {
       linesReplaced,
       totalLines: lines.length,
     };
+  }
+
+  /**
+   * If an edit's `expectedContent` does not match at the hinted `startLine`,
+   * search the whole file for that exact block and silently re-anchor the
+   * edit to the occurrence closest to the hint. Models routinely miscount
+   * line numbers; trusting the content lets the tool absorb that error
+   * instead of bouncing back with a stale-line-numbers failure. If no
+   * occurrence is found we leave the edit untouched and let `validate`
+   * surface a clear error.
+   */
+  private reanchor(edits: Edit[], lines: string[]): void {
+    for (const edit of edits) {
+      if (edit.expectedContent === undefined) continue;
+      if (edit.endLine === edit.startLine - 1) continue; // pure insertion
+
+      const expected = edit.expectedContent
+        .replace(/\r\n/g, '\n')
+        .split('\n');
+      const span = expected.length;
+      const expectedJoined = expected.join('\n');
+
+      const sliceAt = (startIdx: number): string =>
+        lines.slice(startIdx, startIdx + span).join('\n');
+
+      if (sliceAt(edit.startLine - 1) === expectedJoined) continue;
+
+      const matches: number[] = [];
+      for (let i = 0; i + span <= lines.length; i += 1) {
+        if (sliceAt(i) === expectedJoined) matches.push(i + 1);
+      }
+      if (matches.length === 0) continue;
+
+      const hint = edit.startLine;
+      const chosen = matches.reduce((best, cand) =>
+        Math.abs(cand - hint) < Math.abs(best - hint) ? cand : best
+      );
+      edit.startLine = chosen;
+      edit.endLine = chosen + span - 1;
+    }
   }
 
   private validate(edits: Edit[], lines: string[], newline: string): void {

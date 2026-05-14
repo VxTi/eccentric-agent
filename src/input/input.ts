@@ -180,15 +180,20 @@ export class InputHandler {
     this.fieldState.picker = null;
   }
 
-  private async handlePollInput(str: string, key: KeyEvent): Promise<void> {
-    if (!key || this.state.paused) return;
-
-    const { name: keyType } = key;
+  private async handlePollInput(
+    str: string,
+    key: KeyEvent | undefined
+  ): Promise<void> {
+    if (!key) return;
 
     if (key.ctrl && key.name === KeyType.KEY_C) {
       this.context.shellBuffer.dispose();
       process.exit(0);
     }
+
+    if (this.state.paused) return;
+
+    const { name: keyType } = key;
 
     if (this.fieldState.picker) {
       switch (keyType) {
@@ -300,6 +305,19 @@ export class InputHandler {
         this.syncInputField();
         return;
       }
+      case KeyType.UP: // Scroll up
+        this.context.shellBuffer.setOffset(
+          this.context.shellBuffer.heightOffset + 1
+        );
+        this.syncInputField();
+        return;
+
+      case KeyType.DOWN: // Scroll down
+        this.context.shellBuffer.setOffset(
+          this.context.shellBuffer.heightOffset - 1
+        );
+        this.syncInputField();
+        return;
     }
 
     if (str && !key.ctrl && !key.meta && str.length === 1 && str >= ' ') {
