@@ -30,7 +30,7 @@ export default class UpdateTaskListTool extends ToolBase<Input, Output> {
 
     const updated = context.updateTasks(input.updates);
 
-    return { tasks: updated };
+    return Promise.resolve({ tasks: updated });
   }
 
   public override inputToString(input: Input): string {
@@ -55,7 +55,9 @@ const inputSchema = z.object({
       z.object({
         id: z
           .string()
-          .describe('The `id` of the task to update, as set in `create_task_list`.'),
+          .describe(
+            'The `id` of the task to update, as set in `create_task_list`.'
+          ),
         status: z
           .enum(['pending', 'in_progress', 'completed'])
           .describe('The new status for the referenced task.'),

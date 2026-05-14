@@ -12,8 +12,8 @@ import { EventEmitter } from 'node:events';
 import ora from 'ora';
 import { createFileSelector, type FileSelector } from '../file-selector';
 import { InputHandler } from '../input/input';
-import { RendererInstance } from '../rendering/renderer';
-import { previewArgs, formatMarkdown } from './formatting';
+import { ShellBuffer } from '../rendering/shell-buffer';
+import { previewArgs, formatMarkdown } from '../rendering/formatting';
 import { type ToolBase, ToolSelectionOption } from './tools';
 import { allTools } from './tools/registry';
 import { type UserInputQueue, type UserInputRequest } from './types';
@@ -60,7 +60,7 @@ export class AgentContext extends EventEmitter {
   private _taskList: Task[] | null;
 
   public readonly cwd: string;
-  public readonly renderer: RendererInstance;
+  public readonly shellBuffer: ShellBuffer;
   public readonly fileSelector: FileSelector;
   public readonly inputHandler: InputHandler;
 
@@ -75,7 +75,11 @@ export class AgentContext extends EventEmitter {
     this._taskList = null;
     this._systemMessageFragments = this.constructInitialSystemPromptFragments();
 
-    this.renderer = new RendererInstance(this);
+    this.shellBuffer = new ShellBuffer();
+    this.shellBuffer.pushText(
+      `${chalk.bold('eccentric-agent')}${chalk.dim(' — type @ for files, Ctrl+C to exit\n')}`
+    );
+
     this.inputHandler = new InputHandler(this);
     this.fileSelector = createFileSelector(this);
 
@@ -86,7 +90,7 @@ export class AgentContext extends EventEmitter {
   public async start(): Promise<void> {
     void this.inputHandler.consumeUserInputQueue();
 
-    this.renderer.render();
+    this.inputHandler.syncInputField();
   }
 
   public async queueUserMessage(message: string): Promise<AgentContext> {
@@ -200,7 +204,7 @@ export class AgentContext extends EventEmitter {
 
   private async makeRequest(messages: ModelMessage[]) {
     if (!process.env.OPENAI_API_KEY) {
-      this.renderer.commitMessage(
+      this.shellBuffer.pushText(
         chalk.red('OPENAI_API_KEY not set. Export key then retry.\n')
       );
       return;
@@ -210,7 +214,7 @@ export class AgentContext extends EventEmitter {
     const spinner = ora({
       text: 'thinking…',
       spinner: 'dots',
-      stream: this.renderer.outputStream,
+      stream: this.shellBuffer.outputStream,
     }).start();
     this._isStreaming = true;
 
@@ -227,14 +231,14 @@ export class AgentContext extends EventEmitter {
         buffer += chunk;
       }
     } catch (err) {
-      this.renderer.commitMessage(chalk.red(`Stream error: ${String(err)}\n`));
+      this.shellBuffer.pushText(chalk.red(`Stream error: ${String(err)}\n`));
     } finally {
       this._isStreaming = false;
       spinner.stop();
     }
 
     if (buffer.length > 0) {
-      this.renderer.commitMessage(
+      this.shellBuffer.pushText(
         `${chalk.green('◆ ') + formatMarkdown(buffer)}\n`
       );
     }
@@ -243,12 +247,12 @@ export class AgentContext extends EventEmitter {
       const finalMessages = (await result.response).messages;
       this._messages.push(...finalMessages);
     } catch (err) {
-      this.renderer.commitMessage(
+      this.shellBuffer.pushText(
         chalk.red(`Failed to record assistant turn: ${String(err)}\n`)
       );
     }
 
-    this.renderer.render();
+    this.inputHandler.syncInputField();
   }
 
   public createUserInputQueue(): ManagedUserInputQueue {
@@ -323,7 +327,7 @@ export class AgentContext extends EventEmitter {
               }
             }
 
-            this.renderer.commitMessage(
+            this.shellBuffer.pushText(
               `${formatMarkdown(tool.inputToString(processed))}\n`
             );
 
@@ -332,7 +336,7 @@ export class AgentContext extends EventEmitter {
               output = await tool.handle(processed, this);
             } catch (err) {
               const message = `Tool "${tool.internalName}" failed: ${String(err)}`;
-              this.renderer.commitMessage(chalk.red(`${message}\n`));
+              this.shellBuffer.pushText(chalk.red(`${message}\n`));
               return { error: message, ok: false };
             }
 
@@ -340,11 +344,11 @@ export class AgentContext extends EventEmitter {
 
             if (!parsed.success) {
               const message = `Tool "${tool.internalName}" returned an unexpected shape: ${String(parsed.error)}`;
-              this.renderer.commitMessage(chalk.red(`${message}\n`));
+              this.shellBuffer.pushText(chalk.red(`${message}\n`));
               return { error: message, ok: false, raw: output };
             }
 
-            this.renderer.commitMessage(
+            this.shellBuffer.pushText(
               `${formatMarkdown(tool.outputToString(parsed.data))}\n`
             );
 

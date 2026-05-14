@@ -1,58 +1,72 @@
 import * as os from 'node:os';
-import { stdin, stdout } from 'node:process';
-import type { ReadStream, WriteStream } from 'node:tty';
-import { formatMarkdown } from '../common/formatting';
+import { stdout } from 'node:process';
+import type { WriteStream } from 'node:tty';
+import { formatMarkdown } from './formatting';
 import { type UniqueArray } from '../common/types';
 
+export interface Dimensions {
+  width: number;
+  height: number;
+}
+
+export interface InputFieldState {
+  text: string;
+  cursor: number;
+  prefix?: string;
+  pickerLines?: string[];
+}
+
+const ANSI_SCREEN_ENTER = '\x1b[?1049h\x1b[H\x1b[2J';
+const ANSI_SCREEN_EXIT = '\x1b[?1049l';
+const ANSI_CLEAR_HOME = '\x1b[H\x1b[2J';
+const GRAY_BG = '\x1b[100m';
+
 export class ShellBuffer {
-  private dimensions: Dimensions;
+  public dimensions: Dimensions;
   private fragments: BufferFragments[];
-  private offset: number; // By how much the buffer is translated.
+  private offset: number;
   private lines: BufferLine[];
+  private inputField: InputFieldState | null;
 
-  private inputStream: ReadStream;
-  private outputStream: WriteStream;
+  public readonly outputStream: WriteStream;
 
-  constructor(
-    inputStream: ReadStream = stdin,
-    outputStream: WriteStream = stdout
-  ) {
-    this.inputStream = inputStream;
+  constructor(outputStream: WriteStream = stdout) {
     this.outputStream = outputStream;
     this.fragments = [];
     this.lines = [];
     this.offset = 0;
+    this.inputField = null;
     this.dimensions = {
-      width: outputStream.columns,
-      height: outputStream.rows,
+      width: outputStream.columns ?? 80,
+      height: outputStream.rows ?? 24,
     };
 
-    // \x1b[?1000h : Enable mouse click/scroll tracking
-    // \x1b[?1006h : Enable SGR protocol (better for modern terminals)
-    // \x1b[3J     : Clears terminal + history
-    // \x1b[H      : Puts cursor at position 0
-    this.outputStream.write('\x1b[?1000h\x1b[?1006h\x1b[3J\x1b[H');
-    this.inputStream.on('resize', this.handleResize.bind(this));
-    this.inputStream.on('data', this.handleKeyInput.bind(this));
+    this.outputStream.write(ANSI_SCREEN_ENTER);
+    outputStream.on('resize', this.handleResize.bind(this));
   }
 
-  public append(...fragments: BufferFragments[]) {
+  /**
+   * Push a raw (already styled) text blob. Convenience wrapper around
+   * {@link push} for callers that already produced ANSI-styled strings.
+   */
+  public pushText(raw: string): void {
+    if (!raw) return;
+    this.push(textBlock({ content: raw }));
+  }
+
+  public append(...fragments: BufferFragments[]): void {
     this.push(...fragments);
   }
 
   public push(...fragments: BufferFragments[]): void {
     this.fragments.push(...fragments);
     this.computeBuffer();
+    this.draw();
   }
 
-  public get content(): string {
-    const visibleLines = this.lines.slice(
-      this.offset,
-      this.offset + this.dimensions.height
-    );
-
-    // TODO: compute raw content into at most `dimensions.width` (chars wide) and `dimensions.height` (lines)
-    return visibleLines.map(line => line.computed).join(this.newlineChar);
+  public setInputBox(state: InputFieldState | null): void {
+    this.inputField = state;
+    this.draw();
   }
 
   public get heightOffset(): number {
@@ -60,47 +74,109 @@ export class ShellBuffer {
   }
 
   public setOffset(yAmount: number): void {
-    this.offset = yAmount;
-    this.computeBuffer();
+    this.offset = Math.max(0, yAmount);
+    this.draw();
   }
 
   public clear(): void {
     this.fragments = [];
+    this.lines = [];
     this.offset = 0;
-    this.computeBuffer();
+    this.draw();
+  }
+
+  public dispose(): void {
+    this.outputStream.write(ANSI_SCREEN_EXIT);
+  }
+
+  /**
+   * Renders the buffer + input box to the output stream. Performs a full
+   * screen redraw so callers can safely re-invoke after any state change.
+   */
+  public draw(): void {
+    const { width, height } = this.dimensions;
+    if (width <= 0 || height <= 0) return;
+
+    const inputBlock = this.renderInputBlock();
+    const historyHeight = Math.max(0, height - inputBlock.length);
+
+    const totalLines = this.lines.length;
+    const sliceStart = Math.max(0, totalLines - historyHeight - this.offset);
+    const sliceEnd = Math.max(0, totalLines - this.offset);
+    const visible = this.lines.slice(sliceStart, sliceEnd);
+
+    let out = ANSI_CLEAR_HOME;
+
+    // Pad the top so the input box sits at the bottom of the viewport.
+    const padTop = Math.max(0, historyHeight - visible.length);
+    if (padTop > 0) {
+      out += '\n'.repeat(padTop);
+    }
+
+    if (visible.length > 0) {
+      out += visible.map(l => l.computed).join(newlineChar());
+      out += newlineChar();
+    }
+
+    if (inputBlock.length > 0) {
+      out += inputBlock.join(newlineChar());
+    }
+
+    this.outputStream.write(out);
+
+    if (this.inputField) {
+      const cursorPos = this.computeCursorPosition();
+      this.outputStream.write(`\x1b[${cursorPos.row};${cursorPos.col}H`);
+    }
+  }
+
+  private renderInputBlock(): string[] {
+    if (!this.inputField) return [];
+
+    const { width } = this.dimensions;
+    const boxWidth = Math.max(8, Math.floor(width * 0.8));
+    const leftPad = Math.max(0, Math.floor((width - boxWidth) / 2));
+    const padding = ' '.repeat(leftPad);
+
+    const prefix = this.inputField.prefix ?? '';
+    const innerWidth = Math.max(1, boxWidth - 2);
+    const rawText = (prefix + this.inputField.text)
+      .padEnd(innerWidth)
+      .slice(0, innerWidth);
+
+    const inputLine = `${padding}${GRAY_BG} ${rawText} ${RESET_ANSI}`;
+
+    const pickerLines = (this.inputField.pickerLines ?? []).map(line => {
+      const visibleLen = stripAnsi(line).length;
+      const padRight =
+        boxWidth > visibleLen ? ' '.repeat(boxWidth - visibleLen) : '';
+      return `${padding}${line}${padRight}`;
+    });
+
+    return [...pickerLines, inputLine];
+  }
+
+  private computeCursorPosition(): { row: number; col: number } {
+    const { width, height } = this.dimensions;
+    const boxWidth = Math.max(8, Math.floor(width * 0.8));
+    const leftPad = Math.max(0, Math.floor((width - boxWidth) / 2));
+
+    const prefixLen = (this.inputField?.prefix ?? '').length;
+    const cursor = this.inputField?.cursor ?? 0;
+
+    // 1-indexed; +1 to skip the left gray-bg space margin
+    const col = leftPad + 1 + 1 + prefixLen + cursor;
+    const row = height;
+    return { row, col };
   }
 
   private handleResize(): void {
     this.dimensions = {
-      width: this.outputStream.columns,
-      height: this.outputStream.rows,
+      width: this.outputStream.columns ?? 80,
+      height: this.outputStream.rows ?? 24,
     };
     this.computeBuffer();
-  }
-
-  private handleKeyInput(data: Buffer): void {
-    const str = data.toString();
-
-    // Handle Ctrl+C to exit and cleanup
-    if (str === '\u0003') {
-      // Disable mouse tracking before exiting!
-      this.outputStream.write('\x1b[?1000l\x1b[?1006l');
-      process.exit();
-    }
-
-    // SGR Mouse Format: \x1b[<BUTTON;X;Y[M|m]
-    if (str.startsWith('\x1b[<')) {
-      const match = str.match(/\x1b\[<(\d+);(\d+);(\d+)([Mm])/);
-      if (match) {
-        const [_, button] = match;
-
-        if (button === MOUSE_EVENT_KEY_SCROLL_UP) {
-          this.setOffset(this.offset + 1);
-        } else if (button === MOUSE_EVENT_KEY_SCROLL_DOWN) {
-          this.setOffset(this.offset - 1);
-        }
-      }
-    }
+    this.draw();
   }
 
   private computeBuffer(): void {
@@ -115,27 +191,22 @@ export class ShellBuffer {
           break;
       }
     });
-
-    this.outputStream.write(this.content);
   }
 
   private appendTextBlock(block: TextBlockFragment): void {
-    // Text blocks will always occupy their own lines, so we don't have to append
-    // these fragments to previous lines, unlike `TextFragment`s
     const { width } = this.dimensions;
     const { content, align } = block;
 
     content
-      // Map to actual newline chars
       .split('\n')
-      // split lines into even more lines if they exceed shell dimensions
-      .map(line => [
-        ...(line.match(new RegExp(`[\s\S]{1,${width}`, 'g')) ?? []),
-      ])
-      .flat()
-      .map(line => {
-        const alignedLine = this.alignText(line, align ?? DEFAULT_TEXT_ALIGN);
+      .flatMap(line => {
+        if (line.length <= width) return line;
 
+        const chunks = line.match(new RegExp(`[\\s\\S]{1,${width}}`, 'g'));
+        return chunks ?? line;
+      })
+      .forEach(line => {
+        const alignedLine = this.alignText(line, align ?? DEFAULT_TEXT_ALIGN);
         this.lines.push({
           raw: line,
           computed: formatMarkdown(alignedLine),
@@ -143,33 +214,22 @@ export class ShellBuffer {
       });
   }
 
-  /**
-   * Aligns the given text either left or right, conforming to the maximum
-   * buffer size (see {@link this.dimensions.width})
-   * @private
-   */
   private alignText(text: string, align: TextAlignment): string {
     const { width } = this.dimensions;
-
-    // No transformations needed
     if (align === 'left') return text;
 
+    const visibleLen = stripAnsi(text).length;
+    if (visibleLen >= width) return text;
+
     if (align === 'right') {
-      return ' '.repeat(width - text.length) + text;
+      return ' '.repeat(width - visibleLen) + text;
     }
 
-    const sidePaddingCount = (width - text.length) / 2;
+    const sidePaddingCount = Math.floor((width - visibleLen) / 2);
     const sidePadding = ' '.repeat(sidePaddingCount);
-
     return `${sidePadding}${text}${sidePadding}`;
   }
 
-  /**
-   * Appends the provided text fragment into the line buffer
-   * Computes overflow; if the content overflows the previous text
-   * fragment, it will create a new one.
-   * @private
-   */
   private appendTextFragment(fragment: TextFragment): void {
     const { color, styles, content } = fragment;
 
@@ -182,8 +242,6 @@ export class ShellBuffer {
 
     const lastLine: BufferLine | undefined = this.lines.at(-1);
 
-    // We can try to append it to the last fragment, if it doesn't exceed
-    // boundaries
     if (
       lastLine !== undefined &&
       lastLine.raw.length + content.length < this.dimensions.width
@@ -198,19 +256,15 @@ export class ShellBuffer {
       computed: computedContent,
     });
   }
-
-  /**
-   * Platform specific newline character.
-   * Used for final raw buffer computation.
-   * @private
-   */
-  private get newlineChar(): string {
-    return os.platform() === 'win32' ? '\r\n' : '\n';
-  }
 }
 
-const MOUSE_EVENT_KEY_SCROLL_UP = '65';
-const MOUSE_EVENT_KEY_SCROLL_DOWN = '64';
+function newlineChar(): string {
+  return os.platform() === 'win32' ? '\r\n' : '\n';
+}
+
+function stripAnsi(text: string): string {
+  return text.replace(/\x1b\[[0-9;]*m/g, '');
+}
 
 export type TextColor =
   | 'red'
@@ -284,15 +338,8 @@ export interface LineFragment {
 }
 
 interface BufferLine {
-  // styled text
   computed: string;
-  // Raw non-computed (unstyled) text
   raw: string;
-}
-
-interface Dimensions {
-  width: number;
-  height: number;
 }
 
 type BufferFragments = LineFragment | TextBlockFragment;
@@ -322,32 +369,3 @@ export function textFragment<T extends TextStyle[]>(
     styles,
   };
 }
-
-async function test() {
-  const buf = new ShellBuffer();
-
-  await new Promise(res => {
-    buf.append(
-      lineFragment(
-        textFragment('Hello world!', 'blue'),
-        textFragment('in a different!', 'red'),
-        textFragment('Color', 'green', ['underline', 'bold'])
-      )
-    );
-
-    setTimeout(() => {
-      res(void 0);
-    }, 10000);
-  });
-}
-
-test()
-  .then(() => {
-    console.log('Exiting.');
-    stdout.write('\x1b[?1000l\x1b[?1006l');
-    process.exit(0);
-  })
-  .catch(e => {
-    console.error('Something went wrong', e);
-    process.exit(1);
-  });

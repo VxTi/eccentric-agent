@@ -32,7 +32,7 @@ export default class CreateTaskListTool extends ToolBase<Input, Output> {
 
     context.setTaskList(tasks);
 
-    return { tasks };
+    return Promise.resolve({ tasks });
   }
 
   public override inputToString(input: Input): string {
@@ -58,7 +58,9 @@ const inputSchema = z.object({
           ),
         description: z
           .string()
-          .describe('A concise description of what completing the task entails.'),
+          .describe(
+            'A concise description of what completing the task entails.'
+          ),
       })
     )
     .min(1)

@@ -36,7 +36,8 @@ export default class ReadFileTool extends ToolBase<Input, Output> {
 
     // Drop the trailing empty string that split produces when the file ends
     // with a newline — it is not a real line for numbering purposes.
-    const hasTrailingNewline = lines.length > 0 && lines[lines.length - 1] === '';
+    const hasTrailingNewline =
+      lines.length > 0 && lines[lines.length - 1] === '';
     if (hasTrailingNewline) lines.pop();
 
     const width = String(lines.length).length;

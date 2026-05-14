@@ -143,7 +143,9 @@ export default class InsertInFileTool extends ToolBase<Input, Output> {
 
       const hinted = edit.startLine;
       const chosen = matches.reduce((best, candidate) =>
-        Math.abs(candidate - hinted) < Math.abs(best - hinted) ? candidate : best
+        Math.abs(candidate - hinted) < Math.abs(best - hinted)
+          ? candidate
+          : best
       );
 
       edit.startLine = chosen;

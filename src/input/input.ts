@@ -15,10 +15,27 @@ export interface InputState {
   paused: boolean;
 }
 
+interface PickerState {
+  triggerIndex: number;
+  query: string;
+  matches: string[];
+  selected: number;
+}
+
+interface InputFieldInternalState {
+  buffer: string;
+  cursor: number;
+  picker: PickerState | null;
+  maxSuggestions: number;
+}
+
+const INPUT_PREFIX = '> ';
+
 export class InputHandler {
   public inputQueue: ManagedUserInputQueue;
 
   private state: InputState;
+  private fieldState: InputFieldInternalState;
   private readonly context: AgentContext;
   private readonly inputStream: ReadStream = stdin;
 
@@ -26,6 +43,12 @@ export class InputHandler {
     this.inputStream = inputStream;
     this.context = context;
     this.state = { paused: false };
+    this.fieldState = {
+      buffer: '',
+      cursor: 0,
+      picker: null,
+      maxSuggestions: 8,
+    };
 
     if (!this.inputStream.isTTY) {
       stdout.write(
@@ -52,27 +75,57 @@ export class InputHandler {
     this.state.paused = false;
   }
 
-  async startPicker(): Promise<void> {
-    const { renderer, fileSelector } = this.context;
-
-    renderer.setState({
-      picker: {
-        triggerIndex: renderer.state.cursor - 1,
-        query: '',
-        matches: fileSelector.filter(''),
-        selected: 0,
-      },
+  public syncInputField(): void {
+    this.context.shellBuffer.setInputBox({
+      text: this.fieldState.buffer,
+      cursor: this.fieldState.cursor,
+      prefix: INPUT_PREFIX,
+      pickerLines: this.buildPickerLines(),
     });
-    await fileSelector.reload(renderer.context.cwd, false);
+  }
 
-    if (!renderer.state.picker) return;
+  private buildPickerLines(): string[] | undefined {
+    const picker = this.fieldState.picker;
+    if (!picker) return undefined;
 
-    renderer.setState(prev => ({
-      picker: {
-        matches: fileSelector.filter(prev.picker?.query ?? ''),
-      },
-    }));
-    renderer.render();
+    const visible = picker.matches.slice(0, this.fieldState.maxSuggestions);
+    if (visible.length === 0) {
+      return [chalk.dim('  (no matches)')];
+    }
+
+    const lines = visible.map((match, i) => {
+      const marker = i === picker.selected ? chalk.cyan('❯ ') : '  ';
+      const body = i === picker.selected ? chalk.cyan(match) : chalk.dim(match);
+      return `${marker}${body}`;
+    });
+
+    if (picker.matches.length > visible.length) {
+      lines.push(
+        chalk.dim(`  … ${picker.matches.length - visible.length} more`)
+      );
+    }
+
+    return lines;
+  }
+
+  async startPicker(): Promise<void> {
+    const { fileSelector } = this.context;
+
+    this.fieldState.picker = {
+      triggerIndex: this.fieldState.cursor - 1,
+      query: '',
+      matches: fileSelector.filter(''),
+      selected: 0,
+    };
+    await fileSelector.reload(this.context.cwd, false);
+
+    if (!this.fieldState.picker) return;
+
+    this.fieldState.picker = {
+      ...this.fieldState.picker,
+      matches: fileSelector.filter(this.fieldState.picker.query ?? ''),
+    };
+    this.syncInputField();
   }
 
   private async promptUserForRequest(req: DequeuedRequest): Promise<string> {
@@ -106,29 +159,25 @@ export class InputHandler {
   }
 
   private commitPicker(): void {
-    const { renderer } = this.context;
-    const { state } = renderer;
+    const picker = this.fieldState.picker;
+    if (!picker) return;
 
-    if (!state.picker) return;
-
-    const pick = state.picker.matches[state.picker.selected];
+    const pick = picker.matches[picker.selected];
     if (!pick) {
-      renderer.setState(() => ({ picker: null }));
+      this.fieldState.picker = null;
       return;
     }
-    const before = state.buffer.slice(0, state.picker.triggerIndex);
-    const after = state.buffer.slice(state.cursor);
+    const before = this.fieldState.buffer.slice(0, picker.triggerIndex);
+    const after = this.fieldState.buffer.slice(this.fieldState.cursor);
     const insert = `@${pick} `;
 
-    renderer.setState(() => ({
-      buffer: before + insert + after,
-      cursor: before.length + insert.length,
-      picker: null,
-    }));
+    this.fieldState.buffer = before + insert + after;
+    this.fieldState.cursor = before.length + insert.length;
+    this.fieldState.picker = null;
   }
 
   public cancelPicker(): void {
-    this.context.renderer.setState(() => ({ picker: null }));
+    this.fieldState.picker = null;
   }
 
   private async handlePollInput(str: string, key: KeyEvent): Promise<void> {
@@ -137,54 +186,51 @@ export class InputHandler {
     const { name: keyType } = key;
 
     if (key.ctrl && key.name === KeyType.KEY_C) {
+      this.context.shellBuffer.dispose();
       stdout.write('\n');
       process.exit(0);
     }
 
-    const { renderer } = this.context;
-    const { state } = renderer;
-
-    if (state.picker) {
+    if (this.fieldState.picker) {
       switch (keyType) {
         case KeyType.UP:
           {
-            renderer.setState(prev => ({
-              picker: {
-                selected: Math.max(0, (prev.picker?.selected ?? 0) - 1),
-              },
-            }));
-            renderer.render();
+            this.fieldState.picker = {
+              ...this.fieldState.picker,
+              selected: Math.max(0, this.fieldState.picker.selected - 1),
+            };
+            this.syncInputField();
           }
           return;
         case KeyType.DOWN:
           {
-            renderer.setState(prev => ({
-              picker: {
-                selected: Math.min(
-                  Math.min(
-                    prev.picker?.matches.length ?? 0,
-                    prev.maxSuggestions
-                  ) - 1,
-                  (prev.picker?.selected ?? 0) + 1
-                ),
-              },
-            }));
-            renderer.render();
+            this.fieldState.picker = {
+              ...this.fieldState.picker,
+              selected: Math.min(
+                Math.min(
+                  this.fieldState.picker.matches.length,
+                  this.fieldState.maxSuggestions
+                ) - 1,
+                this.fieldState.picker.selected + 1
+              ),
+            };
+            this.syncInputField();
           }
           return;
         case KeyType.ESCAPE:
           {
             this.cancelPicker();
-            renderer.render();
+            this.syncInputField();
           }
           return;
         default:
           if (
             keyType === KeyType.TAB ||
-            (keyType === KeyType.RETURN && state.picker.matches.length)
+            (keyType === KeyType.RETURN &&
+              this.fieldState.picker.matches.length)
           ) {
             this.commitPicker();
-            renderer.render();
+            this.syncInputField();
             return;
           }
       }
@@ -192,83 +238,81 @@ export class InputHandler {
 
     switch (keyType) {
       case KeyType.RETURN: {
-        const line = renderer.state.buffer;
+        const line = this.fieldState.buffer;
 
-        renderer.setState({
-          buffer: '',
-          cursor: 0,
-          picker: null,
-          lastRenderedLines: 1,
-        });
+        this.fieldState.buffer = '';
+        this.fieldState.cursor = 0;
+        this.fieldState.picker = null;
+
         await this.handleSubmit(line);
-        renderer.render();
+        this.syncInputField();
         return;
       }
       case KeyType.BACKSPACE: {
-        if (renderer.state.cursor > 0) {
-          renderer.setState(prev => ({
-            buffer:
-              prev.buffer.slice(0, prev.cursor - 1) +
-              prev.buffer.slice(prev.cursor),
-            cursor: prev.cursor - 1,
-          }));
+        if (this.fieldState.cursor > 0) {
+          this.fieldState.buffer =
+            this.fieldState.buffer.slice(0, this.fieldState.cursor - 1) +
+            this.fieldState.buffer.slice(this.fieldState.cursor);
+          this.fieldState.cursor -= 1;
 
-          if (state.picker && state.cursor <= state.picker.triggerIndex) {
+          if (
+            this.fieldState.picker &&
+            this.fieldState.cursor <= this.fieldState.picker.triggerIndex
+          ) {
             this.cancelPicker();
           } else {
             this.updatePicker();
           }
         }
-        renderer.render();
+        this.syncInputField();
         return;
       }
       case KeyType.LEFT: {
-        if (state.cursor > 0) {
-          renderer.setState(prev => ({ cursor: prev.cursor - 1 }));
+        if (this.fieldState.cursor > 0) {
+          this.fieldState.cursor -= 1;
         }
-        if (state.picker && state.cursor <= state.picker.triggerIndex) {
+        if (
+          this.fieldState.picker &&
+          this.fieldState.cursor <= this.fieldState.picker.triggerIndex
+        ) {
           this.cancelPicker();
         } else {
           this.updatePicker();
         }
-        renderer.render();
+        this.syncInputField();
         return;
       }
       case KeyType.RIGHT: {
-        if (state.cursor < state.buffer.length) {
-          renderer.setState(prev => ({ cursor: prev.cursor + 1 }));
+        if (this.fieldState.cursor < this.fieldState.buffer.length) {
+          this.fieldState.cursor += 1;
         }
         this.updatePicker();
-        renderer.render();
+        this.syncInputField();
         return;
       }
       case KeyType.HOME: {
-        renderer.setState({ cursor: 0 });
+        this.fieldState.cursor = 0;
         this.cancelPicker();
-        renderer.render();
+        this.syncInputField();
         return;
       }
       case KeyType.END: {
-        renderer.setState(prev => ({
-          cursor: prev.buffer.length,
-        }));
-        renderer.render();
+        this.fieldState.cursor = this.fieldState.buffer.length;
+        this.syncInputField();
         return;
       }
     }
 
     if (str && !key.ctrl && !key.meta && str.length === 1 && str >= ' ') {
-      renderer.setState(prev => ({
-        buffer:
-          prev.buffer.slice(0, prev.cursor) +
-          str +
-          prev.buffer.slice(prev.cursor),
-        cursor: prev.cursor + 1,
-      }));
+      this.fieldState.buffer =
+        this.fieldState.buffer.slice(0, this.fieldState.cursor) +
+        str +
+        this.fieldState.buffer.slice(this.fieldState.cursor);
+      this.fieldState.cursor += 1;
 
-      if (str === '@' && !state.picker) {
+      if (str === '@' && !this.fieldState.picker) {
         await this.startPicker();
-      } else if (state.picker) {
+      } else if (this.fieldState.picker) {
         if (str === ' ') {
           this.cancelPicker();
         } else {
@@ -276,33 +320,33 @@ export class InputHandler {
         }
       }
 
-      renderer.render();
+      this.syncInputField();
       return;
     }
   }
 
   private updatePicker(): void {
-    const { renderer, fileSelector } = this.context;
-    const { picker, buffer, cursor } = renderer.state;
-
+    const { fileSelector } = this.context;
+    const picker = this.fieldState.picker;
     if (!picker) return;
 
-    const query = buffer.slice(picker.triggerIndex + 1, cursor);
+    const query = this.fieldState.buffer.slice(
+      picker.triggerIndex + 1,
+      this.fieldState.cursor
+    );
 
-    renderer.setState({
-      picker: {
-        query,
-        matches: fileSelector.filter(query),
-      },
-    });
+    const matches = fileSelector.filter(query);
+    const selected =
+      picker.selected >= matches.length
+        ? Math.max(0, matches.length - 1)
+        : picker.selected;
 
-    if (picker.selected >= picker.matches.length) {
-      renderer.setState(prev => ({
-        picker: {
-          selected: Math.max(0, (prev.picker?.matches.length ?? 0) - 1),
-        },
-      }));
-    }
+    this.fieldState.picker = {
+      ...picker,
+      query,
+      matches,
+      selected,
+    };
   }
 
   /**
@@ -335,7 +379,6 @@ export class InputHandler {
   }
 
   private async handleSubmit(line: string): Promise<void> {
-    stdout.write('\n');
     const trimmed = line.trim();
     if (!trimmed) return;
 
@@ -347,7 +390,7 @@ export class InputHandler {
     const refsLine = mentionedLocalFilePaths.length
       ? `\n\n${mentionedLocalFilePaths.map(p => chalk.cyan(`@${p}`)).join(', ')}`
       : '';
-    stdout.write(
+    this.context.shellBuffer.pushText(
       `${chalk.bold('you ') + chalk.dim('▸ ') + trimmed + refsLine}\n`
     );
 

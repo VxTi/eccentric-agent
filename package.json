@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "lint": "npx eslint --fix \"./src\"",
+    "lint": "eslint --fix \"./src/**/*.ts\"",
+    "lint:ci": "eslint --fix \"./src/**/*.ts\" --max-warnings 0",
+    "check:types": "tsc --noEmit",
     "start": "npx ts-node ./src/main.ts",
     "build": "esbuild ./src/main.ts --bundle --packages=external --minify --platform=node --format=esm --outfile=./dist/index.js"
   },
