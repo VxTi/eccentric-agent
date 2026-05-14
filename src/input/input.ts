@@ -187,7 +187,7 @@ export class InputHandler {
 
     if (key.ctrl && key.name === KeyType.KEY_C) {
       this.context.shellBuffer.dispose();
-      process.exit('SIGTERM');
+      process.exit(0);
     }
 
     if (this.fieldState.picker) {

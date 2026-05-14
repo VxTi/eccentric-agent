@@ -125,7 +125,7 @@ export class ShellBuffer {
     this.outputStream.write(out);
 
     if (this.inputField) {
-      const cursorPos = this.computeCursorPosition();
+      const cursorPos: Cursor = this.computeCursorPosition();
       this.outputStream.write(`\x1b[${cursorPos.row};${cursorPos.col}H`);
     }
   }
@@ -144,7 +144,8 @@ export class ShellBuffer {
       .padEnd(innerWidth)
       .slice(0, innerWidth);
 
-    const inputLine = `${padding}${GRAY_BG} ${rawText} ${RESET_ANSI}`;
+    const emptyLine = `${padding + GRAY_BG + ' '.repeat(boxWidth) + RESET_ANSI}\n`;
+    const inputLine = `${emptyLine}${padding}${GRAY_BG} ${rawText} ${RESET_ANSI}\n${emptyLine}`;
 
     const pickerLines = (this.inputField.pickerLines ?? []).map(line => {
       const visibleLen = stripAnsi(line).length;
@@ -156,7 +157,7 @@ export class ShellBuffer {
     return [...pickerLines, inputLine];
   }
 
-  private computeCursorPosition(): { row: number; col: number } {
+  private computeCursorPosition(): Cursor {
     const { width, height } = this.dimensions;
     const boxWidth = Math.max(8, Math.floor(width * 0.8));
     const leftPad = Math.max(0, Math.floor((width - boxWidth) / 2));
@@ -166,7 +167,7 @@ export class ShellBuffer {
 
     // 1-indexed; +1 to skip the left gray-bg space margin
     const col = leftPad + 1 + 1 + prefixLen + cursor;
-    const row = height;
+    const row = height - 2;
     return { row, col };
   }
 
@@ -266,6 +267,11 @@ function newlineChar(): string {
 
 function stripAnsi(text: string): string {
   return text.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
+interface Cursor {
+  row: number;
+  col: number;
 }
 
 export type TextColor =

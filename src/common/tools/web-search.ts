@@ -80,13 +80,18 @@ export default class WebSearchTool extends ToolBase<Input, Output> {
   }
 
   public override inputToString(input: Input): string {
-    return `Searching the web for \`${input.query}\`${!input.region || input.region === 'wt-wt' ? '' : `in region \`${input.region}\``}`;
+    return `Searching the web for \`${input.query}\`${!input.region || input.region === 'wt-wt' ? '' : ` in region \`${this.getCountryName(input.region)}\``}`;
   }
 
   public override outputToString(output: Output): string {
     const { query, results } = output;
 
     return `\`${query}\` returned \`${results.length} result${results.length > 1 ? 's' : ''}\``;
+  }
+
+  private getCountryName(locale: string) {
+    const countryCode = locale.split('-')[1].toUpperCase();
+    return new Intl.DisplayNames(['en'], { type: 'region' }).of(countryCode);
   }
 }
 

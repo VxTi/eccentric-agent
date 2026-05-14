@@ -27,15 +27,12 @@ process.on('SIGINT', () => {
 
 process.on('SIGTERM', () => abortController.abort());
 
-main()
-  .catch(err => {
-    if (err instanceof Error && err.name === 'ExitPromptError') {
-      io.outputStream.write(chalk.yellow('Goodbye.'));
-    }
+main().catch(err => {
+  if (err instanceof Error && err.name === 'ExitPromptError') {
+    io.outputStream.write(chalk.yellow('Goodbye.'));
+  }
 
-    io.outputStream.write(`\n${chalk.red(String(err))}\n`);
-    process.exit(1);
-  })
-  .finally(() => {
-    abortController.abort();
-  });
+  io.outputStream.write(`\n${chalk.red(String(err))}\n`);
+  abortController.abort();
+  process.exit(1);
+});

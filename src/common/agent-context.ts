@@ -60,7 +60,9 @@ export class AgentContext extends EventEmitter {
     this.shellBuffer = new ShellBuffer(io.outputStream);
     this.shellBuffer.push(
       textBlock({
-        content: `${chalk.bold('Eccentric Agent')}${chalk.dim(' — type @ for files, Ctrl+C to exit\n\n')}`,
+        content: `${chalk.blue('◆')} ${chalk.bold('Eccentric Agent')}${chalk.dim(
+          ' — type @ for files, Ctrl+C to' + ' exit\n\n'
+        )}`,
         align: 'center',
       })
     );
@@ -165,7 +167,7 @@ export class AgentContext extends EventEmitter {
 
     let buffer = '';
     const spinner = ora({
-      text: 'thinking…',
+      text: 'thinking…\n\n',
       spinner: 'dots',
       stream: this.shellBuffer.outputStream,
     }).start();
@@ -174,11 +176,6 @@ export class AgentContext extends EventEmitter {
     const result = streamText({
       allowSystemInMessages: true,
       abortSignal: this.abortController.signal,
-      providerOptions: {
-        openai: {
-          reasoningEffort: 'low',
-        },
-      },
       model: this._model,
       messages,
       tools: this._tools,
@@ -198,7 +195,7 @@ export class AgentContext extends EventEmitter {
 
     if (buffer.length > 0) {
       this.shellBuffer.pushText(
-        `${chalk.green('◆ ') + formatMarkdown(buffer)}\n`
+        `${chalk.blue('◆ ') + formatMarkdown(buffer)}\n`
       );
     }
 
