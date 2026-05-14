@@ -247,6 +247,7 @@ export class InputHandler {
         this.fieldState.buffer = '';
         this.fieldState.cursor = 0;
         this.fieldState.picker = null;
+        this.syncInputField();
 
         await this.handleSubmit(line);
         this.syncInputField();

@@ -11,7 +11,6 @@ import {
 import chalk from 'chalk';
 import { glob } from 'node:fs/promises';
 
-import ora from 'ora';
 import { createFileSelector, type FileSelector } from '../file-selector';
 import { InputHandler } from '../input/input';
 import { textBlock } from '../rendering/fragments';
@@ -174,11 +173,7 @@ export class AgentContext {
     }
 
     let buffer = '';
-    const spinner = ora({
-      text: 'thinking…\n\n',
-      spinner: 'dots',
-      stream: this.shellBuffer.outputStream,
-    }).start();
+    this.shellBuffer.setStatus('thinking…');
     this.isStreaming = true;
 
     const result = streamText({
@@ -198,7 +193,7 @@ export class AgentContext {
       this.shellBuffer.pushText(chalk.red(`Stream error: ${String(err)}\n`));
     } finally {
       this.isStreaming = false;
-      spinner.stop();
+      this.shellBuffer.setStatus(null);
     }
 
     if (buffer.length > 0) {

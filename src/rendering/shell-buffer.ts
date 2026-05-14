@@ -25,12 +25,18 @@ const ANSI_SCREEN_EXIT = '\x1b[?1049l';
 const ANSI_CLEAR_HOME = '\x1b[H\x1b[2J';
 const GRAY_BG = '\x1b[100m';
 
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+const SPINNER_INTERVAL_MS = 80;
+
 export class ShellBuffer {
   public dimensions: Dimensions;
   private fragments: BufferFragments[];
   private offset: number;
   private lines: BufferLine[];
   private inputField: InputFieldState | null;
+  private status: string | null;
+  private spinnerFrame: number;
+  private spinnerTimer: NodeJS.Timeout | null;
 
   public readonly outputStream: WriteStream;
 
@@ -40,6 +46,9 @@ export class ShellBuffer {
     this.lines = [];
     this.offset = 0;
     this.inputField = null;
+    this.status = null;
+    this.spinnerFrame = 0;
+    this.spinnerTimer = null;
     this.dimensions = {
       width: outputStream.columns ?? 80,
       height: outputStream.rows ?? 24,
@@ -73,6 +82,28 @@ export class ShellBuffer {
     this.draw();
   }
 
+  /**
+   * Sets an ephemeral status line (e.g. "thinking…") that renders just above
+   * the input field. Pass `null` to clear. Drives an internal spinner so the
+   * caller does not have to manage an external ora instance, which would
+   * otherwise stomp on the input field's position.
+   */
+  public setStatus(text: string | null): void {
+    this.status = text;
+    if (text) {
+      if (!this.spinnerTimer) {
+        this.spinnerTimer = setInterval(() => {
+          this.spinnerFrame = (this.spinnerFrame + 1) % SPINNER_FRAMES.length;
+          this.draw();
+        }, SPINNER_INTERVAL_MS);
+      }
+    } else if (this.spinnerTimer) {
+      clearInterval(this.spinnerTimer);
+      this.spinnerTimer = null;
+    }
+    this.draw();
+  }
+
   public get heightOffset(): number {
     return this.offset;
   }
@@ -90,19 +121,36 @@ export class ShellBuffer {
   }
 
   public dispose(): void {
+    if (this.spinnerTimer) {
+      clearInterval(this.spinnerTimer);
+      this.spinnerTimer = null;
+    }
     this.outputStream.write(ANSI_SCREEN_EXIT);
   }
 
+  private contentBox(): { width: number; leftPad: number } {
+    const { width } = this.dimensions;
+    const boxWidth = Math.max(8, Math.floor(width * 0.8));
+    const leftPad = Math.max(0, Math.floor((width - boxWidth) / 2));
+    return { width: boxWidth, leftPad };
+  }
+
   /**
-   * Renders the buffer + input box to the output stream. Performs a full
-   * screen redraw so callers can safely re-invoke after any state change.
+   * Renders the buffer + status line + input box to the output stream.
+   * Performs a full screen redraw so callers can safely re-invoke after any
+   * state change.
    */
   public draw(): void {
     const { width, height } = this.dimensions;
     if (width <= 0 || height <= 0) return;
 
+    const { leftPad } = this.contentBox();
+    const padding = ' '.repeat(leftPad);
+
     const inputBlock = this.renderInputBlock();
-    const historyHeight = Math.max(0, height - inputBlock.length);
+    const statusBlock = this.renderStatusBlock();
+    const reservedHeight = inputBlock.length + statusBlock.length;
+    const historyHeight = Math.max(0, height - reservedHeight);
 
     const totalLines = this.lines.length;
     const sliceStart = Math.max(0, totalLines - historyHeight - this.offset);
@@ -118,7 +166,12 @@ export class ShellBuffer {
     }
 
     if (visible.length > 0) {
-      out += visible.map(l => l.computed).join(newlineChar());
+      out += visible.map(l => padding + l.computed).join(newlineChar());
+      out += newlineChar();
+    }
+
+    if (statusBlock.length > 0) {
+      out += statusBlock.join(newlineChar());
       out += newlineChar();
     }
 
@@ -134,12 +187,18 @@ export class ShellBuffer {
     }
   }
 
+  private renderStatusBlock(): string[] {
+    if (!this.status) return [];
+    const { leftPad } = this.contentBox();
+    const padding = ' '.repeat(leftPad);
+    const frame = SPINNER_FRAMES[this.spinnerFrame];
+    return [`${padding}\x1b[36m${frame}\x1b[0m ${this.status}`];
+  }
+
   private renderInputBlock(): string[] {
     if (!this.inputField) return [];
 
-    const { width } = this.dimensions;
-    const boxWidth = Math.max(8, Math.floor(width * 0.8));
-    const leftPad = Math.max(0, Math.floor((width - boxWidth) / 2));
+    const { width: boxWidth, leftPad } = this.contentBox();
     const padding = ' '.repeat(leftPad);
 
     const prefix = this.inputField.prefix ?? '';
@@ -148,8 +207,8 @@ export class ShellBuffer {
       .padEnd(innerWidth)
       .slice(0, innerWidth);
 
-    const emptyLine = `${padding + GRAY_BG + ' '.repeat(boxWidth) + RESET_ANSI}\n`;
-    const inputLine = `${emptyLine}${padding}${GRAY_BG} ${rawText} ${RESET_ANSI}\n${emptyLine}`;
+    const emptyLine = `${padding + GRAY_BG + ' '.repeat(boxWidth) + RESET_ANSI}`;
+    const inputLine = `${emptyLine}\n${padding}${GRAY_BG} ${rawText} ${RESET_ANSI}\n${emptyLine}`;
 
     const pickerLines = (this.inputField.pickerLines ?? []).map(line => {
       const visibleLen = stripAnsi(line).length;
@@ -162,16 +221,15 @@ export class ShellBuffer {
   }
 
   private computeCursorPosition(): Cursor {
-    const { width, height } = this.dimensions;
-    const boxWidth = Math.max(8, Math.floor(width * 0.8));
-    const leftPad = Math.max(0, Math.floor((width - boxWidth) / 2));
+    const { height } = this.dimensions;
+    const { leftPad } = this.contentBox();
 
     const prefixLen = (this.inputField?.prefix ?? '').length;
     const cursor = this.inputField?.cursor ?? 0;
 
     // 1-indexed; +1 to skip the left gray-bg space margin
     const col = leftPad + 1 + 1 + prefixLen + cursor;
-    const row = height - 2;
+    const row = height - 1;
     return { row, col };
   }
 
@@ -199,15 +257,17 @@ export class ShellBuffer {
   }
 
   private appendTextBlock(block: TextBlockFragment): void {
-    const { width } = this.dimensions;
+    const { width: contentWidth } = this.contentBox();
     const { content, align } = block;
 
     content
       .split('\n')
       .flatMap(line => {
-        if (line.length <= width) return line;
+        if (line.length <= contentWidth) return line;
 
-        const chunks = line.match(new RegExp(`[\\s\\S]{1,${width}}`, 'g'));
+        const chunks = line.match(
+          new RegExp(`[\\s\\S]{1,${contentWidth}}`, 'g')
+        );
         return chunks ?? line;
       })
       .forEach(line => {
@@ -220,17 +280,17 @@ export class ShellBuffer {
   }
 
   private alignText(text: string, align: TextAlignment): string {
-    const { width } = this.dimensions;
+    const { width: contentWidth } = this.contentBox();
     if (align === 'left') return text;
 
     const visibleLen = stripAnsi(text).length;
-    if (visibleLen >= width) return text;
+    if (visibleLen >= contentWidth) return text;
 
     if (align === 'right') {
-      return ' '.repeat(width - visibleLen) + text;
+      return ' '.repeat(contentWidth - visibleLen) + text;
     }
 
-    const sidePaddingCount = Math.floor((width - visibleLen) / 2);
+    const sidePaddingCount = Math.floor((contentWidth - visibleLen) / 2);
     const sidePadding = ' '.repeat(sidePaddingCount);
     return `${sidePadding}${text}${sidePadding}`;
   }
@@ -248,10 +308,11 @@ export class ShellBuffer {
     const computedContent = `${computedColor}${computedBackground}${computedStyle}${content}${RESET_ANSI}`;
 
     const lastLine: BufferLine | undefined = this.lines.at(-1);
+    const { width: contentWidth } = this.contentBox();
 
     if (
       lastLine !== undefined &&
-      lastLine.raw.length + content.length < this.dimensions.width
+      lastLine.raw.length + content.length < contentWidth
     ) {
       lastLine.raw += content;
       lastLine.computed += computedContent;
