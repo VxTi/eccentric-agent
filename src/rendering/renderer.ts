@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { stdout } from 'node:process';
 import { type WriteStream } from 'node:tty';
-import { type AgentContext } from './common/AgentContext';
+import { type AgentContext } from '../common/AgentContext';
 
 interface PickerState {
   triggerIndex: number;

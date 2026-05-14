@@ -12,7 +12,7 @@ import { EventEmitter } from 'node:events';
 import ora from 'ora';
 import { createFileSelector, type FileSelector } from '../file-selector';
 import { InputHandler } from '../input/input';
-import { RendererInstance } from '../renderer';
+import { RendererInstance } from '../rendering/renderer';
 import { previewArgs, formatMarkdown } from './formatting';
 import { type ToolBase, ToolSelectionOption } from './tools';
 import { allTools } from './tools/registry';
@@ -66,7 +66,7 @@ export class AgentContext extends EventEmitter {
 
   constructor() {
     super();
-    const MODEL_ID = process.env.OPENAI_MODEL ?? 'gpt-5-mini';
+    const MODEL_ID = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
     this._model = openai(MODEL_ID);
     this.cwd = process.cwd();
     this._isStreaming = false;
@@ -179,7 +179,9 @@ export class AgentContext extends EventEmitter {
     for (const update of updates) {
       const task = this._taskList.find(t => t.id === update.id);
       if (!task) {
-        throw new Error(`No task with id "${update.id}" exists in the task list.`);
+        throw new Error(
+          `No task with id "${update.id}" exists in the task list.`
+        );
       }
       task.status = update.status;
     }
