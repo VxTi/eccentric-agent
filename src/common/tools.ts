@@ -1,5 +1,5 @@
 import type * as z from 'zod';
-import { type AgentContext } from './AgentContext';
+import { type AgentContext } from './agent-context';
 import type { ApprovalOption, MaybePromise } from './types';
 
 export const DEFAULT_APPROVAL_OPTIONS: ApprovalOption[] = [

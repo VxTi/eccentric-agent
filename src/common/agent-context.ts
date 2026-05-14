@@ -4,6 +4,7 @@ import {
   type ModelMessage,
   stepCountIs,
   streamText,
+  type Tool,
   tool as createTool,
   type ToolSet,
 } from 'ai';
@@ -14,6 +15,7 @@ import { createFileSelector, type FileSelector } from '../file-selector';
 import { InputHandler } from '../input/input';
 import { ShellBuffer, textBlock } from '../rendering/shell-buffer';
 import { previewArgs, formatMarkdown } from '../rendering/formatting';
+import { TaskList } from './task-list';
 import { type ToolBase, ToolSelectionOption } from './tools';
 import { allTools } from './tools/registry';
 import { type IO, type UserInputQueue, type UserInputRequest } from './types';
@@ -35,19 +37,6 @@ export interface ManagedUserInputQueue extends UserInputQueue {
   size(): number;
 }
 
-export type TaskStatus = 'pending' | 'in_progress' | 'completed';
-
-export interface Task {
-  id: string;
-  description: string;
-  status: TaskStatus;
-}
-
-export interface TaskUpdate {
-  id: string;
-  status: TaskStatus;
-}
-
 const MAX_TASK_CONTINUATION_TURNS = 10;
 
 export class AgentContext extends EventEmitter {
@@ -57,7 +46,9 @@ export class AgentContext extends EventEmitter {
   private _systemMessageFragments: string[];
   private _messageQueue: string[];
   private _isStreaming: boolean;
-  private _taskList: Task[] | null;
+
+  public taskList: TaskList;
+  public abortController: AbortController;
 
   public readonly cwd: string;
   public readonly shellBuffer: ShellBuffer;
@@ -73,15 +64,16 @@ export class AgentContext extends EventEmitter {
    */
   public readonly fileModificationCache: Map<string, number> = new Map();
 
-  constructor(io: IO) {
+  constructor(io: IO, abortController: AbortController) {
     super();
+    this.abortController = abortController;
     const MODEL_ID = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
     this._model = openai(MODEL_ID);
     this.cwd = process.cwd();
     this._isStreaming = false;
     this._messageQueue = [];
     this._messages = [];
-    this._taskList = null;
+    this.taskList = new TaskList();
     this._systemMessageFragments = this.constructInitialSystemPromptFragments();
 
     this.shellBuffer = new ShellBuffer(io.outputStream);
@@ -95,7 +87,7 @@ export class AgentContext extends EventEmitter {
     this.inputHandler = new InputHandler(this, io.inputStream);
     this.fileSelector = createFileSelector(this);
 
-    this._tools = this.buildAiTools();
+    this._tools = this.constructToolset();
   }
 
   // eslint-disable-next-line
@@ -122,31 +114,35 @@ export class AgentContext extends EventEmitter {
         ...this._messages,
       ]);
 
-      let continuations = 0;
-      while (
-        this._messageQueue.length === 0 &&
-        this.hasIncompleteTasks() &&
-        continuations < MAX_TASK_CONTINUATION_TURNS
-      ) {
-        continuations += 1;
-        this._messages.push({
-          content:
-            'The task list still has incomplete tasks. Continue working on the' +
-            ' next pending or in-progress task and update the task list as you' +
-            ' make progress. Do not wait for further user input.',
-          role: 'user',
-        });
-
-        await this.makeRequest([
-          {
-            content: this.composeSystemPrompt(),
-            role: 'system',
-          },
-          ...this._messages,
-        ]);
-      }
+      await this.pollTaskCompletion();
     }
     return this;
+  }
+
+  private async pollTaskCompletion() {
+    let continuations = 0;
+    while (
+      this._messageQueue.length === 0 &&
+      this.taskList.hasIncompleteTasks() &&
+      continuations < MAX_TASK_CONTINUATION_TURNS
+    ) {
+      continuations += 1;
+      this._messages.push({
+        content:
+          'The task list still has incomplete tasks. Continue working on the' +
+          ' next pending or in-progress task and update the task list as you' +
+          ' make progress. Do not wait for further user input.',
+        role: 'user',
+      });
+
+      await this.makeRequest([
+        {
+          content: this.composeSystemPrompt(),
+          role: 'system',
+        },
+        ...this._messages,
+      ]);
+    }
   }
 
   private composeSystemPrompt(): string {
@@ -157,9 +153,9 @@ export class AgentContext extends EventEmitter {
   }
 
   private renderTaskListFragment(): string | null {
-    if (!this._taskList || this._taskList.length === 0) return null;
+    if (!this.taskList.hasTasks) return null;
 
-    const lines = this._taskList.map(task => {
+    const lines = this.taskList.tasks.map(task => {
       const marker =
         task.status === 'completed'
           ? '[x]'
@@ -176,42 +172,6 @@ export class AgentContext extends EventEmitter {
         ' Use `update_task_list` to mark tasks "in_progress" before starting' +
         ' and "completed" when done. Only stop once every task is completed.',
     ].join('\n');
-  }
-
-  public getTaskList(): Task[] | null {
-    return this._taskList ? this._taskList.map(task => ({ ...task })) : null;
-  }
-
-  public setTaskList(tasks: Task[]): Task[] {
-    this._taskList = tasks.map(task => ({ ...task }));
-    return this.getTaskList()!;
-  }
-
-  public updateTasks(updates: TaskUpdate[]): Task[] {
-    if (!this._taskList) {
-      throw new Error('No task list exists.');
-    }
-
-    for (const update of updates) {
-      const task = this._taskList.find(t => t.id === update.id);
-      if (!task) {
-        throw new Error(
-          `No task with id "${update.id}" exists in the task list.`
-        );
-      }
-      task.status = update.status;
-    }
-
-    return this.getTaskList()!;
-  }
-
-  public clearTaskList(): void {
-    this._taskList = null;
-  }
-
-  public hasIncompleteTasks(): boolean {
-    if (!this._taskList || this._taskList.length === 0) return false;
-    return this._taskList.some(task => task.status !== 'completed');
   }
 
   private async makeRequest(messages: ModelMessage[]) {
@@ -232,6 +192,7 @@ export class AgentContext extends EventEmitter {
 
     const result = streamText({
       allowSystemInMessages: true,
+      abortSignal: this.abortController.signal,
       providerOptions: {
         openai: {
           reasoningEffort: 'low',
@@ -312,70 +273,70 @@ export class AgentContext extends EventEmitter {
     };
   }
 
-  private buildAiTools(): ToolSet {
+  private constructToolset(): ToolSet {
     return Object.fromEntries(
-      allTools.map((tool: ToolBase) => {
-        const constructedTool = createTool({
-          description: tool.description,
-          inputSchema: tool.inputSchema,
-          execute: async (input: unknown) => {
-            const processed: unknown = await tool.inputSchema.parse(input);
-            const needsApproval = await tool.requiresApproval(processed, this);
-
-            if (needsApproval) {
-              const options = await tool.approvalOptions(processed, this);
-              const prompt = `tool "${tool.internalName}" requires approval — args: ${previewArgs(input)}`;
-
-              const chosen = await this.inputHandler.inputQueue.request({
-                toolName: tool.internalName,
-                prompt,
-                options,
-              });
-              const selectionOption = await tool.onOptionSelect(
-                processed,
-                chosen,
-                this
-              );
-
-              if (selectionOption !== ToolSelectionOption.ALLOW) {
-                return {
-                  error: `User denied permission to run tool "${tool.internalName}".`,
-                };
-              }
-            }
-
-            this.shellBuffer.pushText(
-              `${formatMarkdown(tool.inputToString(processed))}\n`
-            );
-
-            let output: unknown;
-            try {
-              output = await tool.handle(processed, this);
-            } catch (err) {
-              const message = `Tool "${tool.internalName}" failed: ${String(err)}`;
-              this.shellBuffer.pushText(chalk.red(`${message}\n`));
-              return { error: message, ok: false };
-            }
-
-            const parsed = await tool.outputSchema.safeParseAsync(output);
-
-            if (!parsed.success) {
-              const message = `Tool "${tool.internalName}" returned an unexpected shape: ${String(parsed.error)}`;
-              this.shellBuffer.pushText(chalk.red(`${message}\n`));
-              return { error: message, ok: false, raw: output };
-            }
-
-            this.shellBuffer.pushText(
-              `${formatMarkdown(tool.outputToString(parsed.data))}\n`
-            );
-
-            return parsed.data;
-          },
-        });
-
-        return [tool.internalName, constructedTool];
-      })
+      allTools.map(tool => [tool.internalName, this.constructTool(tool)])
     );
+  }
+
+  private constructTool(tool: ToolBase): Tool {
+    return createTool({
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+      execute: async (input: unknown) => {
+        const processed: unknown = await tool.inputSchema.parse(input);
+        const needsApproval = await tool.requiresApproval(processed, this);
+
+        if (needsApproval) {
+          const options = await tool.approvalOptions(processed, this);
+          const prompt = `tool "${tool.internalName}" requires approval — args: ${previewArgs(input)}`;
+
+          const chosen = await this.inputHandler.inputQueue.request({
+            toolName: tool.internalName,
+            prompt,
+            options,
+          });
+          const selectionOption = await tool.onOptionSelect(
+            processed,
+            chosen,
+            this
+          );
+
+          if (selectionOption !== ToolSelectionOption.ALLOW) {
+            return {
+              error: `User denied permission to run tool "${tool.internalName}".`,
+            };
+          }
+        }
+
+        this.shellBuffer.pushText(
+          `${formatMarkdown(tool.inputToString(processed))}\n`
+        );
+
+        let output: unknown;
+        try {
+          output = await tool.handle(processed, this);
+        } catch (err) {
+          const message = `Tool "${tool.internalName}" failed: ${String(err)}`;
+          this.shellBuffer.pushText(chalk.red(`${message}\n`));
+          return { error: message, ok: false };
+        }
+
+        const parsed = await tool.outputSchema.safeParseAsync(output);
+
+        if (!parsed.success) {
+          const message = `Tool "${tool.internalName}" returned an unexpected shape: ${String(parsed.error)}`;
+          this.shellBuffer.pushText(chalk.red(`${message}\n`));
+          return { error: message, ok: false, raw: output };
+        }
+
+        this.shellBuffer.pushText(
+          `${formatMarkdown(tool.outputToString(parsed.data))}\n`
+        );
+
+        return parsed.data;
+      },
+    });
   }
 
   private constructInitialSystemPromptFragments(): string[] {

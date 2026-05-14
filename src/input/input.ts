@@ -7,7 +7,7 @@ import {
   type AgentContext,
   type DequeuedRequest,
   type ManagedUserInputQueue,
-} from '../common/AgentContext';
+} from '../common/agent-context';
 import { type LocalFile } from '../file-selector';
 import { type KeyEvent, KeyType } from './key-event';
 

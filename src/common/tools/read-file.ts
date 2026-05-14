@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { z } from 'zod';
 import { ToolBase } from '../tools';
-import { type AgentContext } from '../AgentContext';
+import { type AgentContext } from '../agent-context';
 
 export default class ReadFileTool extends ToolBase<Input, Output> {
   constructor() {

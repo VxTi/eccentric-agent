@@ -1,6 +1,6 @@
 import { glob } from 'glob';
 import { readFile } from 'node:fs/promises';
-import { type AgentContext } from './common/AgentContext';
+import { type AgentContext } from './common/agent-context';
 
 export type LocalFile =
   | { path: string; content: string; error?: undefined }

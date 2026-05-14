@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { type AgentContext } from '../AgentContext';
+import { type AgentContext } from '../agent-context';
 import { ToolBase } from '../tools';
 
 export default class CreateTaskListTool extends ToolBase<Input, Output> {
@@ -30,7 +30,7 @@ export default class CreateTaskListTool extends ToolBase<Input, Output> {
       status: 'pending' as const,
     }));
 
-    context.setTaskList(tasks);
+    context.taskList.set(tasks);
 
     return Promise.resolve({ tasks });
   }

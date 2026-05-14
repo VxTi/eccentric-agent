@@ -2,7 +2,7 @@ import { z } from 'zod';
 import * as path from 'node:path';
 import { readFile, stat, writeFile } from 'fs/promises';
 import { ToolBase } from '../tools';
-import { type AgentContext } from '../AgentContext';
+import { type AgentContext } from '../agent-context';
 
 export default class InsertInFileTool extends ToolBase<Input, Output> {
   constructor() {
