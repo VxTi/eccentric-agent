@@ -20,25 +20,6 @@ import { type ToolBase, ToolSelectionOption } from './tools';
 import { allTools } from './tools/registry';
 import { type IO, type UserInputQueue, type UserInputRequest } from './types';
 
-interface PendingRequest {
-  request: UserInputRequest;
-  resolve: (option: string) => void;
-}
-
-export interface DequeuedRequest extends UserInputRequest {
-  resolve: (option: string) => void;
-}
-
-export interface ManagedUserInputQueue extends UserInputQueue {
-  /**
-   * Pops the next pending request, awaiting until one is enqueued.
-   */
-  next(): Promise<DequeuedRequest>;
-  size(): number;
-}
-
-const MAX_TASK_CONTINUATION_TURNS = 10;
-
 export class AgentContext extends EventEmitter {
   private readonly _tools: ToolSet;
   private readonly _model: LanguageModel;
@@ -346,3 +327,22 @@ export class AgentContext extends EventEmitter {
     ];
   }
 }
+
+interface PendingRequest {
+  request: UserInputRequest;
+  resolve: (option: string) => void;
+}
+
+export interface DequeuedRequest extends UserInputRequest {
+  resolve: (option: string) => void;
+}
+
+export interface ManagedUserInputQueue extends UserInputQueue {
+  /**
+   * Pops the next pending request, awaiting until one is enqueued.
+   */
+  next(): Promise<DequeuedRequest>;
+  size(): number;
+}
+
+const MAX_TASK_CONTINUATION_TURNS = 10;
