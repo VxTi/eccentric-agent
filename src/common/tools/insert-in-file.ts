@@ -1,259 +1,173 @@
 import { z } from 'zod';
+import * as path from 'node:path';
+import { readFile, stat, writeFile } from 'fs/promises';
 import { ToolBase } from '../tools';
-import { readFile, writeFile } from 'fs/promises';
+import { type AgentContext } from '../AgentContext';
 
 export default class InsertInFileTool extends ToolBase<Input, Output> {
   constructor() {
     super(
       'insert_in_file',
       'Insert in file',
-      'Applies one or more line-range edits to a file atomically. Each edit replaces lines from `startLine`' +
-        ' to `endLine` (inclusive, 1-based) with the provided `content`. To perform a pure insertion that' +
-        ' does not remove any existing lines, pass `endLine` equal to `startLine - 1`; the new content is' +
-        ' then inserted *before* `startLine`. To append at end-of-file, use `startLine = totalLines + 1` and' +
-        ' `endLine = totalLines`.\n\n' +
-        'Safety guarantees enforced by this tool:\n' +
+      'Applies one or more line-range edits to a file atomically.\n\n' +
+        'Each edit has `startLine`, `endLine` (1-based, inclusive) and `content`:\n' +
+        '  • Replace: lines [startLine, endLine] are replaced by `content` (set endLine >= startLine).\n' +
+        '  • Insert between lines: to insert *before* line N without removing anything, set' +
+        '    `startLine = N` and `endLine = N - 1`. To append at end-of-file, use' +
+        '    `startLine = totalLines + 1`, `endLine = totalLines`.\n\n' +
+        'Safety guarantees:\n' +
+        '  • The file MUST have been read via `read_file` first; this tool tracks its modification' +
+        '    time and refuses to write if the file changed on disk in the meantime.\n' +
         '  • All edits are validated up front; if ANY edit fails validation, NONE are applied.\n' +
-        '  • Edits may not overlap. Two edits collide when their replacement ranges share a line, or when a' +
-        "    pure-insertion point falls inside another edit's replacement range. Adjacent edits" +
-        '    (`prev.endLine + 1 === next.startLine`) are allowed.\n' +
-        '  • Line numbers are bounds-checked against the current file contents.\n' +
-        '  • For each edit you SHOULD pass `expectedContent` — the exact text currently occupying' +
-        "    `[startLine, endLine]` (joined by the file's newline). The tool will refuse the operation if" +
-        '    the file no longer matches, preventing edits applied to stale line numbers. `expectedContent`' +
-        '    is optional only for pure insertions (where `endLine === startLine - 1`) since they remove' +
-        '    nothing.\n' +
-        '  • When multiple edits are supplied, they are applied bottom-up so earlier line numbers remain' +
-        '    valid for later edits — provide line numbers as they appear in the file you just read; do NOT' +
-        '    pre-adjust them.\n\n' +
-        'Typical flow: locate target ranges via `find_in_file` or `read_file`, then submit them together as' +
-        ' a batch. Prefer one call with several edits over many sequential calls — it is both atomic and' +
-        ' avoids index drift between calls.',
+        '  • Edits may not overlap; adjacent edits (`prev.endLine + 1 === next.startLine`) are fine.\n' +
+        '  • For replacements you SHOULD pass `expectedContent` — the exact text currently occupying' +
+        '    `[startLine, endLine]`. If it does not match, the entire batch is rejected.\n' +
+        '  • Provide line numbers exactly as they appear in the file you read; the tool applies' +
+        '    edits bottom-up internally so you do not need to pre-adjust them.',
       inputSchema,
       outputSchema
     );
   }
 
-  public override async handle(input: Input): Promise<Output> {
-    const original = await readFile(input.filePath, 'utf-8');
-    const newlineMatch = original.match(/\r?\n/);
-    const newline = newlineMatch ? newlineMatch[0] : '\n';
+  public override async handle(
+    input: Input,
+    context: AgentContext
+  ): Promise<Output> {
+    const filePath = path.isAbsolute(input.filePath)
+      ? input.filePath
+      : path.join(context.cwd, input.filePath);
+
+    const stats = await stat(filePath);
+    const cachedMtime = context.fileModificationCache.get(filePath);
+    if (cachedMtime === undefined) {
+      throw new Error(
+        `File '${filePath}' has not been read via 'read_file' in this session.` +
+          ` Read it first so its line numbers and modification time can be verified.`
+      );
+    }
+    if (stats.mtimeMs > cachedMtime) {
+      throw new Error(
+        `File '${filePath}' was modified on disk since it was last read` +
+          ` (cached mtime ${cachedMtime}, actual ${stats.mtimeMs}).` +
+          ` Re-read it and re-submit the edits against fresh line numbers.`
+      );
+    }
+
+    const original = await readFile(filePath, 'utf-8');
+    const newline = original.match(/\r?\n/)?.[0] ?? '\n';
     const lines = original.split(/\r?\n/);
-    const totalLines = lines.length;
+    const hasTrailingNewline =
+      lines.length > 0 && lines[lines.length - 1] === '';
+    if (hasTrailingNewline) lines.pop();
 
-    const edits = this.normalizeEdits(input);
+    this.validate(input.edits, lines, newline);
+    this.assertNoOverlap(input.edits);
 
-    this.reanchorEdits(edits, lines);
-    this.validateEdits(edits, lines, totalLines);
-    this.assertNoCollisions(edits);
+    // Apply bottom-up so earlier line indices remain valid for later edits.
+    const ordered = [...input.edits].sort((a, b) => b.startLine - a.startLine);
 
-    // Apply bottom-up so earlier indices remain valid.
-    const ordered = [...edits].sort((a, b) => b.startLine - a.startLine);
-
-    let totalLinesReplaced = 0;
+    let linesReplaced = 0;
     for (const edit of ordered) {
       const startIdx = edit.startLine - 1;
       const deleteCount = Math.max(0, edit.endLine - edit.startLine + 1);
-      const insertLines = edit.content.split(/\r?\n/);
+      const insertLines =
+        edit.content.length === 0 ? [] : edit.content.split(/\r?\n/);
       lines.splice(startIdx, deleteCount, ...insertLines);
-      totalLinesReplaced += deleteCount;
+      linesReplaced += deleteCount;
     }
 
-    await writeFile(input.filePath, lines.join(newline), 'utf-8');
+    let result = lines.join(newline);
+    if (hasTrailingNewline) result += newline;
+    await writeFile(filePath, result, 'utf-8');
+
+    // Refresh the cached mtime so subsequent edits in this session remain valid.
+    const after = await stat(filePath);
+    context.fileModificationCache.set(filePath, after.mtimeMs);
 
     return {
       success: true,
-      editsApplied: edits.length,
-      linesReplaced: totalLinesReplaced,
+      editsApplied: input.edits.length,
+      linesReplaced,
       totalLines: lines.length,
     };
   }
 
-  private normalizeEdits(input: Input): NormalizedEdit[] {
-    if (input.edits && input.edits.length > 0) {
-      return input.edits.map((edit, index) => ({
-        index,
-        startLine: edit.startLine,
-        endLine: edit.endLine,
-        content: edit.content,
-        expectedContent: edit.expectedContent,
-      }));
-    }
-
-    if (
-      input.startLine !== undefined &&
-      input.endLine !== undefined &&
-      input.content !== undefined
-    ) {
-      return [
-        {
-          index: 0,
-          startLine: input.startLine,
-          endLine: input.endLine,
-          content: input.content,
-          expectedContent: input.expectedContent,
-        },
-      ];
-    }
-
-    throw new Error(
-      'No edits provided. Pass either `edits` or the single-edit fields' +
-        ' (`startLine`, `endLine`, `content`).'
-    );
-  }
-
-  /**
-   * If an edit's `expectedContent` does not match at the supplied
-   * `[startLine, endLine]`, attempt to find that exact block elsewhere in the
-   * file and silently re-anchor the edit to its true location. The model often
-   * miscounts lines by ±1; trusting the content over the line numbers makes
-   * the tool resilient to that. When there are multiple candidates we pick the
-   * one closest to the hinted `startLine`. If no candidate exists we leave the
-   * edit alone — validation will then surface a clear error.
-   */
-  private reanchorEdits(edits: NormalizedEdit[], lines: string[]): void {
-    for (const edit of edits) {
-      if (edit.expectedContent === undefined) continue;
-      const isPureInsertion = edit.endLine === edit.startLine - 1;
-      if (isPureInsertion) continue;
-
-      const expectedLines = edit.expectedContent
-        .replace(/\r\n/g, '\n')
-        .split('\n');
-      const span = expectedLines.length;
-
-      const actualSlice = lines
-        .slice(edit.startLine - 1, edit.startLine - 1 + span)
-        .join('\n');
-      if (actualSlice === expectedLines.join('\n')) continue;
-
-      const matches: number[] = [];
-      for (let i = 0; i + span <= lines.length; i += 1) {
-        let ok = true;
-        for (let j = 0; j < span; j += 1) {
-          if (lines[i + j] !== expectedLines[j]) {
-            ok = false;
-            break;
-          }
-        }
-        if (ok) matches.push(i + 1);
-      }
-
-      if (matches.length === 0) continue;
-
-      const hinted = edit.startLine;
-      const chosen = matches.reduce((best, candidate) =>
-        Math.abs(candidate - hinted) < Math.abs(best - hinted)
-          ? candidate
-          : best
-      );
-
-      edit.startLine = chosen;
-      edit.endLine = chosen + span - 1;
-    }
-  }
-
-  private validateEdits(
-    edits: NormalizedEdit[],
-    lines: string[],
-    totalLines: number,
-    newline: string = '\n'
-  ): void {
-    for (const edit of edits) {
-      const label = `edit #${edit.index}`;
+  private validate(edits: Edit[], lines: string[], newline: string): void {
+    const totalLines = lines.length;
+    for (let i = 0; i < edits.length; i += 1) {
+      const edit = edits[i];
+      const label = `edit #${i}`;
+      const isInsertion = edit.endLine === edit.startLine - 1;
 
       if (!Number.isInteger(edit.startLine) || edit.startLine < 1) {
         throw new Error(
           `${label}: startLine must be a positive integer (got ${edit.startLine}).`
         );
       }
-      if (
-        !Number.isInteger(edit.endLine) ||
-        edit.endLine < edit.startLine - 1
-      ) {
+      if (edit.endLine < edit.startLine - 1) {
         throw new Error(
           `${label}: endLine (${edit.endLine}) must be >= startLine - 1 (${edit.startLine - 1}).`
         );
       }
-
-      const isPureInsertion = edit.endLine === edit.startLine - 1;
-      const maxStart = totalLines + 1;
-      if (edit.startLine > maxStart) {
+      if (edit.startLine > totalLines + 1) {
         throw new Error(
-          `${label}: startLine ${edit.startLine} is past end-of-file (file has ${totalLines} line${totalLines === 1 ? '' : 's'}; max startLine is ${maxStart}).`
+          `${label}: startLine ${edit.startLine} is past end-of-file (file has ${totalLines} line${totalLines === 1 ? '' : 's'}).`
         );
       }
-      if (!isPureInsertion && edit.endLine > totalLines) {
+      if (!isInsertion && edit.endLine > totalLines) {
         throw new Error(
           `${label}: endLine ${edit.endLine} exceeds total lines in file (${totalLines}).`
         );
       }
 
-      if (edit.expectedContent !== undefined) {
-        const actualLines = isPureInsertion
-          ? []
-          : lines.slice(edit.startLine - 1, edit.endLine);
-        const actual = actualLines.join(newline);
-        const expectedNormalized = edit.expectedContent.replace(/\r\n/g, '\n');
-        const actualNormalized = actual.replace(/\r\n/g, '\n');
-        if (expectedNormalized !== actualNormalized) {
+      if (!isInsertion && edit.expectedContent !== undefined) {
+        const actual = lines
+          .slice(edit.startLine - 1, edit.endLine)
+          .join(newline);
+        const expected = edit.expectedContent.replace(/\r\n/g, '\n');
+        const actualNorm = actual.replace(/\r\n/g, '\n');
+        if (expected !== actualNorm) {
           throw new Error(
-            `${label}: expectedContent does not match the current file at lines` +
-              ` ${edit.startLine}-${edit.endLine}. The file likely changed since you` +
-              ` read it — re-read and submit fresh line numbers.\n` +
+            `${label}: expectedContent does not match lines ${edit.startLine}-${edit.endLine}.\n` +
               `--- expected ---\n${edit.expectedContent}\n--- actual ---\n${actual}`
           );
         }
-      } else if (!isPureInsertion) {
-        // Replacement without verification is allowed but strongly discouraged.
-        // We do not throw, but the description tells the model to provide it.
       }
     }
   }
 
-  private assertNoCollisions(edits: NormalizedEdit[]): void {
-    // Represent each edit as a half-open interval [from, to) over line numbers.
-    // Pure insertions become a zero-width interval [startLine, startLine).
-    const intervals = edits.map(edit => {
-      const isPureInsertion = edit.endLine === edit.startLine - 1;
-      const from = edit.startLine;
-      const to = isPureInsertion ? edit.startLine : edit.endLine + 1;
-      return { index: edit.index, from, to };
+  private assertNoOverlap(edits: Edit[]): void {
+    // Half-open intervals over line numbers: [from, to).
+    // Pure insertions are zero-width at `startLine`.
+    const intervals = edits.map((edit, index) => {
+      const isInsertion = edit.endLine === edit.startLine - 1;
+      return {
+        index,
+        from: edit.startLine,
+        to: isInsertion ? edit.startLine : edit.endLine + 1,
+      };
     });
-
-    const sorted = [...intervals].sort((a, b) => {
-      if (a.from !== b.from) return a.from - b.from;
-      return a.to - b.to;
-    });
+    const sorted = [...intervals].sort(
+      (a, b) => a.from - b.from || a.to - b.to
+    );
 
     for (let i = 1; i < sorted.length; i += 1) {
       const prev = sorted[i - 1];
       const curr = sorted[i];
+      const prevInsert = prev.from === prev.to;
+      const currInsert = curr.from === curr.to;
 
-      const prevIsInsertion = prev.from === prev.to;
-      const currIsInsertion = curr.from === curr.to;
-
-      // Two pure insertions at the exact same point collide (ambiguous order).
-      if (prevIsInsertion && currIsInsertion && prev.from === curr.from) {
+      if (prevInsert && currInsert && prev.from === curr.from) {
         throw new Error(
           `Edits #${prev.index} and #${curr.index} both insert at line ${prev.from}; merge them into a single edit.`
         );
       }
-
-      // A pure insertion sitting strictly inside another edit's replacement range collides.
-      if (currIsInsertion && curr.from > prev.from && curr.from < prev.to) {
+      if (currInsert && curr.from > prev.from && curr.from < prev.to) {
         throw new Error(
-          `Edit #${curr.index} inserts inside the replacement range of edit #${prev.index} (lines ${prev.from}-${prev.to - 1}).`
+          `Edit #${curr.index} inserts inside the replacement range of edit #${prev.index}.`
         );
       }
-      if (prevIsInsertion && prev.from > curr.from && prev.from < curr.to) {
-        throw new Error(
-          `Edit #${prev.index} inserts inside the replacement range of edit #${curr.index} (lines ${curr.from}-${curr.to - 1}).`
-        );
-      }
-
-      // Replacement ranges overlap when prev.to > curr.from.
-      if (!prevIsInsertion && !currIsInsertion && prev.to > curr.from) {
+      if (!prevInsert && !currInsert && prev.to > curr.from) {
         throw new Error(
           `Edits #${prev.index} (lines ${prev.from}-${prev.to - 1}) and #${curr.index} (lines ${curr.from}-${curr.to - 1}) overlap.`
         );
@@ -262,14 +176,7 @@ export default class InsertInFileTool extends ToolBase<Input, Output> {
   }
 
   public override inputToString(input: Input): string {
-    const edits = input.edits ?? [
-      {
-        startLine: input.startLine!,
-        endLine: input.endLine!,
-        content: input.content!,
-      },
-    ];
-    const ranges = edits
+    const ranges = input.edits
       .map(edit =>
         edit.endLine === edit.startLine - 1
           ? `insert before line ${edit.startLine}`
@@ -281,7 +188,6 @@ export default class InsertInFileTool extends ToolBase<Input, Output> {
 
   public override outputToString(output: Output): string {
     if (!output.success) return `Unable to insert into file`;
-
     return (
       `Applied ${output.editsApplied} edit${output.editsApplied === 1 ? '' : 's'};` +
       ` replaced ${output.linesReplaced} line${output.linesReplaced === 1 ? '' : 's'}.` +
@@ -296,85 +202,51 @@ const editSchema = z.object({
     .int()
     .min(1)
     .describe(
-      'The 1-based line number at which the edit begins. For a pure insertion, the new content will be' +
+      'The 1-based line number at which the edit begins. For a pure insertion the new content is' +
         ' inserted immediately before this line.'
     ),
   endLine: z
     .number()
     .int()
     .describe(
-      'The 1-based inclusive line number at which the replacement range ends. Lines from `startLine` to' +
-        ' `endLine` (inclusive) will be replaced by `content`. For a pure insertion that removes nothing,' +
-        ' set `endLine = startLine - 1`.'
+      'The 1-based inclusive line number at which the replacement ends. For a pure insertion that' +
+        ' removes nothing, set `endLine = startLine - 1`.'
     ),
   content: z
     .string()
     .describe(
-      'The replacement (or inserted) text. May contain multiple lines separated by `\\n`. Do NOT include' +
-        ' a leading/trailing newline unless you intend to introduce a blank line.'
+      'The replacement (or inserted) text. May contain multiple lines separated by `\\n`. Do NOT' +
+        ' include a leading/trailing newline unless you intend to introduce a blank line.'
     ),
   expectedContent: z
     .string()
     .optional()
     .describe(
-      'The exact text currently occupying lines `[startLine, endLine]` in the file, joined by newline.' +
-        ' STRONGLY recommended for any replacement: if the file no longer matches, the tool aborts the' +
-        ' entire operation instead of corrupting the wrong region. Omit only for pure insertions' +
-        ' (`endLine === startLine - 1`), which remove no existing content.'
+      'The exact text currently occupying lines `[startLine, endLine]`, joined by newline.' +
+        ' STRONGLY recommended for any replacement: if the file no longer matches, the tool aborts' +
+        ' the entire batch instead of corrupting the wrong region. Omit for pure insertions.'
     ),
 });
 
-const inputSchema = z
-  .object({
-    filePath: z.string().describe('The absolute path of the file to edit.'),
-    edits: z
-      .array(editSchema)
-      .optional()
-      .describe(
-        'Batch of edits to apply atomically. Edits may not overlap; adjacent ranges are fine. Provide line' +
-          ' numbers as they appear in the file you just read — the tool applies edits bottom-up internally' +
-          ' so you do not need to pre-adjust later line numbers.'
-      ),
-    startLine: z
-      .number()
-      .int()
-      .optional()
-      .describe('Single-edit shorthand: see `edits[].startLine`.'),
-    endLine: z
-      .number()
-      .int()
-      .optional()
-      .describe('Single-edit shorthand: see `edits[].endLine`.'),
-    content: z
-      .string()
-      .optional()
-      .describe('Single-edit shorthand: see `edits[].content`.'),
-    expectedContent: z
-      .string()
-      .optional()
-      .describe('Single-edit shorthand: see `edits[].expectedContent`.'),
-  })
-  .refine(
-    value =>
-      (value.edits && value.edits.length > 0) ||
-      (value.startLine !== undefined &&
-        value.endLine !== undefined &&
-        value.content !== undefined),
-    {
-      message:
-        'Provide either `edits` (preferred) or all of `startLine`, `endLine`, `content`.',
-    }
-  );
+type Edit = z.infer<typeof editSchema>;
+
+const inputSchema = z.object({
+  filePath: z
+    .string()
+    .describe(
+      'The path of the file to edit. May be absolute or relative to the working directory.'
+    ),
+  edits: z
+    .array(editSchema)
+    .min(1)
+    .describe(
+      'Batch of edits to apply atomically. Edits may not overlap; adjacent ranges are fine.' +
+        ' Provide line numbers as they appear in the file you just read — edits are applied' +
+        ' bottom-up internally.'
+    ),
+});
 
 type Input = z.infer<typeof inputSchema>;
-
-interface NormalizedEdit {
-  index: number;
-  startLine: number;
-  endLine: number;
-  content: string;
-  expectedContent?: string;
-}
 
 const outputSchema = z.object({
   success: z

@@ -64,6 +64,15 @@ export class AgentContext extends EventEmitter {
   public readonly fileSelector: FileSelector;
   public readonly inputHandler: InputHandler;
 
+  /**
+   * Tracks the last-known modification time (mtimeMs) for files that have been
+   * read by the agent. `insert_in_file` consults this map to detect external
+   * modifications between read and write — if the on-disk mtime no longer
+   * matches the cached value (or is missing entirely), the edit is rejected
+   * so the agent must re-read the file with fresh line numbers.
+   */
+  public readonly fileModificationCache: Map<string, number> = new Map();
+
   constructor(io: IO) {
     super();
     const MODEL_ID = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
@@ -223,6 +232,11 @@ export class AgentContext extends EventEmitter {
 
     const result = streamText({
       allowSystemInMessages: true,
+      providerOptions: {
+        openai: {
+          reasoningEffort: 'low',
+        },
+      },
       model: this._model,
       messages,
       tools: this._tools,

@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { z } from 'zod';
 import { ToolBase } from '../tools';
+import { type AgentContext } from '../AgentContext';
 
 export default class ReadFileTool extends ToolBase<Input, Output> {
   constructor() {
@@ -23,27 +24,27 @@ export default class ReadFileTool extends ToolBase<Input, Output> {
     );
   }
 
-  public override async handle(input: Input): Promise<Output> {
-    const { filePath } = input;
-    const resolved = path.isAbsolute(filePath)
-      ? filePath
-      : path.join(process.cwd(), filePath);
+  public override async handle(
+    input: Input,
+    context: AgentContext
+  ): Promise<Output> {
+    const resolved = path.isAbsolute(input.filePath)
+      ? input.filePath
+      : path.join(context.cwd, input.filePath);
 
+    const stats = await fs.stat(resolved);
     const raw = await fs.readFile(resolved, 'utf8');
-    const newlineMatch = raw.match(/\r?\n/);
-    const newline = newlineMatch ? newlineMatch[0] : '\n';
-    const lines = raw.split(/\r?\n/);
 
-    // Drop the trailing empty string that split produces when the file ends
-    // with a newline — it is not a real line for numbering purposes.
-    const hasTrailingNewline =
-      lines.length > 0 && lines[lines.length - 1] === '';
-    if (hasTrailingNewline) lines.pop();
+    const newline = raw.match(/\r?\n/)?.[0] ?? '\n';
+    const lines = raw.split(/\r?\n/);
+    if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
 
     const width = String(lines.length).length;
     const numbered = lines
       .map((line, i) => `${String(i + 1).padStart(width, ' ')}\t${line}`)
       .join(newline);
+
+    context.fileModificationCache.set(resolved, stats.mtimeMs);
 
     return { content: numbered };
   }
