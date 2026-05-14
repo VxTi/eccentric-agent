@@ -16,7 +16,7 @@ import { ShellBuffer, textBlock } from '../rendering/shell-buffer';
 import { previewArgs, formatMarkdown } from '../rendering/formatting';
 import { type ToolBase, ToolSelectionOption } from './tools';
 import { allTools } from './tools/registry';
-import { type UserInputQueue, type UserInputRequest } from './types';
+import { type IO, type UserInputQueue, type UserInputRequest } from './types';
 
 interface PendingRequest {
   request: UserInputRequest;
@@ -64,7 +64,7 @@ export class AgentContext extends EventEmitter {
   public readonly fileSelector: FileSelector;
   public readonly inputHandler: InputHandler;
 
-  constructor() {
+  constructor(io: IO) {
     super();
     const MODEL_ID = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
     this._model = openai(MODEL_ID);
@@ -75,7 +75,7 @@ export class AgentContext extends EventEmitter {
     this._taskList = null;
     this._systemMessageFragments = this.constructInitialSystemPromptFragments();
 
-    this.shellBuffer = new ShellBuffer();
+    this.shellBuffer = new ShellBuffer(io.outputStream);
     this.shellBuffer.push(
       textBlock({
         content: `${chalk.bold('Eccentric Agent')}${chalk.dim(' — type @ for files, Ctrl+C to exit\n\n')}`,
@@ -83,7 +83,7 @@ export class AgentContext extends EventEmitter {
       })
     );
 
-    this.inputHandler = new InputHandler(this);
+    this.inputHandler = new InputHandler(this, io.inputStream);
     this.fileSelector = createFileSelector(this);
 
     this._tools = this.buildAiTools();

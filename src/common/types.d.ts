@@ -1,3 +1,5 @@
+import { type ReadStream, type WriteStream } from 'node:tty';
+
 type MaybePromise<T> = T | Promise<T>;
 
 export interface ApprovalOption<T extends string = string> {
@@ -23,3 +25,8 @@ export type UniqueArray<T, U extends any[] = []> = T extends [
     ? [never, ...UniqueArray<Rest, U>] // Duplicate found
     : [First, ...UniqueArray<Rest, [...U, First]>] // Unique so far
   : T;
+
+export interface IO {
+  inputStream: ReadStream;
+  outputStream: WriteStream;
+}
