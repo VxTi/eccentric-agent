@@ -231,14 +231,16 @@ export class ShellBuffer {
   }
 
   private appendTextFragment(fragment: TextFragment): void {
-    const { color, styles, content } = fragment;
+    const { color, background, styles, content } = fragment;
 
     const computedColor = TextColorAnsiMapping[color ?? DEFAULT_TEXT_COLOR];
+    const computedBackground =
+      BackgroundColorAnsiMapping[background ?? DEFAULT_BACKGROUND_COLOR];
     const computedStyle = (styles ?? [DEFAULT_TEXT_STYLE])
       .map(style => TextStyleAnsiMapping[style])
       .join('');
 
-    const computedContent = `${computedColor}${computedStyle}${content}${RESET_ANSI}`;
+    const computedContent = `${computedColor}${computedBackground}${computedStyle}${content}${RESET_ANSI}`;
 
     const lastLine: BufferLine | undefined = this.lines.at(-1);
 
@@ -303,6 +305,45 @@ export const TextColorAnsiMapping: Record<TextColor, string> = {
   ['bright-white']: '\x1b[97m',
 };
 
+export type BackgroundColor =
+  | 'none'
+  | 'red'
+  | 'green'
+  | 'blue'
+  | 'yellow'
+  | 'cyan'
+  | 'magenta'
+  | 'white'
+  | 'black'
+  | 'gray'
+  | 'bright-red'
+  | 'bright-green'
+  | 'bright-blue'
+  | 'bright-yellow'
+  | 'bright-cyan'
+  | 'bright-magenta'
+  | 'bright-white';
+
+export const BackgroundColorAnsiMapping: Record<BackgroundColor, string> = {
+  none: '',
+  red: '\x1b[41m',
+  green: '\x1b[42m',
+  blue: '\x1b[44m',
+  yellow: '\x1b[43m',
+  cyan: '\x1b[46m',
+  magenta: '\x1b[45m',
+  white: '\x1b[47m',
+  black: '\x1b[40m',
+  gray: '\x1b[100m',
+  ['bright-red']: '\x1b[101m',
+  ['bright-green']: '\x1b[102m',
+  ['bright-blue']: '\x1b[104m',
+  ['bright-yellow']: '\x1b[103m',
+  ['bright-cyan']: '\x1b[106m',
+  ['bright-magenta']: '\x1b[105m',
+  ['bright-white']: '\x1b[107m',
+};
+
 export type TextStyle = 'bold' | 'italic' | 'underline' | 'normal';
 
 export const TextStyleAnsiMapping: Record<TextStyle, string> = {
@@ -313,6 +354,7 @@ export const TextStyleAnsiMapping: Record<TextStyle, string> = {
 };
 
 export const DEFAULT_TEXT_COLOR: TextColor = 'white';
+export const DEFAULT_BACKGROUND_COLOR: BackgroundColor = 'none';
 export const DEFAULT_TEXT_STYLE: TextStyle = 'normal';
 export const DEFAULT_TEXT_ALIGN: TextAlignment = 'left';
 export const RESET_ANSI = '\x1b[0m';
@@ -323,6 +365,7 @@ export interface TextFragment {
   type: 'text';
   content: string;
   color?: TextColor;
+  background?: BackgroundColor;
   styles?: TextStyle[];
 }
 
@@ -360,12 +403,14 @@ export function lineFragment(...textFragments: TextFragment[]): LineFragment {
 export function textFragment<T extends TextStyle[]>(
   content: string,
   color?: TextColor,
-  styles?: [...UniqueArray<T>]
+  styles?: [...UniqueArray<T>],
+  background?: BackgroundColor
 ): TextFragment {
   return {
     type: 'text',
     content,
     color,
+    background,
     styles,
   };
 }

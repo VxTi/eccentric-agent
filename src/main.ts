@@ -11,6 +11,11 @@ async function main(): Promise<void> {
   await context.start();
 }
 
+process.on('SIGINT', () => {
+  process.stdout.write('\x1b[?1000l'); // Disable mouse tracking
+  process.exit();
+});
+
 main().catch(err => {
   stdout.write(`\n${chalk.red(String(err))}\n`);
   process.exit(1);

@@ -12,7 +12,7 @@ import { EventEmitter } from 'node:events';
 import ora from 'ora';
 import { createFileSelector, type FileSelector } from '../file-selector';
 import { InputHandler } from '../input/input';
-import { ShellBuffer } from '../rendering/shell-buffer';
+import { ShellBuffer, textBlock } from '../rendering/shell-buffer';
 import { previewArgs, formatMarkdown } from '../rendering/formatting';
 import { type ToolBase, ToolSelectionOption } from './tools';
 import { allTools } from './tools/registry';
@@ -76,8 +76,11 @@ export class AgentContext extends EventEmitter {
     this._systemMessageFragments = this.constructInitialSystemPromptFragments();
 
     this.shellBuffer = new ShellBuffer();
-    this.shellBuffer.pushText(
-      `${chalk.bold('eccentric-agent')}${chalk.dim(' — type @ for files, Ctrl+C to exit\n')}`
+    this.shellBuffer.push(
+      textBlock({
+        content: `${chalk.bold('Eccentric Agent')}${chalk.dim(' — type @ for files, Ctrl+C to exit\n\n')}`,
+        align: 'center',
+      })
     );
 
     this.inputHandler = new InputHandler(this);
