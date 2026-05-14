@@ -3,6 +3,8 @@ import CreateFile from './create-file';
 import CreateTaskList from './create-task-list';
 import FindFile from './find-file';
 import FindInFile from './find-in-file';
+import GetUserLocation from './get-user-location';
+import GetUserTime from './get-user-time';
 import InsertInFile from './insert-in-file';
 import ReadFile from './read-file';
 import Shell from './shell';
@@ -21,4 +23,6 @@ export const allTools: ToolBase[] = [
   new WebFetch(),
   new CreateTaskList(),
   new UpdateTaskList(),
+  new GetUserTime(),
+  new GetUserLocation(),
 ];
