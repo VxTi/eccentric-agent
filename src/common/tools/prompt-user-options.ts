@@ -36,7 +36,7 @@ export default class PromptUserOptionsTool extends ToolBase<Input, Output> {
       ids.add(option.id);
     }
 
-    const chosen = await context.inputHandler.inputQueue.request({
+    const chosen = await context.inputQueue.request({
       toolName: this.internalName,
       prompt: input.question,
       options: input.options.map(option => ({
@@ -102,9 +102,7 @@ const inputSchema = z.object({
 type Input = z.infer<typeof inputSchema>;
 
 const outputSchema = z.object({
-  selectedId: z
-    .string()
-    .describe('The `id` of the option the user selected.'),
+  selectedId: z.string().describe('The `id` of the option the user selected.'),
   selectedLabel: z
     .string()
     .describe('The `label` of the option the user selected.'),

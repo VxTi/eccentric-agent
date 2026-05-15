@@ -112,13 +112,15 @@ const inputSchema = z.object({});
 type Input = z.infer<typeof inputSchema>;
 
 const outputSchema = z.object({
-  city: z.string().describe('The user\'s approximate city, or empty if unknown.'),
+  city: z
+    .string()
+    .describe("The user's approximate city, or empty if unknown."),
   region: z
     .string()
-    .describe('The user\'s state, province, or region, or empty if unknown.'),
+    .describe("The user's state, province, or region, or empty if unknown."),
   country: z
     .string()
-    .describe('The full name of the user\'s country, or empty if unknown.'),
+    .describe("The full name of the user's country, or empty if unknown."),
   countryCode: z
     .string()
     .describe('The ISO 3166-1 alpha-2 country code, or empty if unknown.'),

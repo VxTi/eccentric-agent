@@ -19,15 +19,23 @@ async function main(): Promise<void> {
   await context.start();
 }
 
+function restoreScreen(): void {
+  io.outputStream.write('\x1b[?1049l');
+}
+
 process.on('SIGINT', () => {
-  io.outputStream.write('\x1b[?1000l'); // Disable mouse tracking
   abortController.abort();
+  restoreScreen();
   process.exit();
 });
 
-process.on('SIGTERM', () => abortController.abort());
+process.on('SIGTERM', () => {
+  abortController.abort();
+  restoreScreen();
+});
 
 main().catch(err => {
+  restoreScreen();
   if (err instanceof Error && err.name === 'ExitPromptError') {
     io.outputStream.write(chalk.yellow('Goodbye.'));
   }

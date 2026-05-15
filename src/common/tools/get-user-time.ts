@@ -17,8 +17,7 @@ export default class GetUserTimeTool extends ToolBase<Input, Output> {
 
   public override async handle(): Promise<Output> {
     const now = new Date();
-    const timeZone =
-      Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
     const formatted = new Intl.DateTimeFormat(undefined, {
       dateStyle: 'full',
@@ -52,8 +51,12 @@ const outputSchema = z.object({
     .describe("The user's current local date and time, human-readable."),
   timeZone: z
     .string()
-    .describe('The resolved IANA time zone identifier (e.g. `Europe/Amsterdam`).'),
-  iso: z.string().describe('The current instant as an ISO 8601 timestamp (UTC).'),
+    .describe(
+      'The resolved IANA time zone identifier (e.g. `Europe/Amsterdam`).'
+    ),
+  iso: z
+    .string()
+    .describe('The current instant as an ISO 8601 timestamp (UTC).'),
 });
 
 type Output = z.infer<typeof outputSchema>;

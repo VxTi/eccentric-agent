@@ -8,10 +8,10 @@ import {
   tool as createTool,
   type ToolSet,
 } from 'ai';
+import { stdout } from 'node:process';
 import chalk from 'chalk';
 import { glob } from 'node:fs/promises';
 import { createFileSelector, type FileSelector } from '../file-selector';
-import { InputHandler } from '../input/input';
 import { FileCache } from '../lib/file-cache';
 import { textBlock } from '../rendering/fragments';
 import { ShellBuffer } from '../rendering/shell-buffer';
@@ -37,12 +37,19 @@ export class AgentContext {
   public readonly cwd: string;
   public readonly shellBuffer: ShellBuffer;
   public readonly fileSelector: FileSelector;
-  public readonly inputHandler: InputHandler;
+  public readonly inputQueue: ManagedUserInputQueue;
   public readonly fileCache: FileCache;
 
   constructor(io: IO, abortController: AbortController) {
     this.abortController = abortController;
     this.cwd = process.cwd();
+
+    if (!io.inputStream.isTTY) {
+      stdout.write(
+        chalk.red('stdin not a TTY. CLI need interactive terminal.\n')
+      );
+      process.exit(1);
+    }
 
     this.model = openai(process.env.OPENAI_MODEL ?? 'gpt-4o-mini');
     this.isStreaming = false;
@@ -50,7 +57,7 @@ export class AgentContext {
     this.messages = [];
     this.taskList = new TaskList();
 
-    this.shellBuffer = new ShellBuffer(io.outputStream);
+    this.shellBuffer = new ShellBuffer(io.outputStream, io.inputStream);
     this.shellBuffer.push(
       textBlock({
         content: `${chalk.blue('◆')} ${chalk.bold('Eccentric Agent')}${chalk.dim(
@@ -61,17 +68,15 @@ export class AgentContext {
     );
 
     this.fileCache = new FileCache(this);
-    this.inputHandler = new InputHandler(this, io.inputStream);
+    this.inputQueue = this.createUserInputQueue();
     this.fileSelector = createFileSelector(this);
+    this.shellBuffer.mount(this);
 
     this.tools = this.constructToolset();
   }
 
-  // eslint-disable-next-line
   public async start(): Promise<void> {
-    void this.inputHandler.consumeUserInputQueue();
-
-    this.inputHandler.syncInputField();
+    // Render loop is driven by Ink; nothing to do here.
   }
 
   public async queueUserMessage(message: string): Promise<AgentContext> {
@@ -203,11 +208,9 @@ export class AgentContext {
         chalk.red(`Failed to record assistant turn: ${String(err)}\n`)
       );
     }
-
-    this.inputHandler.syncInputField();
   }
 
-  public createUserInputQueue(): ManagedUserInputQueue {
+  private createUserInputQueue(): ManagedUserInputQueue {
     const pending: PendingRequest[] = [];
     let notify: (() => void) | null = null;
 
@@ -265,7 +268,7 @@ export class AgentContext {
           const options = await tool.approvalOptions(processed, this);
           const prompt = `tool "${tool.internalName}" requires approval — args: ${previewArgs(input)}`;
 
-          const chosen = await this.inputHandler.inputQueue.request({
+          const chosen = await this.inputQueue.request({
             toolName: tool.internalName,
             prompt,
             options,
