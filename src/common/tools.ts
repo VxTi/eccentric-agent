@@ -1,5 +1,5 @@
 import type * as z from 'zod';
-import { type AgentContext } from './agent-context';
+import { type AgentRuntime } from './agent-runtime';
 import type { ApprovalOption, MaybePromise } from './types';
 
 export const DEFAULT_APPROVAL_OPTIONS: ApprovalOption[] = [
@@ -37,51 +37,31 @@ export abstract class ToolBase<
     this.outputSchema = outputSchema;
   }
 
-  /**
-   * A given set of approval options for when the tool requires user approval.
-   * @optional
-   */
   public approvalOptions(
     _input: TIn,
-    _context: AgentContext
+    _runtime: AgentRuntime
   ): MaybePromise<ApprovalOption[]> {
     return DEFAULT_APPROVAL_OPTIONS;
   }
 
-  /**
-   * Whether this tool requires user approval
-   * If it does, it will show the user {@link approvalOptions}
-   * @optional
-   */
   public requiresApproval(
     _input: TIn,
-    _context: AgentContext
+    _runtime: AgentRuntime
   ): MaybePromise<boolean> {
     return false;
   }
 
-  /**
-   * Handler for when the user has selected an option.
-   * When returned truthy, the tool is invoked.
-   * @optional
-   */
   public onOptionSelect(
     _input: TIn,
     _option: TApprovalOption,
-    _context: AgentContext
+    _runtime: AgentRuntime
   ): MaybePromise<ToolSelectionOption> {
     return ToolSelectionOption.ALLOW;
   }
 
-  public abstract handle(input: TIn, _context: AgentContext): Promise<TOut>;
+  public abstract handle(input: TIn, _runtime: AgentRuntime): Promise<TOut>;
 
-  /**
-   * Returns a human-readable variant of this tool call
-   */
   public abstract inputToString(input: TIn): string;
 
-  /**
-   * Returns a human-readable variant of the result of this tool
-   */
   public abstract outputToString(output: TOut): string;
 }

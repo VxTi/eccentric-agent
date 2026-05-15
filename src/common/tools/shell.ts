@@ -1,6 +1,6 @@
 import { type Output } from 'ai';
 import { z } from 'zod';
-import type { AgentContext } from '../agent-context';
+import type { AgentRuntime } from '../agent-runtime';
 import { ToolBase, ToolSelectionOption } from '../tools';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -33,7 +33,7 @@ export default class ShellCommandTool extends ToolBase<Input, Output, Option> {
 
   public override async handle(
     input: Input,
-    _context: AgentContext
+    _context: AgentRuntime
   ): Promise<Output> {
     const { command, timeoutMs, cwd } = input;
     try {
@@ -60,7 +60,7 @@ export default class ShellCommandTool extends ToolBase<Input, Output, Option> {
 
   public override requiresApproval(
     input: Input,
-    _context: AgentContext
+    _context: AgentRuntime
   ): MaybePromise<boolean> {
     return this.isAllowed(input.command);
   }
@@ -68,7 +68,7 @@ export default class ShellCommandTool extends ToolBase<Input, Output, Option> {
   public override onOptionSelect(
     input: Input,
     option: Option,
-    _context: AgentContext
+    _context: AgentRuntime
   ): MaybePromise<ToolSelectionOption> {
     if (option === Option.DENY) return ToolSelectionOption.DENY;
 
@@ -81,7 +81,7 @@ export default class ShellCommandTool extends ToolBase<Input, Output, Option> {
 
   public approvalOptions(
     input: Input,
-    _context: AgentContext
+    _context: AgentRuntime
   ): MaybePromise<ApprovalOption[]> {
     return [
       { option: Option.APPROVE, text: 'Allow' },

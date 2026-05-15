@@ -1,6 +1,6 @@
-import type { BufferFragments } from './fragments';
+import { textBlock, type BufferFragments } from './fragments';
 
-export interface RendererState {
+export interface MessageState {
   fragments: BufferFragments[];
   status: string | null;
   offset: number;
@@ -8,8 +8,8 @@ export interface RendererState {
 
 type Listener = () => void;
 
-export class RendererStore {
-  private state: RendererState;
+export class MessageStore {
+  private state: MessageState;
   private listeners: Set<Listener>;
 
   constructor() {
@@ -21,7 +21,7 @@ export class RendererStore {
     this.listeners = new Set();
   }
 
-  public getState = (): RendererState => this.state;
+  public getState = (): MessageState => this.state;
 
   public subscribe = (listener: Listener): (() => void) => {
     this.listeners.add(listener);
@@ -30,16 +30,21 @@ export class RendererStore {
     };
   };
 
-  private commit(next: RendererState): void {
+  private commit(next: MessageState): void {
     this.state = next;
     this.listeners.forEach(l => l());
   }
 
-  public pushFragments(...fragments: BufferFragments[]): void {
+  public push(...fragments: BufferFragments[]): void {
     this.commit({
       ...this.state,
       fragments: [...this.state.fragments, ...fragments],
     });
+  }
+
+  public pushText(raw: string): void {
+    if (!raw) return;
+    this.push(textBlock({ content: raw }));
   }
 
   public clear(): void {
@@ -52,5 +57,9 @@ export class RendererStore {
 
   public setOffset(offset: number): void {
     this.commit({ ...this.state, offset: Math.max(0, offset) });
+  }
+
+  public get offset(): number {
+    return this.state.offset;
   }
 }

@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { z } from 'zod';
 import { ToolBase } from '../tools';
-import { type AgentContext } from '../agent-context';
+import { type AgentRuntime } from '../agent-runtime';
 
 export default class ReadFileTool extends ToolBase<Input, Output> {
   constructor() {
@@ -26,7 +26,7 @@ export default class ReadFileTool extends ToolBase<Input, Output> {
 
   public override async handle(
     input: Input,
-    context: AgentContext
+    context: AgentRuntime
   ): Promise<Output> {
     const resolved = path.isAbsolute(input.filePath)
       ? input.filePath

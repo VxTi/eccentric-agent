@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useReducer, useRef, type JSX } from 'react';
-import { useInput } from 'ink';
+import { useApp, useInput } from 'ink';
 import chalk from 'chalk';
-import type { AgentContext } from '../../common/agent-context';
+import { useAgent } from '../../common/agent-context';
 import type { ApprovalOption } from '../../common/types';
+import { useMessageStore } from '../message-context';
 import { InputBox } from './InputBox';
 
 const INPUT_PREFIX = '> ';
@@ -49,13 +50,10 @@ function reducer(state: FieldState, action: Action): FieldState {
   }
 }
 
-interface InputControllerProps {
-  context: AgentContext;
-}
-
-export function InputController({
-  context,
-}: InputControllerProps): JSX.Element {
+export function InputController(): JSX.Element {
+  const runtime = useAgent();
+  const messageStore = useMessageStore();
+  const { exit } = useApp();
   const [state, dispatch] = useReducer(reducer, INITIAL_FIELD);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -73,7 +71,7 @@ export function InputController({
     let cancelled = false;
     void (async () => {
       while (!cancelled) {
-        const req = await context.inputQueue.next();
+        const req = await runtime.inputQueue.next();
         if (cancelled) return;
         await new Promise<void>(resolveDone => {
           set({
@@ -93,11 +91,11 @@ export function InputController({
     return () => {
       cancelled = true;
     };
-  }, [context, set]);
+  }, [runtime, set]);
 
   const startPicker = useCallback(
     async (triggerIndex: number) => {
-      const { fileSelector } = context;
+      const { fileSelector } = runtime;
       set({
         picker: {
           triggerIndex,
@@ -106,7 +104,7 @@ export function InputController({
           selected: 0,
         },
       });
-      await fileSelector.reload(context.cwd, false);
+      await fileSelector.reload(runtime.cwd, false);
       const current = stateRef.current.picker;
       if (!current) return;
       set({
@@ -116,7 +114,7 @@ export function InputController({
         },
       });
     },
-    [context, set]
+    [runtime, set]
   );
 
   const refreshPickerMatches = useCallback(
@@ -124,7 +122,7 @@ export function InputController({
       const picker = next.picker;
       if (!picker) return next;
       const query = next.buffer.slice(picker.triggerIndex + 1, next.cursor);
-      const matches = context.fileSelector.filter(query);
+      const matches = runtime.fileSelector.filter(query);
       const selected =
         picker.selected >= matches.length
           ? Math.max(0, matches.length - 1)
@@ -134,7 +132,7 @@ export function InputController({
         picker: { ...picker, query, matches, selected },
       };
     },
-    [context]
+    [runtime]
   );
 
   const commitPicker = useCallback((next: FieldState): FieldState => {
@@ -154,21 +152,21 @@ export function InputController({
   }, []);
 
   const submitBuffer = useCallback(
-    async (line: string) => {
+    (line: string) => {
       const trimmed = line.trim();
       if (!trimmed) return;
       const formatted = formatReferencedFiles(trimmed);
-      context.shellBuffer.pushText(
+      messageStore.pushText(
         `${chalk.bold('you ') + chalk.dim('▸ ') + formatted}\n`
       );
-      await context.queueUserMessage(formatted);
+      runtime.userMessageQueue.submit(formatted);
     },
-    [context]
+    [runtime, messageStore]
   );
 
   useInput((input, key) => {
     if (key.ctrl && input === 'c') {
-      context.shellBuffer.dispose();
+      exit();
       process.exit(0);
     }
 
@@ -233,7 +231,7 @@ export function InputController({
     if (key.return) {
       const line = current.buffer;
       replace(INITIAL_FIELD);
-      void submitBuffer(line);
+      submitBuffer(line);
       return;
     }
 
@@ -272,12 +270,12 @@ export function InputController({
     }
 
     if (key.upArrow) {
-      context.shellBuffer.setOffset(context.shellBuffer.heightOffset + 1);
+      messageStore.setOffset(messageStore.offset + 1);
       return;
     }
 
     if (key.downArrow) {
-      context.shellBuffer.setOffset(context.shellBuffer.heightOffset - 1);
+      messageStore.setOffset(messageStore.offset - 1);
       return;
     }
 

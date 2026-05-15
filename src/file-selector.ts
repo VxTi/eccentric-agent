@@ -1,6 +1,5 @@
 import { glob } from 'glob';
 import { readFile } from 'node:fs/promises';
-import { type AgentContext } from './common/agent-context';
 
 export type LocalFile =
   | { path: string; content: string; error?: undefined }
@@ -13,7 +12,7 @@ export interface FileSelector {
   loadLocalFiles: (paths: string[]) => Promise<LocalFile[]>;
 }
 
-export function createFileSelector(context: AgentContext): FileSelector {
+export function createFileSelector(cwd: string): FileSelector {
   let files: string[] = [];
 
   const REFRESH_TTL_MS = 2_000;
@@ -43,7 +42,7 @@ export function createFileSelector(context: AgentContext): FileSelector {
   };
 
   // Initial load
-  void reload(context.cwd, true);
+  void reload(cwd, true);
 
   return {
     files,

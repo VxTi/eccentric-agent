@@ -1,15 +1,10 @@
-import { useEffect, useState, useSyncExternalStore, type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { Box, useStdout } from 'ink';
-import type { AgentContext } from '../../common/agent-context';
-import type { RendererStore } from '../renderer-store';
+import { useMessageState } from '../message-context';
+import { AgentEngine } from './AgentEngine';
 import { History } from './History';
 import { StatusLine } from './StatusLine';
 import { InputController } from './InputController';
-
-interface AppProps {
-  store: RendererStore;
-  context: AgentContext;
-}
 
 function useTerminalSize(): { columns: number; rows: number } {
   const { stdout } = useStdout();
@@ -34,15 +29,16 @@ function useTerminalSize(): { columns: number; rows: number } {
   return size;
 }
 
-export function App({ store, context }: AppProps): JSX.Element {
-  const state = useSyncExternalStore(store.subscribe, store.getState);
+export function App(): JSX.Element {
+  const state = useMessageState();
   const { columns, rows } = useTerminalSize();
 
   return (
     <Box flexDirection="column" width={columns} height={rows}>
-      <History store={store} />
+      <AgentEngine />
+      <History />
       {state.status !== null && <StatusLine status={state.status} />}
-      <InputController context={context} />
+      <InputController />
     </Box>
   );
 }

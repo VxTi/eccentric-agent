@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ToolBase } from '../tools';
-import { type AgentContext } from '../agent-context';
+import { type AgentRuntime } from '../agent-runtime';
 
 export default class PromptUserOptionsTool extends ToolBase<Input, Output> {
   constructor() {
@@ -24,7 +24,7 @@ export default class PromptUserOptionsTool extends ToolBase<Input, Output> {
 
   public override async handle(
     input: Input,
-    context: AgentContext
+    context: AgentRuntime
   ): Promise<Output> {
     const ids = new Set<string>();
     for (const option of input.options) {
