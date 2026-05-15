@@ -195,20 +195,57 @@ export class ShellBuffer {
     return [`${padding}\x1b[36m${frame}\x1b[0m ${this.status}`];
   }
 
+  private inputLayout(): {
+    boxWidth: number;
+    leftPad: number;
+    innerWidth: number;
+    contentRowCount: number;
+    cursorRow: number;
+    cursorCol: number;
+    pickerCount: number;
+  } {
+    const { width: boxWidth, leftPad } = this.contentBox();
+    const innerWidth = Math.max(1, boxWidth - 2);
+
+    const prefix = this.inputField?.prefix ?? '';
+    const text = this.inputField?.text ?? '';
+    const cursor = this.inputField?.cursor ?? 0;
+
+    const fullText = prefix + text;
+    const cursorPos = prefix.length + cursor;
+    const maxPos = Math.max(cursorPos, fullText.length);
+    const contentRowCount = Math.max(1, Math.floor(maxPos / innerWidth) + 1);
+
+    return {
+      boxWidth,
+      leftPad,
+      innerWidth,
+      contentRowCount,
+      cursorRow: Math.floor(cursorPos / innerWidth),
+      cursorCol: cursorPos % innerWidth,
+      pickerCount: this.inputField?.pickerLines?.length ?? 0,
+    };
+  }
+
   private renderInputBlock(): string[] {
     if (!this.inputField) return [];
 
-    const { width: boxWidth, leftPad } = this.contentBox();
+    const { boxWidth, leftPad, innerWidth, contentRowCount } =
+      this.inputLayout();
     const padding = ' '.repeat(leftPad);
 
     const prefix = this.inputField.prefix ?? '';
-    const innerWidth = Math.max(1, boxWidth - 2);
-    const rawText = (prefix + this.inputField.text)
-      .padEnd(innerWidth)
-      .slice(0, innerWidth);
+    const fullText = prefix + this.inputField.text;
 
-    const emptyLine = `${padding + GRAY_BG + ' '.repeat(boxWidth) + RESET_ANSI}`;
-    const inputLine = `${emptyLine}\n${padding}${GRAY_BG} ${rawText} ${RESET_ANSI}\n${emptyLine}`;
+    const contentRows: string[] = [];
+    for (let i = 0; i < contentRowCount; i++) {
+      const slice = fullText
+        .slice(i * innerWidth, (i + 1) * innerWidth)
+        .padEnd(innerWidth);
+      contentRows.push(`${padding}${GRAY_BG} ${slice} ${RESET_ANSI}`);
+    }
+
+    const emptyLine = `${padding}${GRAY_BG}${' '.repeat(boxWidth)}${RESET_ANSI}`;
 
     const pickerLines = (this.inputField.pickerLines ?? []).map(line => {
       const visibleLen = stripAnsi(line).length;
@@ -217,19 +254,21 @@ export class ShellBuffer {
       return `${padding}${line}${padRight}`;
     });
 
-    return [...pickerLines, inputLine];
+    return [...pickerLines, emptyLine, ...contentRows, emptyLine];
   }
 
   private computeCursorPosition(): Cursor {
     const { height } = this.dimensions;
-    const { leftPad } = this.contentBox();
+    const { leftPad, contentRowCount, cursorRow, cursorCol, pickerCount } =
+      this.inputLayout();
 
-    const prefixLen = (this.inputField?.prefix ?? '').length;
-    const cursor = this.inputField?.cursor ?? 0;
+    const blockHeight = pickerCount + contentRowCount + 2;
+    // First content row sits one row below the top empty line of the box.
+    const firstContentRow = height - blockHeight + 2;
 
     // 1-indexed; +1 to skip the left gray-bg space margin
-    const col = leftPad + 1 + 1 + prefixLen + cursor;
-    const row = height - 1;
+    const col = leftPad + 1 + 1 + cursorCol;
+    const row = firstContentRow + cursorRow;
     return { row, col };
   }
 

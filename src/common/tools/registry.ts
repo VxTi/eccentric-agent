@@ -8,6 +8,7 @@ import GetUserTime from './get-user-time';
 import InsertInFile from './insert-in-file';
 import PromptUserOptions from './prompt-user-options';
 import ReadFile from './read-file';
+import ReplaceInFile from './replace-in-file';
 import Shell from './shell';
 import UpdateTaskList from './update-task-list';
 import WebFetch from './web-fetch';
@@ -18,6 +19,7 @@ export const allTools: ToolBase[] = [
   new FindFile(),
   new FindInFile(),
   new InsertInFile(),
+  new ReplaceInFile(),
   new CreateFile(),
   new ReadFile(),
   new WebSearch(),

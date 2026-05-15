@@ -45,7 +45,7 @@ export default class ReadFileTool extends ToolBase<Input, Output> {
       .map((line, i) => `${String(i + 1).padStart(width, ' ')}\t${line}`)
       .join(newline);
 
-    context.fileModificationCache.set(resolved, stats.mtimeMs);
+    context.fileCache.set(resolved, stats.mtimeMs);
 
     return { content: numbered };
   }

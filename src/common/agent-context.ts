@@ -10,9 +10,9 @@ import {
 } from 'ai';
 import chalk from 'chalk';
 import { glob } from 'node:fs/promises';
-
 import { createFileSelector, type FileSelector } from '../file-selector';
 import { InputHandler } from '../input/input';
+import { FileCache } from '../lib/file-cache';
 import { textBlock } from '../rendering/fragments';
 import { ShellBuffer } from '../rendering/shell-buffer';
 import { previewArgs, formatMarkdown } from '../rendering/formatting';
@@ -38,6 +38,7 @@ export class AgentContext {
   public readonly shellBuffer: ShellBuffer;
   public readonly fileSelector: FileSelector;
   public readonly inputHandler: InputHandler;
+  public readonly fileCache: FileCache;
 
   /**
    * Tracks the last-known modification time (mtimeMs) for files that have been
@@ -68,6 +69,7 @@ export class AgentContext {
       })
     );
 
+    this.fileCache = new FileCache(this);
     this.inputHandler = new InputHandler(this, io.inputStream);
     this.fileSelector = createFileSelector(this);
 

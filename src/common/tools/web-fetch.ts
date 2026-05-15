@@ -75,7 +75,7 @@ export default class WebFetchTool extends ToolBase<Input, Output> {
       return `Inspecting \`${input.urls[0]}\``;
     }
 
-    return `Inspecting `;
+    return `Inspecting ${input.urls.length} websites\n${input.urls.map(u => `- ${u}`).join('\n')}`;
   }
 
   public override outputToString(output: Output): string {
