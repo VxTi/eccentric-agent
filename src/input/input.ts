@@ -1,4 +1,3 @@
-import { select } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { stdin, stdout } from 'node:process';
 import { emitKeypressEvents } from 'node:readline';
@@ -8,7 +7,7 @@ import {
   type DequeuedRequest,
   type ManagedUserInputQueue,
 } from '../common/agent-context';
-import { type LocalFile } from '../file-selector';
+import { type ApprovalOption } from '../common/types';
 import { type KeyEvent, KeyType } from './key-event';
 
 export interface InputState {
@@ -22,10 +21,18 @@ interface PickerState {
   selected: number;
 }
 
+interface PromptState {
+  message: string;
+  options: readonly ApprovalOption[];
+  selected: number;
+  resolve: (option: string) => void;
+}
+
 interface InputFieldInternalState {
   buffer: string;
   cursor: number;
   picker: PickerState | null;
+  prompt: PromptState | null;
   maxSuggestions: number;
 }
 
@@ -47,6 +54,7 @@ export class InputHandler {
       buffer: '',
       cursor: 0,
       picker: null,
+      prompt: null,
       maxSuggestions: 8,
     };
 
@@ -76,11 +84,32 @@ export class InputHandler {
   }
 
   public syncInputField(): void {
+    const prompt = this.fieldState.prompt;
+
+    if (prompt) {
+      this.context.shellBuffer.setInputBox({
+        text: '',
+        cursor: 0,
+        prefix: chalk.yellow('? ') + prompt.message,
+        pickerLines: this.buildPromptLines(prompt),
+      });
+      return;
+    }
+
     this.context.shellBuffer.setInputBox({
       text: this.fieldState.buffer,
       cursor: this.fieldState.cursor,
       prefix: INPUT_PREFIX,
       pickerLines: this.buildPickerLines(),
+    });
+  }
+
+  private buildPromptLines(prompt: PromptState): string[] {
+    return prompt.options.map((option, i) => {
+      const active = i === prompt.selected;
+      const marker = active ? chalk.cyan('❯ ') : '  ';
+      const body = active ? chalk.cyan(option.text) : chalk.dim(option.text);
+      return `${marker}${body}`;
     });
   }
 
@@ -128,26 +157,27 @@ export class InputHandler {
     this.syncInputField();
   }
 
-  private async promptUserForRequest(req: DequeuedRequest): Promise<string> {
-    this.pauseInputPolling();
-
-    const wasRaw = stdin.isRaw;
-    if (wasRaw) {
-      stdin.setRawMode(false);
-    }
-
-    try {
-      stdout.write('\n');
-
-      return await select<string>({
+  private promptUserForRequest(req: DequeuedRequest): Promise<string> {
+    return new Promise<string>(resolve => {
+      this.fieldState.prompt = {
         message: req.prompt,
-        choices: req.options.map(o => ({ name: o.text, value: o.option })),
-      });
-    } finally {
-      if (wasRaw) stdin.setRawMode(true);
+        options: req.options,
+        selected: 0,
+        resolve,
+      };
+      this.syncInputField();
+    });
+  }
 
-      this.resumeInputPolling();
-    }
+  private commitPrompt(): void {
+    const prompt = this.fieldState.prompt;
+    if (!prompt) return;
+    const chosen = prompt.options[prompt.selected];
+    if (!chosen) return;
+
+    this.fieldState.prompt = null;
+    this.syncInputField();
+    prompt.resolve(chosen.option);
   }
 
   public async consumeUserInputQueue(): Promise<void> {
@@ -194,6 +224,31 @@ export class InputHandler {
     if (this.state.paused) return;
 
     const { name: keyType } = key;
+
+    if (this.fieldState.prompt) {
+      const prompt = this.fieldState.prompt;
+      switch (keyType) {
+        case KeyType.UP:
+          this.fieldState.prompt = {
+            ...prompt,
+            selected: Math.max(0, prompt.selected - 1),
+          };
+          this.syncInputField();
+          return;
+        case KeyType.DOWN:
+          this.fieldState.prompt = {
+            ...prompt,
+            selected: Math.min(prompt.options.length - 1, prompt.selected + 1),
+          };
+          this.syncInputField();
+          return;
+        case KeyType.RETURN:
+          this.commitPrompt();
+          return;
+        default:
+          return;
+      }
+    }
 
     if (this.fieldState.picker) {
       switch (keyType) {
@@ -367,52 +422,34 @@ export class InputHandler {
     };
   }
 
-  /**
-   * Extracts the list of tagged files in the request.
-   * Tagged files are mentioned like `@file-name`
-   * @private
-   */
-  private extractAttachedFiles(input: string): string[] {
-    const re = /@(\S+)/g;
-    const found = new Set<string>();
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(input)) !== null) {
-      const path = m[1].replace(/[.,;:!?)\]]+$/, '');
-
-      if (this.context.fileSelector.files.includes(path)) {
-        found.add(path);
-      }
-    }
-    return [...found];
-  }
-
-  private buildContextSuffix(loaded: readonly LocalFile[]): string {
-    if (!loaded.length) return '';
-    const blocks = loaded.map(f =>
-      f.error !== undefined
-        ? `<file path="${f.path}" error="${f.error}" />`
-        : `<file path="${f.path}">\n${f.content}\n</file>`
-    );
-    return `\n\n${blocks.join('\n\n')}\n\nWhen answering, quote the relevant portions of the file(s) above verbatim in your response, using fenced code blocks.`;
-  }
-
   private async handleSubmit(line: string): Promise<void> {
     const trimmed = line.trim();
     if (!trimmed) return;
 
-    const mentionedLocalFilePaths = this.extractAttachedFiles(trimmed);
-    const loadedFiles = await this.context.fileSelector.loadLocalFiles(
-      mentionedLocalFilePaths
-    );
+    const formatted = formatReferencedFiles(trimmed);
 
-    const refsLine = mentionedLocalFilePaths.length
-      ? `\n\n${mentionedLocalFilePaths.map(p => chalk.cyan(`@${p}`)).join(', ')}`
-      : '';
     this.context.shellBuffer.pushText(
-      `${chalk.bold('you ') + chalk.dim('▸ ') + trimmed + refsLine}\n`
+      `${chalk.bold('you ') + chalk.dim('▸ ') + formatted}\n`
     );
 
-    const contextSuffix = this.buildContextSuffix(loadedFiles);
-    await this.context.queueUserMessage(trimmed + contextSuffix);
+    await this.context.queueUserMessage(formatted);
   }
+}
+
+/**
+ * Extracts the list of tagged files in the request.
+ * Tagged files are mentioned like `@file-name`
+ * @private
+ */
+export function formatReferencedFiles(input: string): string {
+  const re = /@(\S+)/g;
+  let match: RegExpExecArray | null;
+
+  let sanitized = input;
+
+  while ((match = re.exec(input)) !== null) {
+    const path = match[1].replace(/[.,;:!?)\]]+$/, '');
+    sanitized = sanitized.replace(match[0], `\`${path}\``);
+  }
+  return sanitized;
 }

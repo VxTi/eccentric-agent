@@ -40,15 +40,6 @@ export class AgentContext {
   public readonly inputHandler: InputHandler;
   public readonly fileCache: FileCache;
 
-  /**
-   * Tracks the last-known modification time (mtimeMs) for files that have been
-   * read by the agent. `insert_in_file` consults this map to detect external
-   * modifications between read and write — if the on-disk mtime no longer
-   * matches the cached value (or is missing entirely), the edit is rejected
-   * so the agent must re-read the file with fresh line numbers.
-   */
-  public readonly fileModificationCache: Map<string, number> = new Map();
-
   constructor(io: IO, abortController: AbortController) {
     this.abortController = abortController;
     this.cwd = process.cwd();
