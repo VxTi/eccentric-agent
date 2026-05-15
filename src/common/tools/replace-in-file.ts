@@ -11,12 +11,12 @@ export default class ReplaceInFileTool extends ToolBase<Input, Output> {
       'Applies one or more single-line replacements to a file atomically. Each replacement has' +
         ' `find` (the exact single line currently in the file) and `replace` (the single line it' +
         ' should become). Neither `find` nor `replace` may contain newline characters.\n\n' +
-        'Use this tool when changing one or more individual lines in a file. For multi-line' +
-        ' inserts, deletions, or replacements, use `insert_in_file` instead.\n\n' +
+        'Use this tool when changing one or more individual lines in a file. To add new lines' +
+        ' to a file without replacing existing content, use `insert_in_file` instead.\n\n' +
         'Rules:\n' +
         '  • Each `find` must be a single line (no `\\n`) and must match EXACTLY ONCE in the file' +
         '    (whitespace and indentation included). If it appears multiple times, this tool cannot' +
-        '    be used — use `insert_in_file` with surrounding context instead.\n' +
+        '    be used — pick a line that is unique within the file.\n' +
         '  • `replace` must be a single line (no `\\n`). Use an empty string to blank the line' +
         "    (the line's newline is preserved).\n" +
         '  • All replacements are validated up front against the original file contents; if any' +
@@ -49,14 +49,12 @@ export default class ReplaceInFileTool extends ToolBase<Input, Output> {
       }
       if (replacement.find.includes('\n')) {
         throw new Error(
-          `${label}: \`find\` must be a single line (no newline characters). Use` +
-            ` \`insert_in_file\` for multi-line edits.`
+          `${label}: \`find\` must be a single line (no newline characters).`
         );
       }
       if (replacement.replace.includes('\n')) {
         throw new Error(
-          `${label}: \`replace\` must be a single line (no newline characters). Use` +
-            ` \`insert_in_file\` for multi-line edits.`
+          `${label}: \`replace\` must be a single line (no newline characters).`
         );
       }
 
@@ -71,8 +69,7 @@ export default class ReplaceInFileTool extends ToolBase<Input, Output> {
       if (secondIdx !== -1) {
         throw new Error(
           `${label}: \`find\` text appears more than once in the file. This tool requires each` +
-            ` \`find\` to be unique. Use \`insert_in_file\` with surrounding context instead.\n` +
-            `--- find ---\n${replacement.find}`
+            ` \`find\` to be unique within the file.\n--- find ---\n${replacement.find}`
         );
       }
 

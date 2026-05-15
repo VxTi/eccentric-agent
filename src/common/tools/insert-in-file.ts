@@ -8,23 +8,16 @@ export default class InsertInFileTool extends ToolBase<Input, Output> {
     super(
       'insert_in_file',
       'Insert in file',
-      'Applies a single string-based edit to a file. The edit has `find` (the exact text' +
-        ' currently in the file) and `replace` (the text it should become). The tool finds the' +
-        ' unique occurrence of `find` and substitutes `replace` for it.\n\n' +
-        'Use this tool for multi-line inserts, deletions, or replacements. For changing one or' +
-        ' more individual single lines, prefer `replace_in_file`.\n\n' +
-        'Usage patterns:\n' +
-        '  • Replace: `find` is the existing text, `replace` is the new text.\n' +
-        '  • Insert before a fragment: set `find` to that fragment and `replace` to' +
-        '    `"<new content>\\n<find>"`.\n' +
-        '  • Insert after a fragment: `replace` to `"<find>\\n<new content>"`.\n' +
-        '  • Delete: pass an empty string for `replace`.\n\n' +
-        'Rules:\n' +
-        '  • `find` must match EXACTLY ONCE in the file (whitespace and indentation included). If' +
-        '    it appears multiple times, extend it with surrounding context until it is unique. If' +
-        '    it does not appear at all, the edit is rejected.\n' +
-        '  • If the file changed on disk since it was last read in this session, the operation is' +
-        '    rejected so you can re-read and retry against fresh content.',
+      'Inserts `content` into `filePath` at the given 1-based `lineNumber`. Existing' +
+        ' content at and after that line is shifted down — nothing is overwritten.\n\n' +
+        'Line number semantics:\n' +
+        '  • `1` inserts at the very top of the file.\n' +
+        '  • `N` (where the file currently has `N-1` lines) appends to the end.\n' +
+        '  • Values outside `[1, lineCount + 1]` are rejected.\n\n' +
+        '`content` is inserted verbatim. A trailing newline is added automatically if' +
+        ' missing so that the next existing line is not joined onto the inserted block.\n\n' +
+        'For replacing existing text use `replace_in_file`. For deletions or other' +
+        ' content-based edits, read the file first and use a replace-style tool.',
       inputSchema,
       outputSchema
     );
@@ -39,30 +32,27 @@ export default class InsertInFileTool extends ToolBase<Input, Output> {
     );
 
     const original = await readFile(absolutePath, 'utf-8');
+    const lines = original.length === 0 ? [] : original.split('\n');
 
-    if (input.find.length === 0) {
-      throw new Error('`find` must not be empty.');
-    }
+    const hadTrailingNewline = original.endsWith('\n');
+    // `split('\n')` on text ending in '\n' yields a trailing empty string; drop
+    // it so `lines.length` equals the number of actual content lines.
+    if (hadTrailingNewline) lines.pop();
 
-    const firstIdx = original.indexOf(input.find);
-    if (firstIdx === -1) {
+    const maxLine = lines.length + 1;
+    if (input.lineNumber < 1 || input.lineNumber > maxLine) {
       throw new Error(
-        '`find` text was not found in the file. Make sure the text matches exactly,' +
-          ` including indentation and whitespace.\n--- find ---\n${input.find}`
-      );
-    }
-    const secondIdx = original.indexOf(input.find, firstIdx + 1);
-    if (secondIdx !== -1) {
-      throw new Error(
-        '`find` text appears more than once in the file. Add surrounding context to' +
-          ` make it unique.\n--- find ---\n${input.find}`
+        `\`lineNumber\` ${input.lineNumber} is out of range. File has ${lines.length}` +
+          ` line(s); valid range is 1..${maxLine}.`
       );
     }
 
-    const updated =
-      original.slice(0, firstIdx) +
-      input.replace +
-      original.slice(firstIdx + input.find.length);
+    const insertLines = input.content.split('\n');
+    const insertIndex = input.lineNumber - 1;
+    lines.splice(insertIndex, 0, ...insertLines);
+
+    let updated = lines.join('\n');
+    if (hadTrailingNewline || original.length === 0) updated += '\n';
 
     await writeFile(absolutePath, updated, 'utf-8');
     await context.fileCache.update(absolutePath);
@@ -70,16 +60,17 @@ export default class InsertInFileTool extends ToolBase<Input, Output> {
     return {
       success: true,
       bytesWritten: Buffer.byteLength(updated, 'utf-8'),
+      linesInserted: insertLines.length,
     };
   }
 
   public override inputToString(input: Input): string {
-    return `Editing \`${input.filePath}\``;
+    return `Inserting into \`${input.filePath}\` at line ${input.lineNumber}`;
   }
 
   public override outputToString(output: Output): string {
     if (!output.success) return `Unable to insert into file`;
-    return `Applied edit (${output.bytesWritten} bytes).`;
+    return `Inserted ${output.linesInserted} line(s) (${output.bytesWritten} bytes total).`;
   }
 }
 
@@ -89,20 +80,19 @@ const inputSchema = z.object({
     .describe(
       'The path of the file to edit. May be absolute or relative to the working directory.'
     ),
-  find: z
-    .string()
+  lineNumber: z
+    .number()
+    .int()
     .min(1)
     .describe(
-      'The exact text currently in the file that should be replaced. Must match the file content' +
-        ' verbatim (including indentation and whitespace) and must be unique within the file —' +
-        ' include enough surrounding context to disambiguate if needed.'
+      'The 1-based line number at which to insert. Existing content at that line and' +
+        ' below is shifted down. Pass `lineCount + 1` to append at the end of the file.'
     ),
-  replace: z
+  content: z
     .string()
     .describe(
-      'The text that `find` should be replaced with. Use an empty string to delete the matched' +
-        ' text. To insert without removing, include the original `find` text inside `replace`' +
-        ' along with the new content.'
+      'The text to insert. May contain multiple lines separated by `\\n`. The block is' +
+        ' inserted verbatim; a trailing newline is added automatically if not present.'
     ),
 });
 
@@ -111,6 +101,7 @@ type Input = z.infer<typeof inputSchema>;
 const outputSchema = z.object({
   success: z.boolean(),
   bytesWritten: z.number(),
+  linesInserted: z.number(),
 });
 
 type Output = z.infer<typeof outputSchema>;

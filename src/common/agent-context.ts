@@ -284,7 +284,7 @@ export class AgentContext {
         }
 
         this.shellBuffer.pushText(
-          `${formatMarkdown(tool.inputToString(processed))}\n`
+          `${formatMarkdown(tool.inputToString(processed))}`
         );
 
         let output: unknown;
@@ -305,7 +305,7 @@ export class AgentContext {
         }
 
         this.shellBuffer.pushText(
-          `${formatMarkdown(tool.outputToString(parsed.data))}\n`
+          `↳ ${formatMarkdown(tool.outputToString(parsed.data))}\n`
         );
 
         return parsed.data;

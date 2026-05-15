@@ -11,9 +11,8 @@ export default class ReadFileTool extends ToolBase<Input, Output> {
       'read_file',
       'Read file',
       'Reads the entire UTF-8 text content of a file from disk and returns it as a single string with' +
-        ' each line prefixed by its 1-based line number and a tab (`<n>\\t<line>`). The line numbers' +
-        ' are for orientation only — `insert_in_file` is content-based (find/replace strings), so the' +
-        ' numbers themselves do not need to be passed anywhere.\n' +
+        ' each line prefixed by its 1-based line number and a tab (`<n>\\t<line>`). These line' +
+        ' numbers can be passed to `insert_in_file` to insert new content at a specific position.\n' +
         'Accepts either an absolute path or a path relative to the working directory. Use this tool' +
         ' when you need to inspect the full contents of a known file — for example to understand its' +
         ' structure, extract information, or prepare for an edit. Do NOT use this tool to discover' +
