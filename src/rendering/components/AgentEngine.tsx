@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, type JSX } from 'react';
-import { openai } from '@ai-sdk/openai';
+import { createVertex } from '@ai-sdk/google-vertex';
 import {
   type LanguageModel,
   type ModelMessage,
@@ -10,14 +9,16 @@ import {
   type ToolSet,
 } from 'ai';
 import chalk from 'chalk';
-import { glob } from 'node:fs/promises';
 import compact from 'lodash/compact';
 import first from 'lodash/first';
+import { glob } from 'node:fs/promises';
+import { type JSX, useEffect, useMemo, useRef } from 'react';
 import { useAgent } from '../../common/agent-context';
 import type { AgentRuntime } from '../../common/agent-runtime';
+import { TaskStatus } from '../../common/task-list';
 import { type ToolBase, ToolSelectionOption } from '../../common/tools';
 import { allTools } from '../../common/tools/registry';
-import { previewArgs, formatMarkdown } from '../formatting';
+import { formatMarkdown, previewArgs } from '../formatting';
 
 const MAX_TASK_CONTINUATION_TURNS = 10;
 
@@ -40,10 +41,14 @@ A few things to absolutely NEVER do:
 
 export function AgentEngine(): JSX.Element | null {
   const runtime = useAgent();
-  const model = useMemo<LanguageModel>(
-    () => openai(process.env.OPENAI_MODEL ?? 'gpt-4o-mini'),
-    []
-  );
+  const model = useMemo<LanguageModel>(() => {
+    const vertex = createVertex({
+      project: process.env.GOOGLE_CLOUD_PROJECT,
+      location: process.env.GOOGLE_CLOUD_LOCATION,
+    });
+
+    return vertex('gemini-3.5-flash');
+  }, []);
   const tools = useMemo<ToolSet>(
     () => buildToolset(runtime, allTools),
     [runtime]
@@ -67,13 +72,6 @@ export function AgentEngine(): JSX.Element | null {
     };
 
     const sendTurn = async (): Promise<void> => {
-      if (!process.env.OPENAI_API_KEY) {
-        runtime.messageStore.pushText(
-          chalk.red('OPENAI_API_KEY not set. Export key then retry.\n')
-        );
-        return;
-      }
-
       const prompt = await ensureSystemPrompt();
       let buffer = '';
       runtime.messageStore.setStatus('thinking…');
@@ -153,13 +151,12 @@ function renderTaskListFragment(runtime: AgentRuntime): string | null {
   if (!runtime.taskList.hasTasks) return null;
 
   const lines = runtime.taskList.tasks.map(task => {
-    const marker =
-      task.status === 'completed'
-        ? '[x]'
-        : task.status === 'in_progress'
-          ? '[~]'
-          : '[ ]';
-    return `  ${marker} (${task.id}) ${task.description}`;
+    const mapping: Record<TaskStatus, string> = {
+      [TaskStatus.COMPLETED]: '[x]',
+      [TaskStatus.IN_PROGRESS]: '[~]',
+      [TaskStatus.PENDING]: '[ ]',
+    };
+    return `  ${mapping[task.status]} (${task.id}) ${task.description}`;
   });
 
   return [

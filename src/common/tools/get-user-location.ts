@@ -103,7 +103,7 @@ export default class GetUserLocationTool extends ToolBase<Input, Output> {
       part => part.length > 0
     );
     if (parts.length === 0) return 'Location unavailable';
-    return `User location: ${parts.join(', ')}`;
+    return `User location: ${parts.map(p => `\`${p}\``).join(', ')}`;
   }
 }
 

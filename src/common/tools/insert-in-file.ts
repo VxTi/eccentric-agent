@@ -8,15 +8,21 @@ export default class InsertInFileTool extends ToolBase<Input, Output> {
     super(
       'insert_in_file',
       'Insert in file',
-      'Inserts `content` into `filePath` at the given 1-based `lineNumber`. Existing' +
-        ' content at and after that line is shifted down — nothing is overwritten.\n\n' +
-        'Line number semantics:\n' +
-        '  • `1` inserts at the very top of the file.\n' +
-        '  • `N` (where the file currently has `N-1` lines) appends to the end.\n' +
-        '  • Values outside `[1, lineCount + 1]` are rejected.\n\n' +
-        '`content` is inserted verbatim. A trailing newline is added automatically if' +
-        ' missing so that the next existing line is not joined onto the inserted block.\n\n' +
-        'For replacing existing text use `replace_in_file`. For deletions or other' +
+      'Inserts `content` into `filePath` relative to the 1-based `lineNumber`. The' +
+        ' `inclusive` flag controls whether the target line is overwritten or preserved.\n\n' +
+        'Modes:\n' +
+        '  • `inclusive: false` (default) — insert AFTER `lineNumber`. The line at' +
+        ' `lineNumber` is kept; `content` becomes the lines immediately following it.' +
+        ' Pass `lineNumber: 0` to insert at the very top. Valid range:' +
+        ' `[0, lineCount]`.\n' +
+        '  • `inclusive: true` — REPLACE the line at `lineNumber` with `content`.' +
+        ' Valid range: `[1, lineCount]`.\n\n' +
+        '`content` is inserted verbatim and may span multiple lines separated by' +
+        ' `\\n`. A trailing `\\n` in `content` is treated as part of the block, not as' +
+        ' a separator — it will not produce a spurious blank line between the inserted' +
+        ' block and the following line. The file\'s original trailing-newline state is' +
+        ' preserved.\n\n' +
+        'For arbitrary text substitution use `replace_in_file`. For deletions or other' +
         ' content-based edits, read the file first and use a replace-style tool.',
       inputSchema,
       outputSchema
@@ -39,17 +45,30 @@ export default class InsertInFileTool extends ToolBase<Input, Output> {
     // it so `lines.length` equals the number of actual content lines.
     if (hadTrailingNewline) lines.pop();
 
-    const maxLine = lines.length + 1;
-    if (input.lineNumber < 1 || input.lineNumber > maxLine) {
-      throw new Error(
-        `\`lineNumber\` ${input.lineNumber} is out of range. File has ${lines.length}` +
-          ` line(s); valid range is 1..${maxLine}.`
-      );
+    const insertLines = input.content.split('\n');
+    // A trailing '\n' in content would otherwise inject a blank line between
+    // the inserted block and the following file content.
+    if (insertLines.length > 1 && insertLines[insertLines.length - 1] === '') {
+      insertLines.pop();
     }
 
-    const insertLines = input.content.split('\n');
-    const insertIndex = input.lineNumber - 1;
-    lines.splice(insertIndex, 0, ...insertLines);
+    if (input.inclusive) {
+      if (input.lineNumber < 1 || input.lineNumber > lines.length) {
+        throw new Error(
+          `\`lineNumber\` ${input.lineNumber} is out of range for inclusive mode.` +
+            ` File has ${lines.length} line(s); valid range is 1..${lines.length}.`
+        );
+      }
+      lines.splice(input.lineNumber - 1, 1, ...insertLines);
+    } else {
+      if (input.lineNumber < 0 || input.lineNumber > lines.length) {
+        throw new Error(
+          `\`lineNumber\` ${input.lineNumber} is out of range. File has` +
+            ` ${lines.length} line(s); valid range is 0..${lines.length}.`
+        );
+      }
+      lines.splice(input.lineNumber, 0, ...insertLines);
+    }
 
     let updated = lines.join('\n');
     if (hadTrailingNewline || original.length === 0) updated += '\n';
@@ -65,7 +84,8 @@ export default class InsertInFileTool extends ToolBase<Input, Output> {
   }
 
   public override inputToString(input: Input): string {
-    return `Inserting into \`${input.filePath}\` at line ${input.lineNumber}`;
+    const action = input.inclusive ? 'Replacing line' : 'Inserting after line';
+    return `${action} ${input.lineNumber} in \`${input.filePath}\``;
   }
 
   public override outputToString(output: Output): string {
@@ -83,16 +103,26 @@ const inputSchema = z.object({
   lineNumber: z
     .number()
     .int()
-    .min(1)
+    .min(0)
     .describe(
-      'The 1-based line number at which to insert. Existing content at that line and' +
-        ' below is shifted down. Pass `lineCount + 1` to append at the end of the file.'
+      'The 1-based line number to anchor the edit to. Interpretation depends on' +
+        ' `inclusive`: when false (default), content is inserted AFTER this line' +
+        ' (use 0 to insert at the top, `lineCount` to append at the end); when true,' +
+        ' this line is REPLACED by `content`.'
     ),
   content: z
     .string()
     .describe(
-      'The text to insert. May contain multiple lines separated by `\\n`. The block is' +
-        ' inserted verbatim; a trailing newline is added automatically if not present.'
+      'The text to insert. May contain multiple lines separated by `\\n`. Inserted' +
+        ' verbatim; a trailing `\\n` is treated as part of the block, not as a separator.'
+    ),
+  inclusive: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe(
+      'When true, `content` REPLACES the line at `lineNumber`. When false (default),' +
+        ' `content` is inserted immediately AFTER `lineNumber` and nothing is overwritten.'
     ),
 });
 

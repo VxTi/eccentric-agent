@@ -2,7 +2,6 @@ import chalk from 'chalk';
 import { stdin, stdout } from 'node:process';
 import { config } from 'dotenv';
 import { render } from 'ink';
-import { createElement } from 'react';
 import { AgentProvider } from './common/agent-context';
 import {
   createInputQueue,
@@ -62,13 +61,11 @@ async function main(): Promise<void> {
   stdout.write(ANSI_ALT_SCREEN_ENTER);
 
   const instance = render(
-    createElement(MessageProvider, {
-      store: messageStore,
-      children: createElement(AgentProvider, {
-        runtime,
-        children: createElement(App),
-      }),
-    }),
+    <MessageProvider store={messageStore}>
+      <AgentProvider runtime={runtime}>
+        <App />
+      </AgentProvider>
+    </MessageProvider>,
     {
       stdout,
       stdin,

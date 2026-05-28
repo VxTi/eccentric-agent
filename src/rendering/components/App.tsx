@@ -1,4 +1,4 @@
-import { useEffect, useState, type JSX } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Box, useStdout } from 'ink';
 import { useMessageState } from '../message-context';
 import { AgentEngine } from './AgentEngine';
@@ -29,7 +29,7 @@ function useTerminalSize(): { columns: number; rows: number } {
   return size;
 }
 
-export function App(): JSX.Element {
+export function App(): ReactNode {
   const state = useMessageState();
   const { columns, rows } = useTerminalSize();
 

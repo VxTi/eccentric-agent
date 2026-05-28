@@ -1,4 +1,8 @@
-export type TaskStatus = 'pending' | 'in_progress' | 'completed';
+export enum TaskStatus {
+  PENDING = 'pending',
+  COMPLETED = 'completed',
+  IN_PROGRESS = 'in_progress',
+}
 
 export interface Task {
   id: string;
@@ -21,7 +25,7 @@ export class TaskList {
   public hasIncompleteTasks(): boolean {
     if (this._taskList.length === 0) return false;
 
-    return this._taskList.some(task => task.status !== 'completed');
+    return this._taskList.some(task => task.status !== TaskStatus.COMPLETED);
   }
 
   public get hasTasks() {

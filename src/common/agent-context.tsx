@@ -1,4 +1,4 @@
-import { createContext, useContext, type JSX, type ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import type { AgentRuntime } from './agent-runtime';
 
 const AgentRuntimeContext = createContext<AgentRuntime | null>(null);
@@ -11,7 +11,7 @@ interface AgentProviderProps {
 export function AgentProvider({
   runtime,
   children,
-}: AgentProviderProps): JSX.Element {
+}: AgentProviderProps): ReactNode {
   return (
     <AgentRuntimeContext.Provider value={runtime}>
       {children}
