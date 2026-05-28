@@ -62,6 +62,8 @@ export function useAgentEngine(): void {
     if (startedRef.current) return;
     startedRef.current = true;
 
+    const tokensUsed = 0;
+
     let cancelled = false;
     const messages: ModelMessage[] = [];
     let systemPrompt: string | undefined;
@@ -77,7 +79,7 @@ export function useAgentEngine(): void {
     const sendTurn = async (): Promise<void> => {
       const prompt = await ensureSystemPrompt();
       let buffer = '';
-      messageStore.setStatus('processing…');
+      messageStore.setStatus(`processing… - ${tokensUsed}`);
 
       const result = streamText({
         allowSystemInMessages: true,
@@ -85,6 +87,9 @@ export function useAgentEngine(): void {
         model,
         messages: [{ content: prompt, role: 'system' }, ...messages],
         tools,
+        providerOptions: {
+          vertex: { includeThoughts: false },
+        },
         stopWhen: stepCountIs(20),
       });
 
@@ -95,16 +100,12 @@ export function useAgentEngine(): void {
       } catch (err) {
         messageStore.pushText(chalk.red(`Stream error: ${String(err)}\n`));
       } finally {
-        messageStore.setStatus(null);
+        messageStore.setStatus(`↓ ${tokensUsed}`);
       }
 
       if (buffer.length > 0) {
         messageStore.pushText(`${chalk.blue('◆ ') + formatMarkdown(buffer)}\n`);
       }
-
-      messageStore.pushText(
-        `Result after request${buffer} - ${JSON.stringify(result)}`
-      );
 
       try {
         const finalMessages = (await result.response).messages;

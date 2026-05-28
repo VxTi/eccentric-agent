@@ -3,7 +3,7 @@ import { Box, measureElement, type DOMElement } from 'ink';
 import { useMessageState, useMessageStore } from '../context/messages';
 import { Fragment } from './fragments/Fragment';
 
-export function History(): JSX.Element {
+export function MessageList(): JSX.Element {
   const { offset, fragments } = useMessageState();
   const store = useMessageStore();
   const viewportRef = useRef<DOMElement | null>(null);

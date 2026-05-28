@@ -6,51 +6,7 @@ import type { ApprovalOption } from '../../common/types';
 import { useMessageStore } from '../context/messages';
 import { InputBox } from './InputBox';
 
-const INPUT_PREFIX = '> ';
-const MAX_PICKER_SUGGESTIONS = 8;
-
-interface PickerState {
-  triggerIndex: number;
-  query: string;
-  matches: string[];
-  selected: number;
-}
-
-interface PromptState {
-  message: string;
-  options: readonly ApprovalOption[];
-  selected: number;
-  resolve: (option: string) => void;
-}
-
-interface FieldState {
-  buffer: string;
-  cursor: number;
-  picker: PickerState | null;
-  prompt: PromptState | null;
-}
-
-const INITIAL_FIELD: FieldState = {
-  buffer: '',
-  cursor: 0,
-  picker: null,
-  prompt: null,
-};
-
-type Action =
-  | { type: 'replace'; next: FieldState }
-  | { type: 'patch'; patch: Partial<FieldState> };
-
-function reducer(state: FieldState, action: Action): FieldState {
-  switch (action.type) {
-    case 'replace':
-      return action.next;
-    case 'patch':
-      return { ...state, ...action.patch };
-  }
-}
-
-export function InputController(): JSX.Element {
+export default function UserInput(): JSX.Element {
   const runtime = useAgent();
   const messageStore = useMessageStore();
   const { exit } = useApp();
@@ -329,6 +285,50 @@ export function InputController(): JSX.Element {
       }}
     />
   );
+}
+
+const INPUT_PREFIX = '> ';
+const MAX_PICKER_SUGGESTIONS = 8;
+
+interface PickerState {
+  triggerIndex: number;
+  query: string;
+  matches: string[];
+  selected: number;
+}
+
+interface PromptState {
+  message: string;
+  options: readonly ApprovalOption[];
+  selected: number;
+  resolve: (option: string) => void;
+}
+
+interface FieldState {
+  buffer: string;
+  cursor: number;
+  picker: PickerState | null;
+  prompt: PromptState | null;
+}
+
+const INITIAL_FIELD: FieldState = {
+  buffer: '',
+  cursor: 0,
+  picker: null,
+  prompt: null,
+};
+
+type Action =
+  | { type: 'replace'; next: FieldState }
+  | { type: 'patch'; patch: Partial<FieldState> };
+
+function reducer(state: FieldState, action: Action): FieldState {
+  switch (action.type) {
+    case 'replace':
+      return action.next;
+    case 'patch':
+      return { ...state, ...action.patch };
+  }
 }
 
 function buildPromptLines(prompt: PromptState): string[] {
