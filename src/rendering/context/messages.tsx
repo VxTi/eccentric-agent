@@ -4,20 +4,21 @@ import {
   useSyncExternalStore,
   type JSX,
   type ReactNode,
+  useMemo,
 } from 'react';
-import type { MessageState, MessageStore } from './message-store';
+import { type MessageState, MessageStore } from '../message-store';
 
 const MessageStoreContext = createContext<MessageStore | null>(null);
 
-interface MessageProviderProps {
-  store: MessageStore;
-  children: ReactNode;
-}
-
-export function MessageProvider({
-  store,
+export function MessagesProvider({
   children,
-}: MessageProviderProps): JSX.Element {
+}: {
+  children: ReactNode;
+}): JSX.Element {
+  const store = useMemo(() => {
+    return new MessageStore();
+  }, []);
+
   return (
     <MessageStoreContext.Provider value={store}>
       {children}

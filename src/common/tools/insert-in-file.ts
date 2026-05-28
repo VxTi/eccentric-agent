@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { readFile, writeFile } from 'fs/promises';
+import { type AgentRuntime } from '../../rendering/context/agent-context';
 import { ToolBase } from '../tools';
-import { type AgentRuntime } from '../agent-runtime';
 
 export default class InsertInFileTool extends ToolBase<Input, Output> {
   constructor() {
@@ -20,7 +20,7 @@ export default class InsertInFileTool extends ToolBase<Input, Output> {
         '`content` is inserted verbatim and may span multiple lines separated by' +
         ' `\\n`. A trailing `\\n` in `content` is treated as part of the block, not as' +
         ' a separator — it will not produce a spurious blank line between the inserted' +
-        ' block and the following line. The file\'s original trailing-newline state is' +
+        " block and the following line. The file's original trailing-newline state is" +
         ' preserved.\n\n' +
         'For arbitrary text substitution use `replace_in_file`. For deletions or other' +
         ' content-based edits, read the file first and use a replace-style tool.',

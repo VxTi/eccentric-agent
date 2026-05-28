@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { Box, measureElement, type DOMElement } from 'ink';
-import { useMessageState, useMessageStore } from '../message-context';
+import { useMessageState, useMessageStore } from '../context/messages';
 import { Fragment } from './fragments/Fragment';
 
 export function History(): JSX.Element {

@@ -1,4 +1,4 @@
-import { createVertex } from '@ai-sdk/google-vertex';
+import { vertex } from '@ai-sdk/google-vertex';
 import {
   type LanguageModel,
   type ModelMessage,
@@ -12,13 +12,18 @@ import chalk from 'chalk';
 import compact from 'lodash/compact';
 import first from 'lodash/first';
 import { glob } from 'node:fs/promises';
-import { type JSX, useEffect, useMemo, useRef } from 'react';
-import { useAgent } from '../../common/agent-context';
-import type { AgentRuntime } from '../../common/agent-runtime';
+import { useEffect, useMemo, useRef } from 'react';
+import { type AgentRuntime, useAgent } from '../context/agent-context';
 import { TaskStatus } from '../../common/task-list';
 import { type ToolBase, ToolSelectionOption } from '../../common/tools';
 import { allTools } from '../../common/tools/registry';
+import { useSignal } from '../context/application-cancellation';
+import { useMessageStore } from '../context/messages';
 import { formatMarkdown, previewArgs } from '../formatting';
+import { config } from 'dotenv';
+import { type MessageStore } from '../message-store';
+
+config({ quiet: true });
 
 const MAX_TASK_CONTINUATION_TURNS = 10;
 
@@ -39,18 +44,16 @@ A few things to absolutely NEVER do:
   the code should be understandable enough so that a comment is not necessary.
 `;
 
-export function AgentEngine(): JSX.Element | null {
+export function useAgentEngine(): void {
   const runtime = useAgent();
-  const model = useMemo<LanguageModel>(() => {
-    const vertex = createVertex({
-      project: process.env.GOOGLE_CLOUD_PROJECT,
-      location: process.env.GOOGLE_CLOUD_LOCATION,
-    });
+  const messageStore = useMessageStore();
+  const signal = useSignal();
 
-    return vertex('gemini-3.5-flash');
+  const model = useMemo<LanguageModel>(() => {
+    return vertex('gemini-2.5-flash');
   }, []);
   const tools = useMemo<ToolSet>(
-    () => buildToolset(runtime, allTools),
+    () => buildToolset(runtime, messageStore, allTools),
     [runtime]
   );
   const startedRef = useRef(false);
@@ -74,11 +77,11 @@ export function AgentEngine(): JSX.Element | null {
     const sendTurn = async (): Promise<void> => {
       const prompt = await ensureSystemPrompt();
       let buffer = '';
-      runtime.messageStore.setStatus('thinking…');
+      messageStore.setStatus('processing…');
 
       const result = streamText({
         allowSystemInMessages: true,
-        abortSignal: runtime.abortController.signal,
+        abortSignal: signal,
         model,
         messages: [{ content: prompt, role: 'system' }, ...messages],
         tools,
@@ -90,24 +93,24 @@ export function AgentEngine(): JSX.Element | null {
           buffer += chunk;
         }
       } catch (err) {
-        runtime.messageStore.pushText(
-          chalk.red(`Stream error: ${String(err)}\n`)
-        );
+        messageStore.pushText(chalk.red(`Stream error: ${String(err)}\n`));
       } finally {
-        runtime.messageStore.setStatus(null);
+        messageStore.setStatus(null);
       }
 
       if (buffer.length > 0) {
-        runtime.messageStore.pushText(
-          `${chalk.blue('◆ ') + formatMarkdown(buffer)}\n`
-        );
+        messageStore.pushText(`${chalk.blue('◆ ') + formatMarkdown(buffer)}\n`);
       }
+
+      messageStore.pushText(
+        `Result after request${buffer} - ${JSON.stringify(result)}`
+      );
 
       try {
         const finalMessages = (await result.response).messages;
         messages.push(...finalMessages);
       } catch (err) {
-        runtime.messageStore.pushText(
+        messageStore.pushText(
           chalk.red(`Failed to record assistant turn: ${String(err)}\n`)
         );
       }
@@ -143,8 +146,6 @@ export function AgentEngine(): JSX.Element | null {
       cancelled = true;
     };
   }, [runtime, model, tools]);
-
-  return null;
 }
 
 function renderTaskListFragment(runtime: AgentRuntime): string | null {
@@ -183,13 +184,24 @@ async function loadSystemPrompt(cwd: string): Promise<string> {
   return first(agentFile) ?? DEFAULT_SYSTEM_PROMPT;
 }
 
-function buildToolset(runtime: AgentRuntime, tools: ToolBase[]): ToolSet {
+function buildToolset(
+  runtime: AgentRuntime,
+  messageStore: MessageStore,
+  tools: ToolBase[]
+): ToolSet {
   return Object.fromEntries(
-    tools.map(tool => [tool.internalName, bindTool(runtime, tool)])
+    tools.map(tool => [
+      tool.internalName,
+      bindTool(runtime, messageStore, tool),
+    ])
   );
 }
 
-function bindTool(runtime: AgentRuntime, tool: ToolBase): Tool {
+function bindTool(
+  runtime: AgentRuntime,
+  messageStore: MessageStore,
+  tool: ToolBase
+): Tool {
   return createTool({
     description: tool.description,
     inputSchema: tool.inputSchema,
@@ -219,16 +231,14 @@ function bindTool(runtime: AgentRuntime, tool: ToolBase): Tool {
         }
       }
 
-      runtime.messageStore.pushText(
-        `${formatMarkdown(tool.inputToString(processed))}`
-      );
+      messageStore.pushText(`${formatMarkdown(tool.inputToString(processed))}`);
 
       let output: unknown;
       try {
         output = await tool.handle(processed, runtime);
       } catch (err) {
         const message = `Tool "${tool.internalName}" failed: ${String(err)}`;
-        runtime.messageStore.pushText(chalk.red(`${message}\n`));
+        messageStore.pushText(chalk.red(`${message}\n`));
         return { error: message, ok: false };
       }
 
@@ -236,11 +246,11 @@ function bindTool(runtime: AgentRuntime, tool: ToolBase): Tool {
 
       if (!parsed.success) {
         const message = `Tool "${tool.internalName}" returned an unexpected shape: ${String(parsed.error)}`;
-        runtime.messageStore.pushText(chalk.red(`${message}\n`));
+        messageStore.pushText(chalk.red(`${message}\n`));
         return { error: message, ok: false, raw: output };
       }
 
-      runtime.messageStore.pushText(
+      messageStore.pushText(
         `↳ ${formatMarkdown(tool.outputToString(parsed.data))}\n`
       );
 

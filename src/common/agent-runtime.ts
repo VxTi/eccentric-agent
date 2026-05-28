@@ -1,19 +1,4 @@
-import type { FileSelector } from '../file-selector';
-import type { FileCache } from '../lib/file-cache';
-import type { MessageStore } from '../rendering/message-store';
-import type { TaskList } from './task-list';
 import type { UserInputQueue, UserInputRequest } from './types';
-
-export interface AgentRuntime {
-  readonly cwd: string;
-  readonly abortController: AbortController;
-  readonly taskList: TaskList;
-  readonly messageStore: MessageStore;
-  readonly fileSelector: FileSelector;
-  readonly fileCache: FileCache;
-  readonly inputQueue: ManagedUserInputQueue;
-  readonly userMessageQueue: UserMessageQueue;
-}
 
 export interface DequeuedRequest extends UserInputRequest {
   resolve: (option: string) => void;

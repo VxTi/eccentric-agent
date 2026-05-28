@@ -1,23 +1,23 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Box, useStdout } from 'ink';
-import { useMessageState } from '../message-context';
-import { AgentEngine } from './AgentEngine';
+import { Box, Text, useStdout } from 'ink';
+import { useMessageState } from '../context/messages';
+import { useAgentEngine } from '../hooks/agent-engine';
 import { History } from './History';
 import { StatusLine } from './StatusLine';
 import { InputController } from './InputController';
 
-function useTerminalSize(): { columns: number; rows: number } {
+function useTerminalSize(): { width: number; height: number } {
   const { stdout } = useStdout();
   const [size, setSize] = useState(() => ({
-    columns: stdout.columns ?? 80,
-    rows: stdout.rows ?? 24,
+    width: stdout.columns ?? 80,
+    height: stdout.rows ?? 24,
   }));
 
   useEffect(() => {
     const handler = (): void => {
       setSize({
-        columns: stdout.columns ?? 80,
-        rows: stdout.rows ?? 24,
+        width: stdout.columns ?? 80,
+        height: stdout.rows ?? 24,
       });
     };
     stdout.on('resize', handler);
@@ -30,15 +30,38 @@ function useTerminalSize(): { columns: number; rows: number } {
 }
 
 export function App(): ReactNode {
-  const state = useMessageState();
-  const { columns, rows } = useTerminalSize();
+  const { status } = useMessageState();
+  const { width, height } = useTerminalSize();
+
+  useAgentEngine();
 
   return (
-    <Box flexDirection="column" width={columns} height={rows}>
-      <AgentEngine />
+    <Box
+      flexDirection="column"
+      width={width}
+      height={height}
+      borderColor="red"
+      borderStyle="round"
+    >
+      <WelcomingText />
       <History />
-      {state.status !== null && <StatusLine status={state.status} />}
+      {status !== null && <StatusLine status={status} />}
       <InputController />
+    </Box>
+  );
+}
+
+function WelcomingText() {
+  const { fragments } = useMessageState();
+  if (fragments.length > 0) return;
+
+  return (
+    <Box flexDirection="column" alignItems="center">
+      <Box marginTop={1}>
+        <Text color="blue">◆</Text>
+        <Text bold> Eccentric Agent</Text>
+        <Text dimColor> — type @ for files, Ctrl+C to exit</Text>
+      </Box>
     </Box>
   );
 }

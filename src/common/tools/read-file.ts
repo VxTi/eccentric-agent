@@ -2,8 +2,8 @@ import { type Output } from 'ai';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { z } from 'zod';
+import { type AgentRuntime } from '../../rendering/context/agent-context';
 import { ToolBase } from '../tools';
-import { type AgentRuntime } from '../agent-runtime';
 
 export default class ReadFileTool extends ToolBase<Input, Output> {
   constructor() {

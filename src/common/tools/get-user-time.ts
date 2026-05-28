@@ -25,11 +25,11 @@ export default class GetUserTimeTool extends ToolBase<Input, Output> {
       timeZone,
     }).format(now);
 
-    return {
+    return Promise.resolve({
       formatted,
       timeZone,
       iso: now.toISOString(),
-    };
+    });
   }
 
   public override inputToString(_input: Input): string {

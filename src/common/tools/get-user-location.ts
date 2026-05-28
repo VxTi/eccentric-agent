@@ -74,6 +74,7 @@ export default class GetUserLocationTool extends ToolBase<Input, Output> {
 
     if (data.success === false) {
       throw new Error(
+        // eslint-disable-next-line @typescript-eslint/no-base-to-string
         `Geolocation lookup failed: ${String(data.message ?? 'unknown reason')}`
       );
     }

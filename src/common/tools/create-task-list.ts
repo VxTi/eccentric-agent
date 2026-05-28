@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { type AgentRuntime } from '../agent-runtime';
+import { type AgentRuntime } from '../../rendering/context/agent-context';
+import { type Task, TaskStatus } from '../task-list';
 import { ToolBase } from '../tools';
 
 export default class CreateTaskListTool extends ToolBase<Input, Output> {
@@ -24,10 +25,10 @@ export default class CreateTaskListTool extends ToolBase<Input, Output> {
     input: Input,
     context: AgentRuntime
   ): Promise<Output> {
-    const tasks = input.tasks.map(task => ({
+    const tasks: Task[] = input.tasks.map(task => ({
       id: task.id,
       description: task.description,
-      status: 'pending' as const,
+      status: TaskStatus.PENDING,
     }));
 
     context.taskList.set(tasks);

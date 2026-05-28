@@ -2,24 +2,15 @@ import chalk from 'chalk';
 import { stdin, stdout } from 'node:process';
 import { config } from 'dotenv';
 import { render } from 'ink';
-import { AgentProvider } from './common/agent-context';
-import {
-  createInputQueue,
-  createUserMessageQueue,
-  type AgentRuntime,
-} from './common/agent-runtime';
-import { TaskList } from './common/task-list';
-import { createFileSelector } from './file-selector';
-import { FileCache } from './lib/file-cache';
+import { AgentProvider } from './rendering/context/agent-context';
 import { App } from './rendering/components/App';
-import { MessageProvider } from './rendering/message-context';
-import { MessageStore } from './rendering/message-store';
-import { textBlock } from './rendering/fragments';
+import { ApplicationCancellationProvider } from './rendering/context/application-cancellation';
+import { MessagesProvider } from './rendering/context/messages';
 
 config({ quiet: true });
 
 const ANSI_ALT_SCREEN_ENTER = '\x1b[?1049h\x1b[H\x1b[2J';
-const ANSI_ALT_SCREEN_EXIT = '\x1b[?1049l';
+const ANSI_ALT_SCREEN_EXIT = '\x1b[?1049l\x1b[3J';
 
 const abortController = new AbortController();
 
@@ -29,43 +20,19 @@ function restoreScreen(): void {
 
 async function main(): Promise<void> {
   if (!stdin.isTTY) {
-    stdout.write(
-      chalk.red('stdin not a TTY. CLI need interactive terminal.\n')
-    );
-    process.exit(1);
+    throw new Error('stdin not a TTY. CLI need interactive terminal.\n');
   }
-
-  const cwd = process.cwd();
-  const messageStore = new MessageStore();
-
-  messageStore.push(
-    textBlock({
-      content: `${chalk.blue('◆')} ${chalk.bold('Eccentric Agent')}${chalk.dim(
-        ' — type @ for files, Ctrl+C to' + ' exit\n\n'
-      )}`,
-      align: 'center',
-    })
-  );
-
-  const runtime: AgentRuntime = {
-    cwd,
-    abortController,
-    taskList: new TaskList(),
-    messageStore,
-    fileCache: new FileCache(cwd),
-    fileSelector: createFileSelector(cwd),
-    inputQueue: createInputQueue(),
-    userMessageQueue: createUserMessageQueue(),
-  };
 
   stdout.write(ANSI_ALT_SCREEN_ENTER);
 
   const instance = render(
-    <MessageProvider store={messageStore}>
-      <AgentProvider runtime={runtime}>
-        <App />
-      </AgentProvider>
-    </MessageProvider>,
+    <ApplicationCancellationProvider controller={abortController}>
+      <MessagesProvider>
+        <AgentProvider>
+          <App />
+        </AgentProvider>
+      </MessagesProvider>
+    </ApplicationCancellationProvider>,
     {
       stdout,
       stdin,
@@ -75,27 +42,25 @@ async function main(): Promise<void> {
   );
 
   await instance.waitUntilExit();
-  restoreScreen();
 }
 
-process.on('SIGINT', () => {
+process.on('SIGINT', handleExit);
+process.on('SIGTERM', handleExit);
+
+main()
+  .then(handleExit)
+  .catch(err => {
+    if (err instanceof Error && err.name === 'ExitPromptError') {
+      stdout.write(chalk.yellow('Goodbye.'));
+    } else {
+      stdout.write(`\n${chalk.red(String(err))}\n`);
+    }
+
+    handleExit();
+    process.exit(1);
+  });
+
+function handleExit() {
   abortController.abort();
   restoreScreen();
-  process.exit();
-});
-
-process.on('SIGTERM', () => {
-  abortController.abort();
-  restoreScreen();
-});
-
-main().catch(err => {
-  restoreScreen();
-  if (err instanceof Error && err.name === 'ExitPromptError') {
-    stdout.write(chalk.yellow('Goodbye.'));
-  }
-
-  stdout.write(`\n${chalk.red(String(err))}\n`);
-  abortController.abort();
-  process.exit(1);
-});
+}
