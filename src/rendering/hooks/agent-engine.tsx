@@ -1,58 +1,21 @@
 import { vertex } from '@ai-sdk/google-vertex';
-import {
-  type LanguageModel,
-  type ModelMessage,
-  stepCountIs,
-  streamText,
-  type Tool,
-  tool as createTool,
-  type ToolSet,
-} from 'ai';
+import { type LanguageModel, type ModelMessage, stepCountIs, streamText, type ToolSet } from 'ai';
 import chalk from 'chalk';
 import compact from 'lodash/compact';
-import first from 'lodash/first';
-import { glob } from 'node:fs/promises';
 import { useEffect, useMemo, useRef } from 'react';
 import { TaskStatus } from '../../lib/tasks';
-import { toolRegistry, type ToolBase, ToolSelectionOption } from '../../tools';
-import { useSignal, useMessageStore, type AgentContext, useAgent } from '../context';
-import { formatMarkdown, previewArgs } from '../formatting';
+import { toolRegistry } from '../../tools';
+import { useSignal, type AgentContext, useAgent } from '../context';
+import { formatMarkdown } from '../formatting';
 import { config } from 'dotenv';
-import { type MessageStore } from '../message-store';
 
 config({ quiet: true });
 
-const MAX_TASK_CONTINUATION_TURNS = 10;
-
-const DEFAULT_SYSTEM_PROMPT = `You are an expert at writing, navigating and refactoring codebases.
-You've been in the industry for more than 15 years, and have experienced all frameworks of all kinds.
-You have a ton of experience with languages such as TypeScript, JavaScript, Java, Kotlin, C++, C and Go.
-
-Whenever the task is unable to be executed due to ambiguity, don't be afraid to prompt the user with questions.
-If the task is deemed too complex to execute in one go, make a task list for it and execute it in steps.
-
-A few things to absolutely NEVER do:
-
-- Do not ever delete files without explicit user permissions.
-- Whenever simpler tools exist to perform certain actions with, use those.
-  If you can read a file without commands, then do so.
-- Don't write redundant comments for things that don't demand so. You should
-  make your output speak for itself. Whenever the user requests code to be generated,
-  the code should be understandable enough so that a comment is not necessary.
-`;
-
 export function useAgentEngine(): void {
-  const runtime = useAgent();
-  const messageStore = useMessageStore();
+  const context = useAgent();
   const signal = useSignal();
 
-  const model = useMemo<LanguageModel>(() => {
-    return vertex('gemini-2.5-flash');
-  }, []);
-  const tools = useMemo<ToolSet>(
-    () => buildToolset(runtime, messageStore, toolRegistry),
-    [messageStore, runtime]
-  );
+  const tools = useMemo<ToolSet>(() => buildToolset(context, toolRegistry), [context]);
   const startedRef = useRef(false);
 
   useEffect(() => {
@@ -67,9 +30,9 @@ export function useAgentEngine(): void {
 
     const ensureSystemPrompt = async (): Promise<string> => {
       if (!systemPrompt) {
-        systemPrompt = await loadSystemPrompt(runtime.cwd);
+        systemPrompt = await loadSystemPrompt(context.cwd);
       }
-      const taskFragment = renderTaskListFragment(runtime);
+      const taskFragment = renderTaskListFragment(context);
       return compact([systemPrompt, taskFragment]).join('\n');
     };
 
@@ -118,7 +81,7 @@ export function useAgentEngine(): void {
 
     void (async () => {
       while (!cancelled) {
-        const userMessage = await runtime.userMessageQueue.next();
+        const userMessage = await context.userMessageQueue.next();
         if (cancelled) return;
         messages.push({ content: userMessage, role: 'user' });
         await sendTurn();
@@ -126,7 +89,7 @@ export function useAgentEngine(): void {
         let continuations = 0;
         while (
           !cancelled &&
-          runtime.taskList.hasIncompleteTasks() &&
+          context.taskList.hasIncompleteTasks() &&
           continuations < MAX_TASK_CONTINUATION_TURNS
         ) {
           continuations += 1;
@@ -145,7 +108,7 @@ export function useAgentEngine(): void {
     return () => {
       cancelled = true;
     };
-  }, [runtime, model, tools]);
+  }, [context, model, tools]);
 }
 
 function renderTaskListFragment(runtime: AgentContext): string | null {
@@ -167,79 +130,4 @@ function renderTaskListFragment(runtime: AgentContext): string | null {
       ' Use `update_task_list` to mark tasks "in_progress" before starting' +
       ' and "completed" when done. Only stop once every task is completed.',
   ].join('\n');
-}
-
-async function loadSystemPrompt(cwd: string): Promise<string> {
-  const supportedFileNames: string[] = [
-    'AGENTS',
-    'AGENT',
-    'SKILL',
-    'CLAUDE',
-    'claude',
-    'copilot-instructions',
-  ];
-  const agentFile = await Array.fromAsync(glob(`**/{${supportedFileNames.join(',')}}.md`, { cwd }));
-  return first(agentFile) ?? DEFAULT_SYSTEM_PROMPT;
-}
-
-function buildToolset(
-  runtime: AgentContext,
-  messageStore: MessageStore,
-  tools: ToolBase[]
-): ToolSet {
-  return Object.fromEntries(
-    tools.map(tool => [tool.internalName, bindTool(runtime, messageStore, tool)])
-  );
-}
-
-function bindTool(runtime: AgentContext, messageStore: MessageStore, tool: ToolBase): Tool {
-  return createTool({
-    description: tool.description,
-    inputSchema: tool.inputSchema,
-    execute: async (input: unknown) => {
-      const processed: unknown = await tool.inputSchema.parse(input);
-      const needsApproval = await tool.requiresApproval(processed, runtime);
-
-      if (needsApproval) {
-        const options = await tool.approvalOptions(processed, runtime);
-        const prompt = `tool "${tool.internalName}" requires approval — args: ${previewArgs(input)}`;
-
-        const chosen = await runtime.inputQueue.request({
-          toolName: tool.internalName,
-          prompt,
-          options,
-        });
-        const selectionOption = await tool.onOptionSelect(processed, chosen, runtime);
-
-        if (selectionOption !== ToolSelectionOption.ALLOW) {
-          return {
-            error: `User denied permission to run tool "${tool.internalName}".`,
-          };
-        }
-      }
-
-      messageStore.pushText(`${formatMarkdown(tool.inputToString(processed))}`);
-
-      let output: unknown;
-      try {
-        output = await tool.handle(processed, runtime);
-      } catch (err) {
-        const message = `Tool "${tool.internalName}" failed: ${String(err)}`;
-        messageStore.pushText(chalk.red(`${message}\n`));
-        return { error: message, ok: false };
-      }
-
-      const parsed = await tool.outputSchema.safeParseAsync(output);
-
-      if (!parsed.success) {
-        const message = `Tool "${tool.internalName}" returned an unexpected shape: ${String(parsed.error)}`;
-        messageStore.pushText(chalk.red(`${message}\n`));
-        return { error: message, ok: false, raw: output };
-      }
-
-      messageStore.pushText(`↳ ${formatMarkdown(tool.outputToString(parsed.data))}\n`);
-
-      return parsed.data;
-    },
-  });
 }

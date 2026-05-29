@@ -1,5 +1,5 @@
-import { z } from 'zod';
 import { readFile, writeFile } from 'fs/promises';
+import { z } from 'zod';
 import { type AgentContext } from '../rendering/context';
 import { ToolBase } from './common';
 
@@ -34,9 +34,8 @@ export default class ReplaceInFileTool extends ToolBase<Input, Output> {
 
   public override async handle(input: Input, context: AgentContext): Promise<Output> {
     const absolutePath = await context.fileCache.getCachedFilePath(input.filePath);
-    const original = await readFile(absolutePath, 'utf-8');
 
-    let working = original;
+    let working = await readFile(absolutePath, 'utf-8');
     for (let i = 0; i < input.replacements.length; i += 1) {
       const replacement = input.replacements[i];
       const label = `replacement #${i}`;

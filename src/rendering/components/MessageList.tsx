@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { Box, measureElement, type DOMElement } from 'ink';
-import { useAgent }             from '../context';
-import { useMessageState }      from '../context';
+import { useAgent } from '../context';
 import { ModelMessageFragment } from './model-message-fragment';
 
 export function MessageList(): JSX.Element {

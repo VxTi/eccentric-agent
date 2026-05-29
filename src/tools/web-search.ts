@@ -1,7 +1,7 @@
 import { type Output } from 'ai';
 import * as cheerio from 'cheerio';
-import { z } from 'zod';
-import { ToolBase } from './common/tool-base';
+import * as z from 'zod';
+import { ToolBase } from './common';
 
 export default class WebSearchTool extends ToolBase<Input, Output> {
   constructor() {

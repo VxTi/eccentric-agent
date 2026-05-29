@@ -1,5 +1,4 @@
-import { z } from 'zod';
-import { type AgentContext } from '../rendering/context';
+import * as z from 'zod';
 import { Agent } from '../lib/agent';
 import { ToolBase } from './common';
 
@@ -23,21 +22,15 @@ export default class SpawnAgentsTool extends ToolBase<Input, Output> {
     });
   }
 
-  public override async handle(input: Input, context: AgentContext): Promise<Output> {
+  public override async handle(input: Input): Promise<Output> {
     if (input.agents.length === 0) {
       throw new Error('At least one sub-agent must be provided.');
     }
 
-    return await Promise.all(
-      input.agents.map(({ name, goal }) => this.runSubAgent(name, goal, context))
-    );
+    return await Promise.all(input.agents.map(({ name, goal }) => this.runSubAgent(name, goal)));
   }
 
-  private runSubAgent(
-    name: string,
-    goal: string,
-    context: AgentContext
-  ): Promise<z.infer<typeof agentResultSchema>> {
+  private runSubAgent(name: string, goal: string): Promise<z.infer<typeof agentResultSchema>> {
     return new Promise(resolve => {
       const controller = new AbortController();
 
@@ -51,7 +44,6 @@ export default class SpawnAgentsTool extends ToolBase<Input, Output> {
           }
         },
         controller.signal,
-        context,
         z.string()
       );
     });

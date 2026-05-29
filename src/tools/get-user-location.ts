@@ -1,6 +1,6 @@
 import * as https from 'node:https';
-import { z } from 'zod';
-import { ToolBase } from './common/tool-base';
+import * as z from 'zod';
+import { ToolBase } from './common';
 
 const GEO_ENDPOINT = 'https://ipwho.is/';
 

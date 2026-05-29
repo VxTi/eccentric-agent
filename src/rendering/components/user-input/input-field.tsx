@@ -1,7 +1,24 @@
-import { type JSX, type ReactNode, useEffect, useMemo, useState } from 'react';
+import {
+  type Dispatch,
+  type JSX,
+  type ReactNode,
+  type SetStateAction,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { Box, Text, useInput, usePaste } from 'ink';
+import {
+  emitEvent,
+  EventName,
+  subscribeEvent,
+  unsubscribeEvent,
+  type UserInputRequest,
+  type UserInputRequestEvent,
+  UserInputResponseEvent,
+} from '../../../lib/events';
 import { useAbort, useAgent } from '../../context';
-import { useInputSuggestionProvider } from '../../hooks/input-suggestion-provider';
+import { useInputSuggestionProvider } from '../../hooks';
 
 const MAX_SHOWN_SUGGESTIONS = 10;
 
@@ -12,6 +29,19 @@ export default function InputField(): JSX.Element {
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number>(-1);
   const controller = useAbort();
   const agent = useAgent();
+
+  // Handling of user input requests
+  const [inputRequest, setInputRequest] = useState<UserInputRequest | undefined>(undefined);
+
+  useEffect(() => {
+    const handleInputRequest = (event: UserInputRequestEvent) => setInputRequest(event.detail);
+
+    subscribeEvent(EventName.REQUEST_USER_INPUT, handleInputRequest);
+
+    return () => {
+      unsubscribeEvent(EventName.REQUEST_USER_INPUT, handleInputRequest);
+    };
+  }, []);
 
   const submitMessage = () => {
     agent.submitMessage(input);
@@ -25,6 +55,9 @@ export default function InputField(): JSX.Element {
     if (key.ctrl && inputChar === 'c') {
       controller.abort(0);
     }
+
+    // Handled in another component
+    if (inputRequest) return;
 
     // Suggestion handling
     if (suggestions.length > 0) {
@@ -83,11 +116,59 @@ export default function InputField(): JSX.Element {
     }
   });
 
+  if (inputRequest) {
+    return <InputRequest inputRequest={inputRequest} setInputRequest={setInputRequest} />;
+  }
+
   return (
     <Box width="80%" alignSelf="center" flexDirection="column">
       <Suggestions suggestions={suggestions} selectedIndex={selectedSuggestionIndex} />
       <Box backgroundColor="gray" paddingY={1} paddingX={1} flexDirection="column">
         <InputText input={input} cursor={cursorOffset} />
+      </Box>
+    </Box>
+  );
+}
+
+interface InputRequestProps {
+  inputRequest: UserInputRequest;
+  setInputRequest: Dispatch<SetStateAction<UserInputRequest | undefined>>;
+}
+
+function InputRequest({ inputRequest, setInputRequest }: InputRequestProps): ReactNode {
+  const [userSelectedInputIndex, setUserSelectedInputIndex] = useState<number>(0);
+
+  useInput((_input, key) => {
+    if (key.upArrow) {
+      setUserSelectedInputIndex(
+        prev => (prev + inputRequest.options.length - 1) % inputRequest.options.length
+      );
+    } else if (key.downArrow) {
+      setUserSelectedInputIndex(
+        prev => (prev + inputRequest.options.length + 1) % inputRequest.options.length
+      );
+    } else if (key.return || key.tab) {
+      emitEvent(new UserInputResponseEvent(inputRequest.options[userSelectedInputIndex]));
+
+      setInputRequest(undefined);
+      setUserSelectedInputIndex(-1);
+    }
+  });
+
+  return (
+    <Box width="80%" alignSelf="center" flexDirection="column">
+      <Box flexDirection="column" alignItems="center">
+        <Text bold color="white">
+          {inputRequest.title}
+        </Text>
+        <Text color="gray">{inputRequest.description}</Text>
+      </Box>
+      <Box marginTop={1} marginLeft={2}>
+        {inputRequest.options.map((option, i) => (
+          <Text key={i} color={i === userSelectedInputIndex ? 'red' : 'white'}>
+            {option.label}
+          </Text>
+        ))}
       </Box>
     </Box>
   );

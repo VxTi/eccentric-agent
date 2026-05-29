@@ -1,4 +1,14 @@
-import { type ModelMessage } from 'ai';
+import { vertex } from '@ai-sdk/google-vertex';
+import {
+  type LanguageModel,
+  type ModelMessage,
+  type Tool,
+  tool as createTool,
+  type ToolSet,
+} from 'ai';
+import chalk from 'chalk';
+import first from 'lodash/first';
+import { glob } from 'node:fs/promises';
 import {
   createContext,
   type Dispatch,
@@ -9,8 +19,20 @@ import {
   useMemo,
   useState,
 } from 'react';
+import {
+  emitEvent,
+  EventName,
+  subscribeEvent,
+  SyncAgentContextEvent,
+  unsubscribeEvent,
+} from '../../lib/events';
 import { FileCache } from '../../lib/file-cache';
+import { Result } from '../../lib/result';
+import { DEFAULT_SYSTEM_PROMPT } from '../../lib/constants';
 import { TaskList } from '../../lib/tasks';
+import { emitAgentMessage, requestUserInput } from '../../lib/user-input';
+import { type ToolBase, toolRegistry, ToolSelectionOption } from '../../tools';
+import { formatMarkdown, previewArgs } from '../formatting';
 
 export type Message = Extract<ModelMessage, { role: 'assistant' | 'user' }>;
 
@@ -41,6 +63,12 @@ export function AgentProvider({ children }: { children: ReactNode }): ReactNode 
 
   const fileCache = useMemo(() => new FileCache(cwd), [cwd]);
   const taskList = useMemo(() => new TaskList(), []);
+
+  const model = useMemo<LanguageModel>(() => {
+    return vertex('gemini-2.5-flash');
+  }, []);
+
+  const tools = useMemo<ToolSet>(() => constructToolset(toolRegistry), [context]);
 
   const submitMessage = useCallback(
     (input: string) => {
@@ -77,4 +105,75 @@ export function useAgent(): AgentContext {
     throw new Error('useAgent must be used inside <AgentProvider>');
   }
   return runtime;
+}
+
+async function loadSystemPrompt(cwd: string): Promise<string> {
+  const supportedFileNames: string[] = [
+    'AGENTS',
+    'AGENT',
+    'SKILL',
+    'CLAUDE',
+    'claude',
+    'copilot-instructions',
+  ];
+  const agentFile = await Array.fromAsync(glob(`**/{${supportedFileNames.join(',')}}.md`, { cwd }));
+  return first(agentFile) ?? DEFAULT_SYSTEM_PROMPT;
+}
+
+function constructToolset(tools: ToolBase[]): ToolSet {
+  return Object.fromEntries(tools.map(tool => [tool.internalName, constructTool(tool)]));
+}
+
+function constructTool(runtime: AgentContext, tool: ToolBase): Tool {
+  const { description, inputSchema, outputSchema } = tool;
+  return createTool({
+    description,
+    inputSchema,
+    outputSchema,
+    execute: async (input: unknown) => {
+      const requiresApproval = await tool.requiresApproval(input, runtime);
+
+      if (requiresApproval) {
+        const options = await tool.approvalOptions(input, runtime);
+
+        const chosen = await requestUserInput({
+          title: 'Approval required',
+          description: `Tool "${tool.internalName}" requires approval\n ↳ ${previewArgs(input)}`,
+          options: options.map(opt => ({ label: opt.text, id: opt.option })),
+        });
+        const selectionOption = await tool.onOptionSelect(input, chosen.id, runtime);
+
+        if (selectionOption !== ToolSelectionOption.ALLOW) {
+          return Result.Error(`User denied permission to run tool "${tool.internalName}".`);
+        }
+      }
+      emitAgentMessage(formatMarkdown(tool.inputToString(input)));
+
+      let output: unknown;
+      try {
+        output = await tool.handle(input, runtime);
+      } catch (err) {
+        const message = `Tool "${tool.internalName}" failed: ${String(err)}`;
+        emitAgentMessage(chalk.red(`${message}\n`));
+        return Result.Error(message);
+      }
+
+      emitAgentMessage(`↳ ${formatMarkdown(tool.outputToString(output))}\n`);
+      return output;
+    },
+  });
+}
+
+export async function acquireContextInstance(): Promise<AgentContext> {
+  return new Promise(resolve => {
+    const handler = (event: SyncAgentContextEvent) => {
+      if (event.detail.type === 'sync-context-response') {
+        unsubscribeEvent(EventName.SYNC_AGENT_CONTEXT, handler);
+        resolve(event.detail.context);
+      }
+    };
+
+    emitEvent(new SyncAgentContextEvent({ type: 'sync-context' }));
+    subscribeEvent(EventName.SYNC_AGENT_CONTEXT, handler);
+  });
 }

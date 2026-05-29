@@ -1,9 +1,9 @@
 import { type Output } from 'ai';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import { z } from 'zod';
-import { type AgentContext } from '../rendering/context/agent-context';
-import { ToolBase } from './common/tool-base';
+import * as z from 'zod';
+import { acquireContextInstance } from '../rendering/context';
+import { ToolBase } from './common';
 
 export default class ReadFileTool extends ToolBase<Input, Output> {
   constructor() {
@@ -26,7 +26,8 @@ export default class ReadFileTool extends ToolBase<Input, Output> {
     });
   }
 
-  public override async handle(input: Input, context: AgentContext): Promise<Output> {
+  public override async handle(input: Input): Promise<Output> {
+    const context = await acquireContextInstance();
     const resolved = path.isAbsolute(input.filePath)
       ? input.filePath
       : path.join(context.cwd, input.filePath);

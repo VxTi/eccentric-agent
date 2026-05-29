@@ -1,6 +1,6 @@
-import { z } from 'zod';
-import { type AgentContext } from '../rendering/context/agent-context';
-import { ToolBase } from './common/tool-base';
+import * as z from 'zod';
+import { requestUserInput } from '../lib/user-input';
+import { ToolBase } from './common';
 
 export default class PromptUserOptionsTool extends ToolBase<Input, Output> {
   constructor() {
@@ -24,7 +24,7 @@ export default class PromptUserOptionsTool extends ToolBase<Input, Output> {
     });
   }
 
-  public override async handle(input: Input, context: AgentContext): Promise<Output> {
+  public override async handle(input: Input): Promise<Output> {
     const ids = new Set<string>();
     for (const option of input.options) {
       if (ids.has(option.id)) {
@@ -33,19 +33,16 @@ export default class PromptUserOptionsTool extends ToolBase<Input, Output> {
       ids.add(option.id);
     }
 
-    const chosen = await context.inputQueue.request({
-      toolName: this.internalName,
-      prompt: input.question,
-      options: input.options.map(option => ({
-        option: option.id,
-        text: option.label,
-      })),
+    const chosen = await requestUserInput({
+      title: 'Your attention is needed',
+      description: input.question,
+      options: input.options,
     });
 
-    const match = input.options.find(option => option.id === chosen);
+    const match = input.options.find(option => option.id === chosen.id);
     if (!match) {
       throw new Error(
-        `User selected an unrecognised option id "${chosen}". Expected one of:` +
+        `User selected an unrecognised option id "${chosen.id}". Expected one of:` +
           ` ${input.options.map(option => option.id).join(', ')}.`
       );
     }

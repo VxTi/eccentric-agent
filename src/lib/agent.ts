@@ -8,7 +8,6 @@ import {
   type ToolSet,
 } from 'ai';
 import * as z from 'zod';
-import { type AgentContext } from '../rendering/context';
 import { type ToolBase, agentTools } from '../tools';
 import { Result } from './result';
 
@@ -22,14 +21,12 @@ export class Agent<T = string> {
   private readonly model: LanguageModel;
 
   private goalAccomplished = false;
-  private result: T | undefined;
+  private result: string | undefined;
 
   constructor(
     private readonly goal: string,
     private readonly callback: (data: Result<T, Error>) => void,
-    private readonly signal: AbortSignal,
-    private readonly context: AgentContext,
-    private readonly resultSchema: z.ZodType<T>
+    private readonly signal: AbortSignal
   ) {
     this.toolset = this.constructToolset();
     this.model = vertex('gemini-3.1-flash-lite-preview');
@@ -99,7 +96,7 @@ export class Agent<T = string> {
       inputSchema,
       outputSchema,
       execute: async (input: unknown) => {
-        return await tool.handle(input, this.context).catch((err: Error) => {
+        return await tool.handle(input).catch((err: Error) => {
           const message = `Tool "${tool.internalName}" failed: ${String(err)}`;
 
           return Result.Error(message);
@@ -110,7 +107,7 @@ export class Agent<T = string> {
 
   private constructPrimaryGoalTool(): Tool {
     const inputSchema = z.object({
-      result: this.resultSchema.describe('The final result of accomplishing the goal.'),
+      result: z.string().describe('The final result of accomplishing the goal.'),
     });
 
     return createTool({

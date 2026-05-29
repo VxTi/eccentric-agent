@@ -3,12 +3,7 @@ import { isNumber } from 'lodash';
 import { stdin, stdout } from 'node:process';
 import { config } from 'dotenv';
 import { render } from 'ink';
-import {
-  FileCacheProvider,
-  AgentProvider,
-  MessagesProvider,
-  ApplicationCancellationProvider,
-} from './rendering/context';
+import { AgentProvider, ApplicationCancellationProvider } from './rendering/context';
 import { App } from './rendering/components/App';
 
 config({ quiet: true });
@@ -35,13 +30,9 @@ async function main(): Promise<void> {
 
   const { waitUntilExit } = render(
     <ApplicationCancellationProvider controller={controller}>
-      <FileCacheProvider>
-        <MessagesProvider>
-          <AgentProvider>
-            <App />
-          </AgentProvider>
-        </MessagesProvider>
-      </FileCacheProvider>
+      <AgentProvider>
+        <App />
+      </AgentProvider>
     </ApplicationCancellationProvider>,
     {
       stdout,

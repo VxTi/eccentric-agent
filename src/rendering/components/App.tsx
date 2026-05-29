@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { Box, Text } from 'ink';
-import { useMessageState } from '../context';
+import { useAgent } from '../context';
 import { useAgentEngine } from '../hooks/agent-engine';
 import { useTerminalSize } from '../hooks/terminal-size';
 import { MessageList } from './MessageList';
@@ -23,8 +23,8 @@ export function App(): ReactNode {
 }
 
 function WelcomingText() {
-  const { fragments } = useMessageState();
-  if (fragments.length > 0) return;
+  const { messages } = useAgent();
+  if (messages.length > 0) return;
 
   return (
     <Box flexDirection="column" alignItems="center">

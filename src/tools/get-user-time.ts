@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import { ToolBase } from './common/tool-base';
+import * as z from 'zod';
+import { ToolBase } from './common';
 
 export default class GetUserTimeTool extends ToolBase<Input, Output> {
   constructor() {

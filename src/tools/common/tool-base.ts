@@ -1,5 +1,4 @@
 import type * as z from 'zod';
-import { type AgentContext } from '../../rendering/context/agent-context';
 import type { ApprovalOption, MaybePromise } from '../../types';
 
 export const DEFAULT_APPROVAL_OPTIONS: ApprovalOption[] = [
@@ -47,23 +46,19 @@ export abstract class ToolBase<
     this.mightRequireApproval = props.mightRequireApproval ?? true;
   }
 
-  public approvalOptions(_input: TIn, _context: AgentContext): MaybePromise<ApprovalOption[]> {
+  public approvalOptions(_input: TIn): MaybePromise<ApprovalOption[]> {
     return DEFAULT_APPROVAL_OPTIONS;
   }
 
-  public requiresApproval(_input: TIn, _context: AgentContext): MaybePromise<boolean> {
+  public requiresApproval(_input: TIn): MaybePromise<boolean> {
     return false;
   }
 
-  public onOptionSelect(
-    _input: TIn,
-    _option: TApprovalOption,
-    _context: AgentContext
-  ): MaybePromise<ToolSelectionOption> {
+  public onOptionSelect(_input: TIn, _option: TApprovalOption): MaybePromise<ToolSelectionOption> {
     return ToolSelectionOption.ALLOW;
   }
 
-  public abstract handle(input: TIn, _context: AgentContext): Promise<TOut>;
+  public abstract handle(input: TIn): Promise<TOut>;
 
   public abstract inputToString(input: TIn): string;
 
