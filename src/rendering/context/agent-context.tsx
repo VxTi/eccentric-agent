@@ -17,9 +17,9 @@ import {
   type Dispatch,
   type ReactNode,
   type SetStateAction,
-  use,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
@@ -53,6 +53,7 @@ export interface AgentContext {
   taskList: TaskList;
   fileCache: FileCache;
   messages: Message[];
+  setMessages: Dispatch<SetStateAction<ModelMessage[]>>;
 
   status: AgentStatus;
   setStatus: Dispatch<SetStateAction<AgentStatus>>;
@@ -72,8 +73,18 @@ export function AgentProvider({ children }: { children: ReactNode }): ReactNode 
   const taskList = useMemo(() => new TaskList(), []);
 
   const tools = useMemo<ToolSet>(() => constructToolset(toolRegistry), []);
-  const systemPrompt = use(constructSystemPrompt(taskList, cwd));
   const model = useMemo<LanguageModel>(() => vertex('gemini-2.5-flash'), []);
+  const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SYSTEM_PROMPT);
+
+  useEffect(() => {
+    let cancelled = false;
+    void constructSystemPrompt(taskList, cwd).then(prompt => {
+      if (!cancelled) setSystemPrompt(prompt);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [taskList, cwd]);
 
   const processRequest = useCallback(
     async (prompt: string) => {
@@ -136,8 +147,8 @@ export function AgentProvider({ children }: { children: ReactNode }): ReactNode 
 
   const submitMessage = useCallback(
     (input: string) => {
-      // If we're streaming something, we'll add the input message to the queue
       if (status.loading) {
+        // If we're streaming something, we'll add the input message to the queue
         setMessageQueue(prev => [...prev, input]);
         return;
       }
@@ -150,6 +161,7 @@ export function AgentProvider({ children }: { children: ReactNode }): ReactNode 
     <PrimaryAgentContext.Provider
       value={{
         messages: messages.filter((m): m is Message => m.role === 'user' || m.role === 'assistant'),
+        setMessages,
         cwd,
         setCwd,
         submitMessage,

@@ -49,7 +49,11 @@ export default function InputField(): JSX.Element {
     setCursorOffset(0);
   };
 
-  usePaste(text => setInput(prev => prev + text));
+  usePaste(text => {
+    const updatedText = input + text;
+    setInput(updatedText);
+    setCursorOffset(cursorOffset + text.length);
+  });
 
   useInput((inputChar, key) => {
     if (key.ctrl && inputChar === 'c') {
@@ -104,7 +108,7 @@ export default function InputField(): JSX.Element {
     }
 
     if (key.rightArrow) {
-      if (cursorOffset > inputChar.length - 1) return;
+      if (cursorOffset > inputChar.length) return;
       setCursorOffset(prev => prev + 1);
       return;
     }
@@ -188,17 +192,18 @@ function InputText({ input, cursor }: InputTextProps): ReactNode {
   const [blinkState, setBlinkState] = useState<boolean>(false);
 
   useEffect(() => {
-    setInterval(() => setBlinkState(prev => !prev), 500);
+    const id = setInterval(() => setBlinkState(prev => !prev), 500);
+    return () => clearInterval(id);
   }, []);
 
   return (
-    <Text>
-      {before}
+    <Box>
+      <Text>{before}</Text>
       <Box borderLeftColor="white" borderLeft={blinkState}>
-        {cursorChar}
+        <Text>{cursorChar}</Text>
       </Box>
-      {after}
-    </Text>
+      <Text>{after}</Text>
+    </Box>
   );
 }
 
