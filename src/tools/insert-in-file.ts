@@ -31,13 +31,8 @@ export default class InsertInFileTool extends ToolBase<Input, Output> {
     });
   }
 
-  public override async handle(
-    input: Input,
-    context: AgentContext
-  ): Promise<Output> {
-    const absolutePath = await context.fileCache.getCachedFilePath(
-      input.filePath
-    );
+  public override async handle(input: Input, context: AgentContext): Promise<Output> {
+    const absolutePath = await context.fileCache.getCachedFilePath(input.filePath);
 
     const original = await readFile(absolutePath, 'utf-8');
     const lines = original.length === 0 ? [] : original.split('\n');

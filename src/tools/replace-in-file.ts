@@ -32,13 +32,8 @@ export default class ReplaceInFileTool extends ToolBase<Input, Output> {
     });
   }
 
-  public override async handle(
-    input: Input,
-    context: AgentContext
-  ): Promise<Output> {
-    const absolutePath = await context.fileCache.getCachedFilePath(
-      input.filePath
-    );
+  public override async handle(input: Input, context: AgentContext): Promise<Output> {
+    const absolutePath = await context.fileCache.getCachedFilePath(input.filePath);
     const original = await readFile(absolutePath, 'utf-8');
 
     let working = original;
@@ -50,14 +45,10 @@ export default class ReplaceInFileTool extends ToolBase<Input, Output> {
         throw new Error(`${label}: \`find\` must not be empty.`);
       }
       if (replacement.find.includes('\n')) {
-        throw new Error(
-          `${label}: \`find\` must be a single line (no newline characters).`
-        );
+        throw new Error(`${label}: \`find\` must be a single line (no newline characters).`);
       }
       if (replacement.replace.includes('\n')) {
-        throw new Error(
-          `${label}: \`replace\` must be a single line (no newline characters).`
-        );
+        throw new Error(`${label}: \`replace\` must be a single line (no newline characters).`);
       }
 
       const firstIdx = working.indexOf(replacement.find);

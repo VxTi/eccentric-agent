@@ -16,24 +16,20 @@ export interface TaskUpdate {
 }
 
 export class TaskList {
-  private _taskList: Task[];
-
-  constructor(taskList: Task[] = []) {
-    this._taskList = taskList;
-  }
+  constructor(private taskList: Task[] = []) {}
 
   public hasIncompleteTasks(): boolean {
-    if (this._taskList.length === 0) return false;
+    if (this.taskList.length === 0) return false;
 
-    return this._taskList.some(task => task.status !== TaskStatus.COMPLETED);
+    return this.taskList.some(t => t.status !== TaskStatus.COMPLETED);
   }
 
   public get hasTasks() {
-    return this._taskList.length > 0;
+    return this.taskList.length > 0;
   }
 
   public get tasks(): Task[] {
-    return this._taskList;
+    return this.taskList;
   }
 
   public updateTasks(updates: TaskUpdate[]): Task[] {
@@ -41,25 +37,23 @@ export class TaskList {
       throw new Error('No task list exists.');
     }
 
-    for (const update of updates) {
-      const task = this._taskList.find(t => t.id === update.id);
+    updates.forEach((update: TaskUpdate) => {
+      const task = this.taskList.find(t => t.id === update.id);
       if (!task) {
-        throw new Error(
-          `No task with id "${update.id}" exists in the task list.`
-        );
+        throw new Error(`No task with id "${update.id}" exists in the task list.`);
       }
       task.status = update.status;
-    }
+    });
 
     return this.tasks;
   }
 
   public set(tasks: Task[]): Task[] {
-    this._taskList = tasks;
-    return this._taskList;
+    this.taskList = tasks;
+    return this.taskList;
   }
 
   public clear(): void {
-    this._taskList = [];
+    this.taskList = [];
   }
 }

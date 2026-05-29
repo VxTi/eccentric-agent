@@ -14,7 +14,7 @@ import first from 'lodash/first';
 import { glob } from 'node:fs/promises';
 import { useEffect, useMemo, useRef } from 'react';
 import { type AgentContext, useAgent } from '../context/agent-context';
-import { TaskStatus } from '../../tools/tasks/task-list';
+import { TaskStatus } from '../../tools/tasks/tasks';
 import { toolRegistry, type ToolBase, ToolSelectionOption } from '../../tools';
 import { useSignal } from '../context/application-cancellation';
 import { useMessageStore } from '../context/messages';
@@ -114,9 +114,7 @@ export function useAgentEngine(): void {
         const finalMessages = (await result.response).messages;
         messages.push(...finalMessages);
       } catch (err) {
-        messageStore.pushText(
-          chalk.red(`Failed to record assistant turn: ${String(err)}\n`)
-        );
+        messageStore.pushText(chalk.red(`Failed to record assistant turn: ${String(err)}\n`));
       }
     };
 
@@ -182,9 +180,7 @@ async function loadSystemPrompt(cwd: string): Promise<string> {
     'claude',
     'copilot-instructions',
   ];
-  const agentFile = await Array.fromAsync(
-    glob(`**/{${supportedFileNames.join(',')}}.md`, { cwd })
-  );
+  const agentFile = await Array.fromAsync(glob(`**/{${supportedFileNames.join(',')}}.md`, { cwd }));
   return first(agentFile) ?? DEFAULT_SYSTEM_PROMPT;
 }
 
@@ -194,18 +190,11 @@ function buildToolset(
   tools: ToolBase[]
 ): ToolSet {
   return Object.fromEntries(
-    tools.map(tool => [
-      tool.internalName,
-      bindTool(runtime, messageStore, tool),
-    ])
+    tools.map(tool => [tool.internalName, bindTool(runtime, messageStore, tool)])
   );
 }
 
-function bindTool(
-  runtime: AgentContext,
-  messageStore: MessageStore,
-  tool: ToolBase
-): Tool {
+function bindTool(runtime: AgentContext, messageStore: MessageStore, tool: ToolBase): Tool {
   return createTool({
     description: tool.description,
     inputSchema: tool.inputSchema,
@@ -222,11 +211,7 @@ function bindTool(
           prompt,
           options,
         });
-        const selectionOption = await tool.onOptionSelect(
-          processed,
-          chosen,
-          runtime
-        );
+        const selectionOption = await tool.onOptionSelect(processed, chosen, runtime);
 
         if (selectionOption !== ToolSelectionOption.ALLOW) {
           return {
@@ -254,9 +239,7 @@ function bindTool(
         return { error: message, ok: false, raw: output };
       }
 
-      messageStore.pushText(
-        `↳ ${formatMarkdown(tool.outputToString(parsed.data))}\n`
-      );
+      messageStore.pushText(`↳ ${formatMarkdown(tool.outputToString(parsed.data))}\n`);
 
       return parsed.data;
     },

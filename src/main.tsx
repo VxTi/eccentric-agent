@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import { isNumber } from 'lodash';
 import { stdin, stdout } from 'node:process';
 import { config } from 'dotenv';
 import { render } from 'ink';
@@ -25,7 +26,9 @@ async function main(): Promise<void> {
 
   stdout.write(ANSI_ALT_SCREEN_ENTER);
 
-  controller.signal.addEventListener('abort', () => handleExit(0));
+  controller.signal.addEventListener('abort', () =>
+    handleExit(isNumber(controller.signal.reason) ? controller.signal.reason : 0)
+  );
 
   const { waitUntilExit } = render(
     <ApplicationCancellationProvider controller={controller}>

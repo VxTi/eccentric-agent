@@ -10,20 +10,12 @@ import { type MessageState, MessageStore } from '../message-store';
 
 const MessageStoreContext = createContext<MessageStore | null>(null);
 
-export function MessagesProvider({
-  children,
-}: {
-  children: ReactNode;
-}): JSX.Element {
+export function MessagesProvider({ children }: { children: ReactNode }): JSX.Element {
   const store = useMemo(() => {
     return new MessageStore();
   }, []);
 
-  return (
-    <MessageStoreContext.Provider value={store}>
-      {children}
-    </MessageStoreContext.Provider>
-  );
+  return <MessageStoreContext.Provider value={store}>{children}</MessageStoreContext.Provider>;
 }
 
 export function useMessageStore(): MessageStore {

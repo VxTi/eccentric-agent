@@ -32,19 +32,8 @@ export function MessageList(): JSX.Element {
   const marginTop = -(overflow - clampedOffset);
 
   return (
-    <Box
-      ref={viewportRef}
-      flexDirection="column"
-      flexGrow={1}
-      flexShrink={1}
-      overflowY="hidden"
-    >
-      <Box
-        ref={contentRef}
-        flexDirection="column"
-        flexShrink={0}
-        marginTop={marginTop}
-      >
+    <Box ref={viewportRef} flexDirection="column" flexGrow={1} flexShrink={1} overflowY="hidden">
+      <Box ref={contentRef} flexDirection="column" flexShrink={0} marginTop={marginTop}>
         {fragments.map((fragment, idx) => (
           <Box key={idx} flexShrink={0} flexDirection="column">
             <Fragment fragment={fragment} />

@@ -23,18 +23,13 @@ export default class SpawnAgentsTool extends ToolBase<Input, Output> {
     });
   }
 
-  public override async handle(
-    input: Input,
-    context: AgentContext
-  ): Promise<Output> {
+  public override async handle(input: Input, context: AgentContext): Promise<Output> {
     if (input.agents.length === 0) {
       throw new Error('At least one sub-agent must be provided.');
     }
 
     return await Promise.all(
-      input.agents.map(({ name, goal }) =>
-        this.runSubAgent(name, goal, context)
-      )
+      input.agents.map(({ name, goal }) => this.runSubAgent(name, goal, context))
     );
   }
 
@@ -117,16 +112,12 @@ const agentResultSchema = z.discriminatedUnion('ok', [
   z.object({
     name: z.string().describe('The label of the sub-agent.'),
     ok: z.literal(false),
-    error: z
-      .string()
-      .describe('The error message describing why the sub-agent failed.'),
+    error: z.string().describe('The error message describing why the sub-agent failed.'),
   }),
 ]);
 
 const outputSchema = z
   .array(agentResultSchema)
-  .describe(
-    'One result entry per spawned sub-agent, in the same order as the input.'
-  );
+  .describe('One result entry per spawned sub-agent, in the same order as the input.');
 
 type Output = z.infer<typeof outputSchema>;

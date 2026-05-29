@@ -6,9 +6,7 @@ export type SuccessResult<T> = {
   ok: true;
   data: T;
 };
-export type Result<Success, Error = string> =
-  | SuccessResult<Success>
-  | ErrorResult<Error>;
+export type Result<Success, Error = string> = SuccessResult<Success> | ErrorResult<Error>;
 
 export const Result = {
   Ok: <T = undefined>(data: T): SuccessResult<T> => ({

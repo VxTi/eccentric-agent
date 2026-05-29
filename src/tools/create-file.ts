@@ -96,14 +96,10 @@ type Input = z.infer<typeof inputSchema>;
 
 const outputSchema = z.object({
   filePath: z.string().describe('The absolute path of the created file'),
-  bytesWritten: z
-    .number()
-    .describe('The number of bytes written to the new file'),
+  bytesWritten: z.number().describe('The number of bytes written to the new file'),
   created: z
     .boolean()
-    .describe(
-      'Whether the file was newly created (false means it was overwritten)'
-    ),
+    .describe('Whether the file was newly created (false means it was overwritten)'),
 });
 
 type Output = z.infer<typeof outputSchema>;

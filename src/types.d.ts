@@ -17,10 +17,7 @@ export interface UserInputQueue {
   request(req: UserInputRequest): Promise<string>;
 }
 
-export type UniqueArray<T, U extends any[] = []> = T extends [
-  infer First,
-  ...infer Rest,
-]
+export type UniqueArray<T, U extends any[] = []> = T extends [infer First, ...infer Rest]
   ? First extends U[number]
     ? [never, ...UniqueArray<Rest, U>] // Duplicate found
     : [First, ...UniqueArray<Rest, [...U, First]>] // Unique so far

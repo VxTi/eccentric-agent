@@ -40,22 +40,17 @@ export default class WebSearchTool extends ToolBase<Input, Output> {
           kl: regionCode,
         });
 
-        const response = await fetch(
-          `https://html.duckduckgo.com/html/?${params}`,
-          {
-            headers: {
-              'User-Agent':
-                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
-                '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              Accept: 'text/html',
-            },
-          }
-        );
+        const response = await fetch(`https://html.duckduckgo.com/html/?${params}`, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
+              '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            Accept: 'text/html',
+          },
+        });
 
         if (!response.ok) {
-          throw new Error(
-            `Web search failed: ${response.status} ${response.statusText}`
-          );
+          throw new Error(`Web search failed: ${response.status} ${response.statusText}`);
         }
         const rawHtml = await response.text();
         const $ = cheerio.load(rawHtml);
@@ -112,10 +107,7 @@ export default class WebSearchTool extends ToolBase<Input, Output> {
       return `\`${query}\` returned \`${results.length} result${results.length === 1 ? '' : 's'}\``;
     }
 
-    const totalResults = output.reduce(
-      (sum, { results }) => sum + results.length,
-      0
-    );
+    const totalResults = output.reduce((sum, { results }) => sum + results.length, 0);
 
     return `\`${output.length}\` queries returned \`${totalResults} result${totalResults === 1 ? '' : 's'}\` in total`;
   }
@@ -137,9 +129,7 @@ const inputSchema = z.object({
   maxResults: z
     .number()
     .optional()
-    .describe(
-      'The maximum number of results to return per query. Defaults to 10 when omitted.'
-    ),
+    .describe('The maximum number of results to return per query. Defaults to 10 when omitted.'),
   region: z
     .string()
     .optional()
@@ -154,9 +144,7 @@ type Input = z.infer<typeof inputSchema>;
 const resultSchema = z.object({
   title: z.string().describe('The title of the search result'),
   url: z.string().describe('The URL of the search result'),
-  snippet: z
-    .string()
-    .describe('A short text snippet summarizing the contents of the result'),
+  snippet: z.string().describe('A short text snippet summarizing the contents of the result'),
 });
 
 const outputSchema = z

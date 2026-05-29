@@ -48,17 +48,11 @@ const inputSchema = z.object({});
 type Input = z.infer<typeof inputSchema>;
 
 const outputSchema = z.object({
-  formatted: z
-    .string()
-    .describe("The user's current local date and time, human-readable."),
+  formatted: z.string().describe("The user's current local date and time, human-readable."),
   timeZone: z
     .string()
-    .describe(
-      'The resolved IANA time zone identifier (e.g. `Europe/Amsterdam`).'
-    ),
-  iso: z
-    .string()
-    .describe('The current instant as an ISO 8601 timestamp (UTC).'),
+    .describe('The resolved IANA time zone identifier (e.g. `Europe/Amsterdam`).'),
+  iso: z.string().describe('The current instant as an ISO 8601 timestamp (UTC).'),
 });
 
 type Output = z.infer<typeof outputSchema>;

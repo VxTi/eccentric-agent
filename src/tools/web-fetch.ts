@@ -29,9 +29,7 @@ export default class WebFetchTool extends ToolBase<Input, Output> {
       throw new Error('List of URLs must be greater than 0 ');
     }
 
-    const websites = await Promise.all(
-      urls.map(async url => this.makeRequest(url, maxBytes))
-    );
+    const websites = await Promise.all(urls.map(async url => this.makeRequest(url, maxBytes)));
 
     return { websites };
   }
@@ -42,9 +40,7 @@ export default class WebFetchTool extends ToolBase<Input, Output> {
   ): Promise<Output['websites'][0]> {
     const parsed = new URL(url);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      throw new Error(
-        `Unsupported protocol: ${parsed.protocol}. Only http and https are allowed.`
-      );
+      throw new Error(`Unsupported protocol: ${parsed.protocol}. Only http and https are allowed.`);
     }
 
     const response = await fetch(url, {
@@ -52,17 +48,14 @@ export default class WebFetchTool extends ToolBase<Input, Output> {
         'User-Agent':
           'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
           '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Accept:
-          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       },
       redirect: 'follow',
     });
 
     const body = await response.text();
     const content =
-      typeof maxBytes === 'number' && body.length > maxBytes
-        ? body.slice(0, maxBytes)
-        : body;
+      typeof maxBytes === 'number' && body.length > maxBytes ? body.slice(0, maxBytes) : body;
 
     return {
       url: response.url,
@@ -94,9 +87,7 @@ export default class WebFetchTool extends ToolBase<Input, Output> {
       return `Unable to analyse website`;
     }
 
-    const errStatuses = websites.filter(
-      ({ status }) => Math.floor(status / 100) === 2
-    ).length;
+    const errStatuses = websites.filter(({ status }) => Math.floor(status / 100) === 2).length;
 
     if (errStatuses === 0) {
       return `All \`${count}\` websites have been analysed`;
@@ -134,15 +125,11 @@ const outputSchema = z.object({
   websites: z
     .array(
       z.object({
-        url: z
-          .string()
-          .describe('The URL of the web page that was attempted to fetch'),
+        url: z.string().describe('The URL of the web page that was attempted to fetch'),
         status: z.number().describe('The HTTP status code of the response'),
         contentType: z
           .string()
-          .describe(
-            'The `Content-Type` header of the response, or an empty string if missing'
-          ),
+          .describe('The `Content-Type` header of the response, or an empty string if missing'),
         content: z.string().describe('The textual body of the response'),
       })
     )

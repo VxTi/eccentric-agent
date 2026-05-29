@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { type AgentContext } from '../../rendering/context/agent-context';
-import { type Task, TaskStatus } from './task-list';
+import { type Task, TaskStatus } from './tasks';
 import { ToolBase } from '../common/tool-base';
 
 export default class CreateTaskListTool extends ToolBase<Input, Output> {
@@ -23,10 +23,7 @@ export default class CreateTaskListTool extends ToolBase<Input, Output> {
     });
   }
 
-  public override async handle(
-    input: Input,
-    context: AgentContext
-  ): Promise<Output> {
+  public override async handle(input: Input, context: AgentContext): Promise<Output> {
     const tasks: Task[] = input.tasks.map(task => ({
       id: task.id,
       description: task.description,
@@ -39,9 +36,7 @@ export default class CreateTaskListTool extends ToolBase<Input, Output> {
   }
 
   public override inputToString(input: Input): string {
-    const lines = input.tasks
-      .map(task => `  - [${task.id}] ${task.description}`)
-      .join('\n');
+    const lines = input.tasks.map(task => `  - [${task.id}] ${task.description}`).join('\n');
     return `Create task list:\n${lines}`;
   }
 
@@ -61,9 +56,7 @@ const inputSchema = z.object({
           ),
         description: z
           .string()
-          .describe(
-            'A concise description of what completing the task entails.'
-          ),
+          .describe('A concise description of what completing the task entails.'),
       })
     )
     .min(1)

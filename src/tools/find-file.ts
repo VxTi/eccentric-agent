@@ -66,9 +66,7 @@ export default class FindFileTool extends ToolBase<Input, Output> {
 }
 
 const inputSchema = z.object({
-  directoryPath: z
-    .string()
-    .describe('The directory path in which to search files in'),
+  directoryPath: z.string().describe('The directory path in which to search files in'),
   filePattern: z
     .string()
     .describe(

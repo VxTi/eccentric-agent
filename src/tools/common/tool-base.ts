@@ -47,17 +47,11 @@ export abstract class ToolBase<
     this.mightRequireApproval = props.mightRequireApproval ?? true;
   }
 
-  public approvalOptions(
-    _input: TIn,
-    _context: AgentContext
-  ): MaybePromise<ApprovalOption[]> {
+  public approvalOptions(_input: TIn, _context: AgentContext): MaybePromise<ApprovalOption[]> {
     return DEFAULT_APPROVAL_OPTIONS;
   }
 
-  public requiresApproval(
-    _input: TIn,
-    _context: AgentContext
-  ): MaybePromise<boolean> {
+  public requiresApproval(_input: TIn, _context: AgentContext): MaybePromise<boolean> {
     return false;
   }
 

@@ -26,10 +26,7 @@ export default class ReadFileTool extends ToolBase<Input, Output> {
     });
   }
 
-  public override async handle(
-    input: Input,
-    context: AgentContext
-  ): Promise<Output> {
+  public override async handle(input: Input, context: AgentContext): Promise<Output> {
     const resolved = path.isAbsolute(input.filePath)
       ? input.filePath
       : path.join(context.cwd, input.filePath);

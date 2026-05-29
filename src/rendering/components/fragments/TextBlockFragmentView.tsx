@@ -7,15 +7,9 @@ interface TextBlockFragmentViewProps {
   fragment: TextBlockFragment;
 }
 
-export function TextBlockFragmentView({
-  fragment,
-}: TextBlockFragmentViewProps): JSX.Element {
+export function TextBlockFragmentView({ fragment }: TextBlockFragmentViewProps): JSX.Element {
   const justify =
-    fragment.align === 'center'
-      ? 'center'
-      : fragment.align === 'right'
-        ? 'flex-end'
-        : 'flex-start';
+    fragment.align === 'center' ? 'center' : fragment.align === 'right' ? 'flex-end' : 'flex-start';
 
   return (
     <Box width="80%" alignSelf="center" justifyContent={justify} flexShrink={0}>

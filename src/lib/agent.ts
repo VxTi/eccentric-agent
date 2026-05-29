@@ -85,10 +85,7 @@ export class Agent<T = string> {
   private constructToolset(): ToolSet {
     return {
       ...Object.fromEntries(
-        agentTools.map((tool: ToolBase) => [
-          tool.internalName,
-          this.constructTool(tool),
-        ])
+        agentTools.map((tool: ToolBase) => [tool.internalName, this.constructTool(tool)])
       ),
       [PRIMARY_GOAL_TOOL_NAME]: this.constructPrimaryGoalTool(),
     };
@@ -113,9 +110,7 @@ export class Agent<T = string> {
 
   private constructPrimaryGoalTool(): Tool {
     const inputSchema = z.object({
-      result: this.resultSchema.describe(
-        'The final result of accomplishing the goal.'
-      ),
+      result: this.resultSchema.describe('The final result of accomplishing the goal.'),
     });
 
     return createTool({

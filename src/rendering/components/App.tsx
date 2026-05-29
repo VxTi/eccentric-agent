@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Box, Text, useStdout } from 'ink';
-import { useMessageState } from '../context/messages';
+import { useMessageState } from '../context';
 import { useAgentEngine } from '../hooks/agent-engine';
 import { MessageList } from './MessageList';
 import { StatusLine } from './StatusLine';
-import UserInput from './UserInput';
+import InputField from './user-input/input-field';
 
 function useTerminalSize(): { width: number; height: number } {
   const { stdout } = useStdout();
@@ -36,17 +36,11 @@ export function App(): ReactNode {
   useAgentEngine();
 
   return (
-    <Box
-      flexDirection="column"
-      width={width}
-      height={height}
-      borderColor="red"
-      borderStyle="round"
-    >
+    <Box flexDirection="column" width={width} height={height} borderColor="red" borderStyle="round">
       <WelcomingText />
       <MessageList />
       {status !== null && <StatusLine status={status} />}
-      <UserInput />
+      <InputField />
     </Box>
   );
 }

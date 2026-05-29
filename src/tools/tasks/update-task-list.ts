@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { type AgentContext } from '../../rendering/context/agent-context';
-import { TaskStatus } from './task-list';
-import { ToolBase } from '../common/tool-base';
+import { type AgentContext } from '../../rendering/context';
+import { type Task, TaskStatus } from './tasks';
+import { ToolBase } from '../common';
 
 export default class UpdateTaskListTool extends ToolBase<Input, Output> {
   constructor() {
@@ -20,19 +20,14 @@ export default class UpdateTaskListTool extends ToolBase<Input, Output> {
     });
   }
 
-  public override async handle(
-    input: Input,
-    context: AgentContext
-  ): Promise<Output> {
+  public override async handle(input: Input, context: AgentContext): Promise<Output> {
     if (!context.taskList.hasTasks) {
-      throw new Error(
-        'No task list exists. Call `create_task_list` before updating tasks.'
-      );
+      throw new Error('No task list exists. Call `create_task_list` before updating tasks.');
     }
 
-    const updated = context.taskList.updateTasks(input.updates);
+    const tasks: Task[] = context.taskList.updateTasks(input.updates);
 
-    return Promise.resolve({ tasks: updated });
+    return Promise.resolve({ tasks });
   }
 
   public override inputToString(input: Input): string {
@@ -44,9 +39,7 @@ export default class UpdateTaskListTool extends ToolBase<Input, Output> {
 
   public override outputToString(output: Output): string {
     const { tasks } = output;
-    const remaining = tasks.filter(
-      t => t.status !== TaskStatus.COMPLETED
-    ).length;
+    const remaining = tasks.filter(t => t.status !== TaskStatus.COMPLETED).length;
     if (remaining === 0) {
       return `All ${tasks.length} tasks completed.`;
     }
@@ -65,14 +58,8 @@ const inputSchema = z.object({
   updates: z
     .array(
       z.object({
-        id: z
-          .string()
-          .describe(
-            'The `id` of the task to update, as set in `create_task_list`.'
-          ),
-        status: z
-          .enum(TaskStatus)
-          .describe('The new status for the referenced task.'),
+        id: z.string().describe('The `id` of the task to update, as set in `create_task_list`.'),
+        status: z.enum(TaskStatus).describe('The new status for the referenced task.'),
       })
     )
     .min(1)

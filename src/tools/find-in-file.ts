@@ -66,9 +66,7 @@ const inputSchema = z.object({
   filePath: z.string().describe('The absolute path of the file to search in'),
   pattern: z
     .string()
-    .describe(
-      'The substring or regular expression pattern to search for within the file'
-    ),
+    .describe('The substring or regular expression pattern to search for within the file'),
   isRegex: z
     .boolean()
     .optional()
@@ -82,22 +80,16 @@ const inputSchema = z.object({
   maxResults: z
     .number()
     .optional()
-    .describe(
-      'The maximum number of matches to return. When omitted, all matches are returned.'
-    ),
+    .describe('The maximum number of matches to return. When omitted, all matches are returned.'),
 });
 
 type Input = z.infer<typeof inputSchema>;
 
 const matchSchema = z.object({
   line: z.number().describe('The 1-based line number where the match occurred'),
-  column: z
-    .number()
-    .describe('The 1-based column at which the match starts on the line'),
+  column: z.number().describe('The 1-based column at which the match starts on the line'),
   match: z.string().describe('The exact text that matched the pattern'),
-  lineContent: z
-    .string()
-    .describe('The full content of the line containing the match'),
+  lineContent: z.string().describe('The full content of the line containing the match'),
 });
 
 const outputSchema = z.object({

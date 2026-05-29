@@ -33,10 +33,7 @@ export default class ShellCommandTool extends ToolBase<Input, Output, Option> {
     return ALLOWED_COMMAND_PATTERNS.some(pattern => pattern.test(trimmed));
   }
 
-  public override async handle(
-    input: Input,
-    _context: AgentContext
-  ): Promise<Output> {
+  public override async handle(input: Input, _context: AgentContext): Promise<Output> {
     const { command, timeoutMs, cwd } = input;
     try {
       const { stdout, stderr } = await execAsync(command, {
@@ -60,10 +57,7 @@ export default class ShellCommandTool extends ToolBase<Input, Output, Option> {
     }
   }
 
-  public override requiresApproval(
-    input: Input,
-    _context: AgentContext
-  ): MaybePromise<boolean> {
+  public override requiresApproval(input: Input, _context: AgentContext): MaybePromise<boolean> {
     return this.isAllowed(input.command);
   }
 
@@ -81,10 +75,7 @@ export default class ShellCommandTool extends ToolBase<Input, Output, Option> {
     return ToolSelectionOption.ALLOW;
   }
 
-  public approvalOptions(
-    input: Input,
-    _context: AgentContext
-  ): MaybePromise<ApprovalOption[]> {
+  public approvalOptions(input: Input, _context: AgentContext): MaybePromise<ApprovalOption[]> {
     return [
       { option: Option.APPROVE, text: 'Allow' },
       { option: Option.DENY, text: 'Deny' },
@@ -135,9 +126,7 @@ type Input = z.infer<typeof inputSchema>;
 const outputSchema = z.object({
   stdout: z.string().describe('Standard output captured from the command'),
   stderr: z.string().describe('Standard error captured from the command'),
-  exitCode: z
-    .number()
-    .describe('The exit code of the command. 0 indicates success.'),
+  exitCode: z.number().describe('The exit code of the command. 0 indicates success.'),
 });
 type Output = z.infer<typeof outputSchema>;
 

@@ -24,16 +24,11 @@ export default class PromptUserOptionsTool extends ToolBase<Input, Output> {
     });
   }
 
-  public override async handle(
-    input: Input,
-    context: AgentContext
-  ): Promise<Output> {
+  public override async handle(input: Input, context: AgentContext): Promise<Output> {
     const ids = new Set<string>();
     for (const option of input.options) {
       if (ids.has(option.id)) {
-        throw new Error(
-          `Duplicate option id "${option.id}". Each option must have a unique id.`
-        );
+        throw new Error(`Duplicate option id "${option.id}". Each option must have a unique id.`);
       }
       ids.add(option.id);
     }
@@ -105,9 +100,7 @@ type Input = z.infer<typeof inputSchema>;
 
 const outputSchema = z.object({
   selectedId: z.string().describe('The `id` of the option the user selected.'),
-  selectedLabel: z
-    .string()
-    .describe('The `label` of the option the user selected.'),
+  selectedLabel: z.string().describe('The `label` of the option the user selected.'),
 });
 
 type Output = z.infer<typeof outputSchema>;

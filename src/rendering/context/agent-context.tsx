@@ -5,7 +5,7 @@ import {
   type ManagedUserInputQueue,
   type UserMessageQueue,
 } from '../../lib/agent-runtime';
-import { TaskList } from '../../tools/tasks/task-list';
+import { TaskList } from '../../tools/tasks/tasks';
 import { createFileSelector, type FileSelector } from '../../lib/file-selector';
 import { FileCache } from '../../lib/file-cache';
 
@@ -19,13 +19,9 @@ export interface AgentContext {
   // subAgents: [];
 }
 
-const $AgentContext = createContext<AgentContext | null>(null);
+const PrimaryAgentContext = createContext<AgentContext | null>(null);
 
-export function AgentProvider({
-  children,
-}: {
-  children: ReactNode;
-}): ReactNode {
+export function AgentProvider({ children }: { children: ReactNode }): ReactNode {
   const runtime: AgentContext = useMemo(() => {
     const cwd = process.cwd();
 
@@ -39,13 +35,11 @@ export function AgentProvider({
     };
   }, []);
 
-  return (
-    <$AgentContext.Provider value={runtime}>{children}</$AgentContext.Provider>
-  );
+  return <PrimaryAgentContext.Provider value={runtime}>{children}</PrimaryAgentContext.Provider>;
 }
 
 export function useAgent(): AgentContext {
-  const runtime = useContext($AgentContext);
+  const runtime = useContext(PrimaryAgentContext);
   if (!runtime) {
     throw new Error('useAgent must be used inside <AgentProvider>');
   }
