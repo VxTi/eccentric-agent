@@ -5,6 +5,7 @@ import prettierPlugin from 'eslint-plugin-prettier';
 import unusedImports from 'eslint-plugin-unused-imports';
 import prettierConfig from './prettier.config';
 import importPlugin from 'eslint-plugin-import';
+import reactHooksPlugin from 'eslint-plugin-react-hooks';
 
 export default defineConfig([
   // TypeScript recommendations
@@ -24,6 +25,7 @@ export default defineConfig([
   // Custom setup
   {
     plugins: {
+      'react-hooks': reactHooksPlugin as any,
       'unused-imports': unusedImports,
       prettier: prettierPlugin,
       import: importPlugin,
@@ -45,6 +47,8 @@ export default defineConfig([
       'prefer-arrow-callback': 0,
       'prefer-template': 2,
       'object-shorthand': ['error', 'always'],
+
+      'react-hooks/exhaustive-deps': 2,
 
       '@typescript-eslint/no-explicit-any': 0,
       '@typescript-eslint/no-empty-object-type': 0,

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { readFile, writeFile } from 'fs/promises';
-import { type AgentContext } from '../rendering/context/agent-context';
-import { ToolBase } from './common/tool-base';
+import { type AgentContext } from '../rendering/context';
+import { ToolBase } from './common';
 
 export default class ReplaceInFileTool extends ToolBase<Input, Output> {
   constructor() {

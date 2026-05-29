@@ -1,31 +1,23 @@
-import { type JSX, type ReactNode, useCallback, useEffect, useState } from 'react';
+import { type JSX, type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Box, Text, useInput, usePaste } from 'ink';
-import chalk from 'chalk';
 import { useAbort, useAgent } from '../../context';
 import { useInputSuggestionProvider } from '../../hooks/input-suggestion-provider';
+
+const MAX_SHOWN_SUGGESTIONS = 10;
 
 export default function InputField(): JSX.Element {
   const [cursorOffset, setCursorOffset] = useState<number>(0);
   const [input, setInput] = useState<string>('');
   const { suggestions } = useInputSuggestionProvider(input, cursorOffset);
-  const [selectedSuggestion, setSelectedSuggestion] = useState<number>(-1);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number>(-1);
   const controller = useAbort();
-  const runtime = useAgent();
+  const agent = useAgent();
 
-  const submitMessage = useCallback(() => {}, []);
-
-  /*  const submitBuffer = useCallback(
-   (line: string) => {
-   const trimmed = line.trim();
-   if (!trimmed) return;
-   const formatted = formatReferencedFiles(trimmed);
-   messageStore.pushText(
-   `${chalk.bold('you ') + chalk.dim('▸ ') + formatted}\n`
-   );
-   runtime.userMessageQueue.submit(formatted);
-   },
-   [runtime, messageStore]
-   );*/
+  const submitMessage = () => {
+    agent.submitMessage(input);
+    setInput('');
+    setCursorOffset(0);
+  };
 
   usePaste(text => setInput(prev => prev + text));
 
@@ -37,23 +29,23 @@ export default function InputField(): JSX.Element {
     // Suggestion handling
     if (suggestions.length > 0) {
       if (key.upArrow) {
-        setSelectedSuggestion(prev => (prev + suggestions.length - 1) % suggestions.length);
+        setSelectedSuggestionIndex(prev => (prev + suggestions.length - 1) % suggestions.length);
         return;
       }
 
       if (key.downArrow) {
-        setSelectedSuggestion(prev => (prev + suggestions.length + 1) % suggestions.length);
+        setSelectedSuggestionIndex(prev => (prev + suggestions.length + 1) % suggestions.length);
         return;
       }
 
       if (key.escape) {
-        setSelectedSuggestion(-1);
+        setSelectedSuggestionIndex(-1);
         return;
       }
 
       if (key.tab || key.return) {
-        if (selectedSuggestion > -1) {
-          setInput(prev => prev + suggestions[selectedSuggestion]);
+        if (selectedSuggestionIndex > -1) {
+          setInput(prev => prev + suggestions[selectedSuggestionIndex]);
         }
         return;
       }
@@ -93,11 +85,9 @@ export default function InputField(): JSX.Element {
 
   return (
     <Box width="80%" alignSelf="center" flexDirection="column">
-      {suggestions.map((line, i) => (
-        <Text key={i}>{line}</Text>
-      ))}
+      <Suggestions suggestions={suggestions} selectedIndex={selectedSuggestionIndex} />
       <Box backgroundColor="gray" paddingY={1} paddingX={1} flexDirection="column">
-        <Cursor input={input} cursorOffset={cursorOffset} />
+        <InputText input={input} cursor={cursorOffset} />
       </Box>
     </Box>
   );
@@ -105,11 +95,11 @@ export default function InputField(): JSX.Element {
 
 interface InputTextProps {
   input: string;
-  cursorOffset: number;
+  cursor: number;
 }
 
-function Cursor({ input, cursorOffset }: InputTextProps): ReactNode {
-  const safeCursor = Math.max(0, Math.min(cursorOffset, input.length));
+function InputText({ input, cursor }: InputTextProps): ReactNode {
+  const safeCursor = Math.max(0, Math.min(cursor, input.length));
   const before = input.slice(0, safeCursor);
   const cursorChar = input[safeCursor] ?? ' ';
   const after = input.slice(safeCursor + 1);
@@ -132,37 +122,51 @@ function Cursor({ input, cursorOffset }: InputTextProps): ReactNode {
 }
 
 interface SuggestionTextProps {
-  suggestion: string;
-  selected: number;
+  children: string;
+  selected: boolean;
 }
 
-function SuggestionText({ suggestion, selected }: SuggestionTextProps): ReactNode {
-  return <Text>{suggestion}</Text>;
+function SuggestionText({ children, selected }: SuggestionTextProps): ReactNode {
+  return <Text color={selected ? 'redBright' : 'white'}>{children}</Text>;
 }
 
-const MAX_PICKER_SUGGESTIONS = 8;
-
-function buildPromptLines(prompt: PromptState): string[] {
-  return prompt.options.map((option, i) => {
-    const active = i === prompt.selected;
-    const marker = active ? chalk.cyan('❯ ') : '  ';
-    const body = active ? chalk.cyan(option.text) : chalk.dim(option.text);
-    return `${marker}${body}`;
-  });
+interface SuggestionsProps {
+  suggestions: string[];
+  selectedIndex: number;
 }
 
-function buildPickerLines(picker: PickerState): string[] {
-  const visible = picker.matches.slice(0, MAX_PICKER_SUGGESTIONS);
-  if (visible.length === 0) return [chalk.dim('  (no matches)')];
-  const lines = visible.map((match, i) => {
-    const marker = i === picker.selected ? chalk.cyan('❯ ') : '  ';
-    const body = i === picker.selected ? chalk.cyan(match) : chalk.dim(match);
-    return `${marker}${body}`;
-  });
-  if (picker.matches.length > visible.length) {
-    lines.push(chalk.dim(`  … ${picker.matches.length - visible.length} more`));
-  }
-  return lines;
+function Suggestions({ suggestions, selectedIndex }: SuggestionsProps): ReactNode {
+  const state = useMemo(() => {
+    if (suggestions.length === 0) return undefined;
+
+    if (suggestions.length < MAX_SHOWN_SUGGESTIONS) {
+      return {
+        shown: suggestions,
+        additional: 0,
+      };
+    }
+    const offsetIndex = suggestions.length - MAX_SHOWN_SUGGESTIONS / 2 + selectedIndex;
+
+    const partialSuggestions = suggestions.slice(offsetIndex, offsetIndex + MAX_SHOWN_SUGGESTIONS);
+
+    return {
+      shown: partialSuggestions,
+      additional: suggestions.length - partialSuggestions.length,
+    };
+  }, [suggestions, selectedIndex]);
+
+  if (!state) return;
+
+  return (
+    <Box>
+      {state.shown.map((suggestion, i) => (
+        <SuggestionText key={i} selected={selectedIndex === i}>
+          {suggestion}
+        </SuggestionText>
+      ))}
+      {state.additional > 0 && <Text color="gray">+{state.additional} more</Text>}
+    </Box>
+  );
 }
 
 export function formatReferencedFiles(input: string): string {

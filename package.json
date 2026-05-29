@@ -36,6 +36,8 @@
     "cheerio": "^1.2.0",
     "cli-highlight": "^2.1.11",
     "dotenv": "^17.4.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "glob": "^13.0.6",
     "google-auth-library": "^10.6.2",
     "ink": "^7.0.3",

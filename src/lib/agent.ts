@@ -8,7 +8,7 @@ import {
   type ToolSet,
 } from 'ai';
 import * as z from 'zod';
-import { type AgentContext } from '../rendering/context/agent-context';
+import { type AgentContext } from '../rendering/context';
 import { type ToolBase, agentTools } from '../tools';
 import { Result } from './result';
 

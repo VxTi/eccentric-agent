@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { type AgentContext } from '../../rendering/context/agent-context';
-import { type Task, TaskStatus } from './tasks';
-import { ToolBase } from '../common/tool-base';
+import { type AgentContext } from '../../rendering/context';
+import { type Task, TaskStatus } from '../../lib/tasks';
+import { ToolBase } from '../common';
 
 export default class CreateTaskListTool extends ToolBase<Input, Output> {
   constructor() {

@@ -13,11 +13,9 @@ import compact from 'lodash/compact';
 import first from 'lodash/first';
 import { glob } from 'node:fs/promises';
 import { useEffect, useMemo, useRef } from 'react';
-import { type AgentContext, useAgent } from '../context/agent-context';
-import { TaskStatus } from '../../tools/tasks/tasks';
+import { TaskStatus } from '../../lib/tasks';
 import { toolRegistry, type ToolBase, ToolSelectionOption } from '../../tools';
-import { useSignal } from '../context/application-cancellation';
-import { useMessageStore } from '../context/messages';
+import { useSignal, useMessageStore, type AgentContext, useAgent } from '../context';
 import { formatMarkdown, previewArgs } from '../formatting';
 import { config } from 'dotenv';
 import { type MessageStore } from '../message-store';
@@ -53,7 +51,7 @@ export function useAgentEngine(): void {
   }, []);
   const tools = useMemo<ToolSet>(
     () => buildToolset(runtime, messageStore, toolRegistry),
-    [runtime]
+    [messageStore, runtime]
   );
   const startedRef = useRef(false);
 

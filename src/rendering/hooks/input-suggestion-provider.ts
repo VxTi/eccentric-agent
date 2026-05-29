@@ -1,29 +1,52 @@
 import { glob } from 'glob';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+
+const FILE_SUGGESTION_PATTERN = /@(\w+)$/;
 
 export function useInputSuggestionProvider(input: string, cursorOffset: number) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
-    const lastCharacter = input.at(-1);
+    if (cursorOffset === 0) return;
 
-    // no input = no suggestions. Simple as that.
-    if (input.length === 0 || !lastCharacter) return;
+    const preCursorInput = input.slice(0, cursorOffset);
 
-    // File suggestions
-    if (lastCharacter === '@') {
-      void glob('**/*', {
+    tryMatch(FILE_SUGGESTION_PATTERN, preCursorInput, async ([filePath]) => {
+      const files = await glob('**/*', {
         nodir: true,
         ignore: ['node_modules/**', 'dist/**', '.git/**'],
         dot: false,
         cwd: process.cwd(),
-      }).then(files => setSuggestions(files));
-    } else if (lastCharacter === '/') {
-      // Somehow provide a list of supported commands
-    }
+      });
+      const filtered = filterFiles(files, filePath);
+      setSuggestions(filtered);
+    });
   }, [input, cursorOffset]);
+
+  const recomputeSuggestions = useCallback(() => {}, []);
 
   return {
     suggestions,
+    recomputeSuggestions,
   };
+}
+
+function tryMatch(pattern: RegExp, input: string, callback: (matches: string[]) => void): void {
+  const matches = pattern.exec(input);
+  if (!matches?.[0]) return;
+
+  callback([...matches]);
+}
+
+function filterFiles(files: string[], query: string): string[] {
+  const q = query.toLowerCase();
+  if (!q) return files.slice(0, 200);
+  return files
+    .filter(f => f.toLowerCase().includes(q))
+    .sort((a, b) => {
+      const ai = a.toLowerCase().indexOf(q);
+      const bi = b.toLowerCase().indexOf(q);
+      if (ai !== bi) return ai - bi;
+      return a.length - b.length;
+    });
 }
