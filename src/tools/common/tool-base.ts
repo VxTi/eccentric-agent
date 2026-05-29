@@ -49,14 +49,14 @@ export abstract class ToolBase<
 
   public approvalOptions(
     _input: TIn,
-    _runtime: AgentContext
+    _context: AgentContext
   ): MaybePromise<ApprovalOption[]> {
     return DEFAULT_APPROVAL_OPTIONS;
   }
 
   public requiresApproval(
     _input: TIn,
-    _runtime: AgentContext
+    _context: AgentContext
   ): MaybePromise<boolean> {
     return false;
   }
@@ -64,12 +64,12 @@ export abstract class ToolBase<
   public onOptionSelect(
     _input: TIn,
     _option: TApprovalOption,
-    _runtime: AgentContext
+    _context: AgentContext
   ): MaybePromise<ToolSelectionOption> {
     return ToolSelectionOption.ALLOW;
   }
 
-  public abstract handle(input: TIn, _runtime: AgentContext): Promise<TOut>;
+  public abstract handle(input: TIn, _context: AgentContext): Promise<TOut>;
 
   public abstract inputToString(input: TIn): string;
 

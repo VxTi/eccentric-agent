@@ -10,23 +10,29 @@ import PromptUserOptions from '../prompt-user-options';
 import ReadFile from '../read-file';
 import ReplaceInFile from '../replace-in-file';
 import Shell from '../shell';
+import SpawnAgents from '../spawn-agents';
 import UpdateTaskList from '../update-task-list';
 import WebFetch from '../web-fetch';
 import WebSearch from '../web-search';
 
-export const allTools: ToolBase[] = [
-  new Shell(),
+export const agentTools = [
   new FindFile(),
   new FindInFile(),
-  new InsertInFile(),
-  new ReplaceInFile(),
-  new CreateFile(),
   new ReadFile(),
   new WebSearch(),
   new WebFetch(),
-  new CreateTaskList(),
-  new UpdateTaskList(),
   new GetUserTime(),
   new GetUserLocation(),
+] satisfies ToolBase[];
+
+export const toolRegistry = [
+  ...agentTools,
+  new Shell(),
+  new InsertInFile(),
+  new ReplaceInFile(),
+  new CreateFile(),
+  new CreateTaskList(),
+  new UpdateTaskList(),
   new PromptUserOptions(),
-];
+  new SpawnAgents(),
+] satisfies ToolBase[];

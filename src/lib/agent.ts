@@ -1,92 +1,134 @@
-import { tool as createTool, type Tool, type ToolSet } from 'ai';
-import chalk from 'chalk';
-import { formatMarkdown, previewArgs } from '../rendering/formatting';
-import { type ToolBase, ToolSelectionOption } from '../tools/common/tool-base';
+import { vertex } from '@ai-sdk/google-vertex';
+import {
+  generateText,
+  type LanguageModel,
+  type ModelMessage,
+  tool as createTool,
+  type Tool,
+  type ToolSet,
+} from 'ai';
+import * as z from 'zod';
+import { type AgentContext } from '../rendering/context/agent-context';
+import { type ToolBase, agentTools } from '../tools';
 import { Result } from './result';
 
-export class Agent<T> {
+const AGENT_MAX_LOOP_ITERATIONS = 200;
+
+const PRIMARY_GOAL_TOOL_NAME = 'complete_goal';
+
+export class Agent<T = string> {
   private readonly toolset: ToolSet;
+  private readonly messages: ModelMessage[] = [];
+  private readonly model: LanguageModel;
+
+  private goalAccomplished = false;
+  private result: T | undefined;
 
   constructor(
     private readonly goal: string,
-    private readonly callback: (data: Result<T, Error>) => void
+    private readonly callback: (data: Result<T, Error>) => void,
+    private readonly signal: AbortSignal,
+    private readonly context: AgentContext,
+    private readonly resultSchema: z.ZodType<T>
   ) {
     this.toolset = this.constructToolset();
+    this.model = vertex('gemini-3.1-flash-lite-preview');
+    this.messages = [
+      { role: 'system', content: this.constructSystemPrompt() },
+      { role: 'user', content: this.goal },
+    ];
     this.process()
-      .then((result: T) => callback(Result.Ok(result)))
-      .catch((error: Error) => callback(Result.Error(error)));
+      .then((result: T) => this.callback(Result.Ok(result)))
+      .catch((error: Error) => this.callback(Result.Error(error)));
   }
 
-  private async process(): Promise<T> {}
+  private async process(): Promise<T> {
+    let iterations = 0;
+    while (iterations++ < AGENT_MAX_LOOP_ITERATIONS) {
+      const { response } = await generateText({
+        tools: this.toolset,
+        allowSystemInMessages: true,
+        model: this.model,
+        messages: this.messages,
+        abortSignal: this.signal,
+      });
 
-  private constructToolset(): ToolSet {
-    return Object.fromEntries(
-      toolRegistry.map((tool: ToolBase) => [
-        tool.internalName,
-        this.constructTool(tool),
-      ])
+      this.messages.push(...response.messages);
+
+      if (this.goalAccomplished) {
+        return this.result as T;
+      }
+    }
+
+    throw new Error(
+      `Agent exceeded maximum loop iterations (${AGENT_MAX_LOOP_ITERATIONS}) without accomplishing its goal.`
     );
   }
 
+  private constructSystemPrompt(): string {
+    return [
+      `You are an autonomous agent operating in a tool-driven loop.`,
+      ``,
+      `## Your goal`,
+      this.goal,
+      ``,
+      `## Operating procedure`,
+      `- Each turn, decide on the single next action that advances the goal and call the appropriate tool. Do not stop or wait for further instructions — there is no user to respond to between turns.`,
+      `- Inspect tool results carefully. If a tool fails, diagnose the failure and try a different approach rather than repeating the same call.`,
+      `- Keep going until the goal is fully accomplished. Returning a plain text response without a tool call does NOT end the loop; only calling \`${PRIMARY_GOAL_TOOL_NAME}\` does.`,
+      `- When, and only when, the goal is completely satisfied, call the \`${PRIMARY_GOAL_TOOL_NAME}\` tool with the final result. This terminates the loop.`,
+      `- Do not call \`${PRIMARY_GOAL_TOOL_NAME}\` prematurely. If any required step is still pending, continue working.`,
+      `- You have at most ${AGENT_MAX_LOOP_ITERATIONS} iterations; work efficiently and avoid redundant calls.`,
+    ].join('\n');
+  }
+
+  private constructToolset(): ToolSet {
+    return {
+      ...Object.fromEntries(
+        agentTools.map((tool: ToolBase) => [
+          tool.internalName,
+          this.constructTool(tool),
+        ])
+      ),
+      [PRIMARY_GOAL_TOOL_NAME]: this.constructPrimaryGoalTool(),
+    };
+  }
+
   private constructTool(tool: ToolBase): Tool {
+    const { inputSchema, description, outputSchema } = tool;
+
     return createTool({
-      description: tool.description,
-      inputSchema: tool.inputSchema,
+      description,
+      inputSchema,
+      outputSchema,
       execute: async (input: unknown) => {
-        const processed: unknown = await tool.inputSchema.parse(input);
-        const needsApproval = await tool.requiresApproval(processed, runtime);
-
-        if (needsApproval) {
-          const options = await tool.approvalOptions(processed, runtime);
-          const prompt = `tool "${tool.internalName}" requires approval — args: ${previewArgs(input)}`;
-
-          const chosen = await runtime.inputQueue.request({
-            toolName: tool.internalName,
-            prompt,
-            options,
-          });
-          const selectionOption = await tool.onOptionSelect(
-            processed,
-            chosen,
-            runtime
-          );
-
-          if (selectionOption !== ToolSelectionOption.ALLOW) {
-            return {
-              error: `User denied permission to run tool "${tool.internalName}".`,
-            };
-          }
-        }
-
-        messageStore.pushText(
-          `${formatMarkdown(tool.inputToString(processed))}`
-        );
-
-        let output: unknown;
-        try {
-          output = await tool.handle(processed, runtime);
-        } catch (err) {
+        return await tool.handle(input, this.context).catch((err: Error) => {
           const message = `Tool "${tool.internalName}" failed: ${String(err)}`;
-          messageStore.pushText(chalk.red(`${message}\n`));
-          return { error: message, ok: false };
-        }
 
-        const parsed = await tool.outputSchema.safeParseAsync(output);
+          return Result.Error(message);
+        });
+      },
+    });
+  }
 
-        if (!parsed.success) {
-          const message = `Tool "${tool.internalName}" returned an unexpected shape: ${String(parsed.error)}`;
-          messageStore.pushText(chalk.red(`${message}\n`));
-          return { error: message, ok: false, raw: output };
-        }
+  private constructPrimaryGoalTool(): Tool {
+    const inputSchema = z.object({
+      result: this.resultSchema.describe(
+        'The final result of accomplishing the goal.'
+      ),
+    });
 
-        messageStore.pushText(
-          `↳ ${formatMarkdown(tool.outputToString(parsed.data))}\n`
-        );
-
-        return parsed.data;
+    return createTool({
+      description:
+        `Call this tool when, and only when, the goal has been fully accomplished. ` +
+        `Goal: ${this.goal}. ` +
+        `Provide the final result; this will terminate the agent loop.`,
+      inputSchema,
+      execute: ({ result }: z.infer<typeof inputSchema>) => {
+        this.result = result;
+        this.goalAccomplished = true;
+        return Result.Ok('Goal marked as accomplished.');
       },
     });
   }
 }
-
-const toolRegistry: ToolBase[] = [];

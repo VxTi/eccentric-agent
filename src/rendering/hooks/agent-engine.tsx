@@ -15,11 +15,7 @@ import { glob } from 'node:fs/promises';
 import { useEffect, useMemo, useRef } from 'react';
 import { type AgentContext, useAgent } from '../context/agent-context';
 import { TaskStatus } from '../../task-list';
-import {
-  type ToolBase,
-  ToolSelectionOption,
-} from '../../tools/common/tool-base';
-import { allTools } from '../../tools/common/tool-registry';
+import { toolRegistry, type ToolBase, ToolSelectionOption } from '../../tools';
 import { useSignal } from '../context/application-cancellation';
 import { useMessageStore } from '../context/messages';
 import { formatMarkdown, previewArgs } from '../formatting';
@@ -56,7 +52,7 @@ export function useAgentEngine(): void {
     return vertex('gemini-2.5-flash');
   }, []);
   const tools = useMemo<ToolSet>(
-    () => buildToolset(runtime, messageStore, allTools),
+    () => buildToolset(runtime, messageStore, toolRegistry),
     [runtime]
   );
   const startedRef = useRef(false);
