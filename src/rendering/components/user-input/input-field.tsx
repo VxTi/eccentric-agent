@@ -138,13 +138,13 @@ export default function InputField(): JSX.Element {
   }
 
   return (
-    <Box width="80%" alignSelf="center" flexDirection="column">
+    <Box width="80%" alignSelf="center" flexDirection="column" flexShrink={0}>
       <Suggestions
         suggestions={suggestions}
         selectedIndex={selectedSuggestionIndex}
         maxSuggestions={maxSuggestions}
       />
-      <Box backgroundColor="gray" paddingY={1} paddingX={1} flexDirection="column">
+      <Box borderStyle="round" borderColor="gray" paddingX={1} flexDirection="column">
         <InputText input={input} cursor={cursorOffset} />
       </Box>
     </Box>

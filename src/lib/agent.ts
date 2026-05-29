@@ -10,6 +10,7 @@ import {
 import * as z from 'zod';
 import { type ToolBase, agentTools } from '../tools';
 import { Result } from './result';
+import { emitAgentMessage } from './user-input';
 
 const AGENT_MAX_LOOP_ITERATIONS = 200;
 
@@ -29,7 +30,7 @@ export class Agent<T = string> {
     private readonly signal: AbortSignal
   ) {
     this.toolset = this.constructToolset();
-    this.model = vertex('gemini-2.5-flash-lite');
+    this.model = vertex('gemini-2.5-flash');
     this.messages = [
       { role: 'system', content: this.constructSystemPrompt() },
       { role: 'user', content: this.goal },
@@ -51,6 +52,7 @@ export class Agent<T = string> {
       });
 
       this.messages.push(...response.messages);
+      response.messages.map(msg => emitAgentMessage(msg.content as string, msg.role));
 
       if (this.goalAccomplished) {
         return this.result as T;

@@ -28,7 +28,6 @@ export const agentTools = [
 ] satisfies ToolBase[];
 
 export const toolRegistry = [
-  ...agentTools,
   new Shell(),
   new InsertInFile(),
   new ReplaceInFile(),
