@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { isNumber } from 'lodash';
+import isNumber from 'lodash/isNumber';
 import { stdin, stdout } from 'node:process';
 import { config } from 'dotenv';
 import { render } from 'ink';

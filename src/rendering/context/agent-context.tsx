@@ -2,11 +2,14 @@ import { vertex } from '@ai-sdk/google-vertex';
 import {
   type LanguageModel,
   type ModelMessage,
+  stepCountIs,
+  streamText,
   type Tool,
   tool as createTool,
   type ToolSet,
 } from 'ai';
 import chalk from 'chalk';
+import compact from 'lodash/compact';
 import first from 'lodash/first';
 import { glob } from 'node:fs/promises';
 import {
@@ -14,6 +17,7 @@ import {
   type Dispatch,
   type ReactNode,
   type SetStateAction,
+  use,
   useCallback,
   useContext,
   useMemo,
@@ -28,11 +32,12 @@ import {
 } from '../../lib/events';
 import { FileCache } from '../../lib/file-cache';
 import { Result } from '../../lib/result';
-import { DEFAULT_SYSTEM_PROMPT } from '../../lib/constants';
+import { DEFAULT_SYSTEM_PROMPT, MAX_TASK_CONTINUATION_ITERATIONS } from '../../lib/constants';
 import { TaskList, TaskStatus } from '../../lib/tasks';
 import { emitAgentMessage, requestUserInput } from '../../lib/user-input';
 import { type ToolBase, toolRegistry, ToolSelectionOption } from '../../tools';
 import { formatMarkdown, previewArgs } from '../formatting';
+import { useSignal } from './application-cancellation';
 
 export type Message = Extract<ModelMessage, { role: 'assistant' | 'user' }>;
 
@@ -50,7 +55,7 @@ export interface AgentContext {
   messages: Message[];
 
   status: AgentStatus;
-  setStatus: Dispatch<SetStateAction<string>>;
+  setStatus: Dispatch<SetStateAction<AgentStatus>>;
 }
 
 const PrimaryAgentContext = createContext<AgentContext | null>(null);
@@ -59,25 +64,86 @@ export function AgentProvider({ children }: { children: ReactNode }): ReactNode 
   const [messageQueue, setMessageQueue] = useState<string[]>([]);
   const [cwd, setCwd] = useState<string>(process.cwd());
   const [messages, setMessages] = useState<ModelMessage[]>([]);
-
   const [status, setStatus] = useState<AgentStatus>({ loading: false, text: '' });
+
+  const signal = useSignal();
 
   const fileCache = useMemo(() => new FileCache(cwd), [cwd]);
   const taskList = useMemo(() => new TaskList(), []);
 
-  const model = useMemo<LanguageModel>(() => {
-    return vertex('gemini-2.5-flash');
-  }, []);
+  const tools = useMemo<ToolSet>(() => constructToolset(toolRegistry), []);
+  const systemPrompt = use(constructSystemPrompt(taskList, cwd));
+  const model = useMemo<LanguageModel>(() => vertex('gemini-2.5-flash'), []);
 
-  const tools = useMemo<ToolSet>(() => constructToolset(toolRegistry), [context]);
+  const processRequest = useCallback(
+    async (prompt: string) => {
+      setStatus({ text: 'Processing...', loading: true });
+
+      const updatedMessages: ModelMessage[] = [...messages, { role: 'user', content: prompt }];
+
+      const result = streamText({
+        allowSystemInMessages: true,
+        abortSignal: signal,
+        model,
+        messages: [{ content: systemPrompt, role: 'system' }, ...updatedMessages],
+        tools,
+        providerOptions: {
+          google: {
+            thinkingConfig: {
+              thinkingBudget: 0,
+            },
+          },
+        },
+        stopWhen: stepCountIs(20),
+      });
+
+      try {
+        const message = { role: 'user', content: `${chalk.blue('◆ ')}` } satisfies Message;
+        updatedMessages.push(message);
+        for await (const chunk of result.textStream) {
+          message.content += chunk;
+          message.content = formatMarkdown(message.content);
+        }
+      } catch (err) {
+        setMessages(prev => [
+          ...prev,
+          { role: 'assistant', content: `Something went wrong whilst responding: ${String(err)}` },
+        ]);
+        return;
+      }
+      setStatus({ text: '', loading: false });
+      setMessages(updatedMessages);
+
+      let taskIterations = 0;
+      while (taskList.hasIncompleteTasks() && taskIterations < MAX_TASK_CONTINUATION_ITERATIONS) {
+        taskIterations += 1;
+        messages.push({
+          content:
+            'The task list still has incomplete tasks. Continue working on the' +
+            ' next pending or in-progress task and update the task list as you' +
+            ' make progress. Do not wait for further user input.',
+          role: 'user',
+        });
+      }
+
+      const firstQueuedMessage = messageQueue.shift();
+      if (firstQueuedMessage) {
+        await processRequest(firstQueuedMessage);
+      }
+    },
+    [messageQueue, messages, model, signal, systemPrompt, taskList, tools]
+  );
 
   const submitMessage = useCallback(
     (input: string) => {
-      setMessageQueue(prev => {
-        // if (prev.length === 0) const totalQueue = [...prev, input];
-      });
+      // If we're streaming something, we'll add the input message to the queue
+      if (status.loading) {
+        setMessageQueue(prev => [...prev, input]);
+        return;
+      }
+      void processRequest(input);
     },
-    [messageQueue.length]
+    [processRequest, status.loading]
   );
 
   return (
@@ -89,10 +155,8 @@ export function AgentProvider({ children }: { children: ReactNode }): ReactNode 
         submitMessage,
         taskList,
         fileCache,
-        statusText,
-        setStatusText,
-        loading,
-        setLoading,
+        status,
+        setStatus,
       }}
     >
       {children}
@@ -106,6 +170,13 @@ export function useAgent(): AgentContext {
     throw new Error('useAgent must be used inside <AgentProvider>');
   }
   return runtime;
+}
+
+async function constructSystemPrompt(taskList: TaskList, cwd: string): Promise<string> {
+  const systemPrompt = await loadSystemPrompt(cwd);
+
+  const taskFragment = constructTaskListSystemPromptFragment(taskList);
+  return compact([systemPrompt, taskFragment]).join('\n');
 }
 
 function constructTaskListSystemPromptFragment(taskList: TaskList): string | null {

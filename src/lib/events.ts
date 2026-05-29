@@ -17,7 +17,6 @@ export function emitEvent<E extends Event>(event: E): void {
 export const enum EventName {
   REQUEST_USER_INPUT = 'request-user-input',
   USER_INPUT_RESPONSE = 'user-input-response',
-  USER_PROMPT = 'user-prompt',
   AGENT_MESSAGE = 'agent-message',
   SYNC_AGENT_CONTEXT = 'sync-agent-context-context',
 }
@@ -41,12 +40,6 @@ export class UserInputRequestEvent extends CustomEvent<UserInputRequest> {
 export class UserInputResponseEvent extends CustomEvent<InputOption> {
   constructor(option: InputOption) {
     super(EventName.USER_INPUT_RESPONSE, { detail: option });
-  }
-}
-
-export class UserPromptEvent extends CustomEvent<string> {
-  constructor(prompt: string) {
-    super(EventName.USER_PROMPT, { detail: prompt });
   }
 }
 

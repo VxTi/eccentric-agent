@@ -8,7 +8,6 @@ import {
   type UserInputRequest,
   UserInputRequestEvent,
   type UserInputResponseEvent,
-  UserPromptEvent,
 } from './events';
 
 export function requestUserInput(props: UserInputRequest): Promise<InputOption> {
@@ -21,10 +20,6 @@ export function requestUserInput(props: UserInputRequest): Promise<InputOption> 
     emitEvent(new UserInputRequestEvent(props));
     subscribeEvent(EventName.USER_INPUT_RESPONSE, handler);
   });
-}
-
-export function requestPrompt(prompt: string): void {
-  emitEvent(new UserPromptEvent(prompt));
 }
 
 export function emitAgentMessage(message: string): void {

@@ -1,16 +1,13 @@
 import { type ReactNode } from 'react';
 import { Box, Text } from 'ink';
 import { useAgent } from '../context';
-import { useAgentEngine } from '../hooks/agent-engine';
-import { useTerminalSize } from '../hooks/terminal-size';
+import { useTerminalSize } from '../hooks';
 import { MessageList } from './MessageList';
 import { StatusLine } from './StatusLine';
 import InputField from './user-input/input-field';
 
 export function App(): ReactNode {
   const { width, height } = useTerminalSize();
-
-  useAgentEngine();
 
   return (
     <Box flexDirection="column" width={width} height={height} borderColor="red" borderStyle="round">

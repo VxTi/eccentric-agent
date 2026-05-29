@@ -15,4 +15,4 @@ A few things to absolutely NEVER do:
   the code should be understandable enough so that a comment is not necessary.
 `;
 
-export const MAX_TASK_CONTINUATION_TURNS = 10;
+export const MAX_TASK_CONTINUATION_ITERATIONS = 10;
