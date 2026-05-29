@@ -43,8 +43,7 @@ export default class SpawnAgentsTool extends ToolBase<Input, Output> {
             resolve({ name, ok: false, error: result.error.message });
           }
         },
-        controller.signal,
-        z.string()
+        controller.signal
       );
     });
   }

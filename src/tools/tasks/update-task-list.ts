@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import { type AgentContext } from '../../rendering/context';
+import * as z from 'zod';
+import { acquireContextInstance } from '../../rendering/context';
 import { type Task, TaskStatus } from '../../lib/tasks';
 import { ToolBase } from '../common';
 
@@ -20,7 +20,8 @@ export default class UpdateTaskListTool extends ToolBase<Input, Output> {
     });
   }
 
-  public override async handle(input: Input, context: AgentContext): Promise<Output> {
+  public override async handle(input: Input): Promise<Output> {
+    const context = await acquireContextInstance();
     if (!context.taskList.hasTasks) {
       throw new Error('No task list exists. Call `create_task_list` before updating tasks.');
     }

@@ -29,12 +29,17 @@ import {
 import { FileCache } from '../../lib/file-cache';
 import { Result } from '../../lib/result';
 import { DEFAULT_SYSTEM_PROMPT } from '../../lib/constants';
-import { TaskList } from '../../lib/tasks';
+import { TaskList, TaskStatus } from '../../lib/tasks';
 import { emitAgentMessage, requestUserInput } from '../../lib/user-input';
 import { type ToolBase, toolRegistry, ToolSelectionOption } from '../../tools';
 import { formatMarkdown, previewArgs } from '../formatting';
 
 export type Message = Extract<ModelMessage, { role: 'assistant' | 'user' }>;
+
+interface AgentStatus {
+  loading: boolean;
+  text: string;
+}
 
 export interface AgentContext {
   cwd: string;
@@ -44,11 +49,8 @@ export interface AgentContext {
   fileCache: FileCache;
   messages: Message[];
 
-  loading: boolean;
-  setLoading: Dispatch<SetStateAction<boolean>>;
-
-  statusText: string;
-  setStatusText: Dispatch<SetStateAction<string>>;
+  status: AgentStatus;
+  setStatus: Dispatch<SetStateAction<string>>;
 }
 
 const PrimaryAgentContext = createContext<AgentContext | null>(null);
@@ -58,8 +60,7 @@ export function AgentProvider({ children }: { children: ReactNode }): ReactNode 
   const [cwd, setCwd] = useState<string>(process.cwd());
   const [messages, setMessages] = useState<ModelMessage[]>([]);
 
-  const [loading, setLoading] = useState(false);
-  const [statusText, setStatusText] = useState<string>('');
+  const [status, setStatus] = useState<AgentStatus>({ loading: false, text: '' });
 
   const fileCache = useMemo(() => new FileCache(cwd), [cwd]);
   const taskList = useMemo(() => new TaskList(), []);
@@ -107,6 +108,27 @@ export function useAgent(): AgentContext {
   return runtime;
 }
 
+function constructTaskListSystemPromptFragment(taskList: TaskList): string | null {
+  if (!taskList.hasTasks) return null;
+
+  const lines = taskList.tasks.map(task => {
+    const mapping: Record<TaskStatus, string> = {
+      [TaskStatus.COMPLETED]: '[x]',
+      [TaskStatus.IN_PROGRESS]: '[~]',
+      [TaskStatus.PENDING]: '[ ]',
+    };
+    return `  ${mapping[task.status]} (${task.id}) ${task.description}`;
+  });
+
+  return [
+    'Current task list (markers: [ ] pending, [~] in_progress, [x] completed):',
+    ...lines,
+    'While any task is not completed you MUST keep working autonomously.' +
+      ' Use `update_task_list` to mark tasks "in_progress" before starting' +
+      ' and "completed" when done. Only stop once every task is completed.',
+  ].join('\n');
+}
+
 async function loadSystemPrompt(cwd: string): Promise<string> {
   const supportedFileNames: string[] = [
     'AGENTS',
@@ -124,24 +146,24 @@ function constructToolset(tools: ToolBase[]): ToolSet {
   return Object.fromEntries(tools.map(tool => [tool.internalName, constructTool(tool)]));
 }
 
-function constructTool(runtime: AgentContext, tool: ToolBase): Tool {
+function constructTool(tool: ToolBase): Tool {
   const { description, inputSchema, outputSchema } = tool;
   return createTool({
     description,
     inputSchema,
     outputSchema,
     execute: async (input: unknown) => {
-      const requiresApproval = await tool.requiresApproval(input, runtime);
+      const requiresApproval = await tool.requiresApproval(input);
 
       if (requiresApproval) {
-        const options = await tool.approvalOptions(input, runtime);
+        const options = await tool.approvalOptions(input);
 
         const chosen = await requestUserInput({
           title: 'Approval required',
           description: `Tool "${tool.internalName}" requires approval\n ↳ ${previewArgs(input)}`,
           options: options.map(opt => ({ label: opt.text, id: opt.option })),
         });
-        const selectionOption = await tool.onOptionSelect(input, chosen.id, runtime);
+        const selectionOption = await tool.onOptionSelect(input, chosen.id);
 
         if (selectionOption !== ToolSelectionOption.ALLOW) {
           return Result.Error(`User denied permission to run tool "${tool.internalName}".`);
@@ -151,7 +173,7 @@ function constructTool(runtime: AgentContext, tool: ToolBase): Tool {
 
       let output: unknown;
       try {
-        output = await tool.handle(input, runtime);
+        output = await tool.handle(input);
       } catch (err) {
         const message = `Tool "${tool.internalName}" failed: ${String(err)}`;
         emitAgentMessage(chalk.red(`${message}\n`));

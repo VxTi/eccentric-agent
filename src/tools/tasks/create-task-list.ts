@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import { type AgentContext } from '../../rendering/context';
+import * as z from 'zod';
+import { acquireContextInstance } from '../../rendering/context';
 import { type Task, TaskStatus } from '../../lib/tasks';
 import { ToolBase } from '../common';
 
@@ -23,7 +23,8 @@ export default class CreateTaskListTool extends ToolBase<Input, Output> {
     });
   }
 
-  public override async handle(input: Input, context: AgentContext): Promise<Output> {
+  public override async handle(input: Input): Promise<Output> {
+    const context = await acquireContextInstance();
     const tasks: Task[] = input.tasks.map(task => ({
       id: task.id,
       description: task.description,

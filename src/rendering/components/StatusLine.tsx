@@ -6,7 +6,9 @@ const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', 
 const SPINNER_INTERVAL_MS = 80;
 
 export function StatusLine(): ReactNode {
-  const { loading, statusText } = useAgent();
+  const {
+    status: { loading, text },
+  } = useAgent();
   const [frame, setFrame] = useState(0);
 
   useEffect(() => {
@@ -18,12 +20,12 @@ export function StatusLine(): ReactNode {
     return () => clearInterval(id);
   }, [loading]);
 
-  if (!loading && !statusText.length) return null;
+  if (!loading && !text.length) return null;
 
   return (
     <Box width="80%" alignSelf="center">
       {loading && <Text color="cyan">{SPINNER_FRAMES[frame]}</Text>}
-      {statusText && <Text> {statusText}</Text>}
+      {text && <Text> {text}</Text>}
     </Box>
   );
 }
