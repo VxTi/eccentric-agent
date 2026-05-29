@@ -1,4 +1,4 @@
-import type { UniqueArray } from '../common/types';
+import type { UniqueArray } from '../types';
 import type {
   BackgroundColor,
   TextAlignment,

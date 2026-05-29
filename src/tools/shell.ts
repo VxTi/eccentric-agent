@@ -1,6 +1,6 @@
 import { type Output } from 'ai';
 import { z } from 'zod';
-import { type AgentRuntime } from '../../rendering/context/agent-context';
+import { type AgentRuntime } from '../rendering/context/agent-context';
 import { ToolBase, ToolSelectionOption } from '../tools';
 import { exec } from 'child_process';
 import { promisify } from 'util';

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { type AgentRuntime } from '../../rendering/context/agent-context';
+import { type AgentRuntime } from '../rendering/context/agent-context';
 import { ToolBase } from '../tools';
 
 export default class PromptUserOptionsTool extends ToolBase<Input, Output> {

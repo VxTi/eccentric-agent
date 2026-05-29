@@ -2,7 +2,7 @@ import { type Output } from 'ai';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { z } from 'zod';
-import { type AgentRuntime } from '../../rendering/context/agent-context';
+import { type AgentRuntime } from '../rendering/context/agent-context';
 import { ToolBase } from '../tools';
 
 export default class ReadFileTool extends ToolBase<Input, Output> {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, type JSX } from 'react';
 import { useApp, useInput } from 'ink';
 import chalk from 'chalk';
 import { useAgent } from '../context/agent-context';
-import type { ApprovalOption } from '../../common/types';
+import type { ApprovalOption } from '../../types';
 import { useMessageStore } from '../context/messages';
 import { InputBox } from './InputBox';
 

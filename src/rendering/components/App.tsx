@@ -2,8 +2,8 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Box, Text, useStdout } from 'ink';
 import { useMessageState } from '../context/messages';
 import { useAgentEngine } from '../hooks/agent-engine';
-import { MessageList }    from './MessageList';
-import { StatusLine }     from './StatusLine';
+import { MessageList } from './MessageList';
+import { StatusLine } from './StatusLine';
 import UserInput from './UserInput';
 
 function useTerminalSize(): { width: number; height: number } {
