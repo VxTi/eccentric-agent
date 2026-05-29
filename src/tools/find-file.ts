@@ -1,7 +1,7 @@
 import { type Output } from 'ai';
 import * as path from 'node:path';
 import { z } from 'zod';
-import { ToolBase } from '../tools';
+import { ToolBase } from './common/tool-base';
 import { glob } from 'glob';
 
 export default class FindFileTool extends ToolBase<Input, Output> {

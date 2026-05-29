@@ -12,7 +12,7 @@ config({ quiet: true });
 const ANSI_ALT_SCREEN_ENTER = '\x1b[?1049h\x1b[H\x1b[2J';
 const ANSI_ALT_SCREEN_EXIT = '\x1b[?1049l\x1b[3J';
 
-const abortController = new AbortController();
+const controller = new AbortController();
 
 function restoreScreen(): void {
   stdout.write(ANSI_ALT_SCREEN_EXIT);
@@ -25,8 +25,10 @@ async function main(): Promise<void> {
 
   stdout.write(ANSI_ALT_SCREEN_ENTER);
 
-  const instance = render(
-    <ApplicationCancellationProvider controller={abortController}>
+  controller.signal.addEventListener('abort', () => handleExit(0));
+
+  const { waitUntilExit } = render(
+    <ApplicationCancellationProvider controller={controller}>
       <MessagesProvider>
         <AgentProvider>
           <App />
@@ -36,19 +38,22 @@ async function main(): Promise<void> {
     {
       stdout,
       stdin,
-      exitOnCtrlC: false,
+      exitOnCtrlC: true,
       patchConsole: false,
+      maxFps: 120,
+      incrementalRendering: true,
+      concurrent: true,
     }
   );
 
-  await instance.waitUntilExit();
+  await waitUntilExit();
 }
 
-process.on('SIGINT', handleExit);
-process.on('SIGTERM', handleExit);
+process.on('SIGINT', controller.abort.bind(controller));
+process.on('SIGTERM', controller.abort.bind(controller));
 
 main()
-  .then(handleExit)
+  .then(() => handleExit(0))
   .catch(err => {
     if (err instanceof Error && err.name === 'ExitPromptError') {
       stdout.write(chalk.yellow('Goodbye.'));
@@ -56,11 +61,11 @@ main()
       stdout.write(`\n${chalk.red(String(err))}\n`);
     }
 
-    handleExit();
-    process.exit(1);
+    handleExit(1);
   });
 
-function handleExit() {
-  abortController.abort();
+function handleExit(statusCode = 0): void {
   restoreScreen();
+  console.log('Exiting...');
+  process.exit(statusCode);
 }

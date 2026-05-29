@@ -9,7 +9,7 @@ import { TaskList } from '../../task-list';
 import { createFileSelector, type FileSelector } from '../../file-selector';
 import { FileCache } from '../../lib/file-cache';
 
-export interface AgentRuntime {
+export interface AgentContext {
   cwd: string;
   taskList: TaskList;
   fileSelector: FileSelector;
@@ -19,14 +19,14 @@ export interface AgentRuntime {
   // subAgents: [];
 }
 
-const AgentRuntimeContext = createContext<AgentRuntime | null>(null);
+const $AgentContext = createContext<AgentContext | null>(null);
 
 export function AgentProvider({
   children,
 }: {
   children: ReactNode;
 }): ReactNode {
-  const runtime: AgentRuntime = useMemo(() => {
+  const runtime: AgentContext = useMemo(() => {
     const cwd = process.cwd();
 
     return {
@@ -40,14 +40,12 @@ export function AgentProvider({
   }, []);
 
   return (
-    <AgentRuntimeContext.Provider value={runtime}>
-      {children}
-    </AgentRuntimeContext.Provider>
+    <$AgentContext.Provider value={runtime}>{children}</$AgentContext.Provider>
   );
 }
 
-export function useAgent(): AgentRuntime {
-  const runtime = useContext(AgentRuntimeContext);
+export function useAgent(): AgentContext {
+  const runtime = useContext($AgentContext);
   if (!runtime) {
     throw new Error('useAgent must be used inside <AgentProvider>');
   }

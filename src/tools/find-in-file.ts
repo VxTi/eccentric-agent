@@ -1,6 +1,6 @@
 import { type Output } from 'ai';
 import { z } from 'zod';
-import { ToolBase } from '../tools';
+import { ToolBase } from './common/tool-base';
 import { readFile } from 'fs/promises';
 
 export default class FindInFile extends ToolBase<Input, Output> {

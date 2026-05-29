@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { type AgentRuntime } from '../rendering/context/agent-context';
+import { type AgentContext } from '../rendering/context/agent-context';
 import { TaskStatus } from '../task-list';
-import { ToolBase } from '../tools';
+import { ToolBase } from './common/tool-base';
 
 export default class UpdateTaskListTool extends ToolBase<Input, Output> {
   constructor() {
@@ -20,7 +20,7 @@ export default class UpdateTaskListTool extends ToolBase<Input, Output> {
 
   public override async handle(
     input: Input,
-    context: AgentRuntime
+    context: AgentContext
   ): Promise<Output> {
     if (!context.taskList.hasTasks) {
       throw new Error(

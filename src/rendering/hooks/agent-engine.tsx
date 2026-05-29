@@ -13,10 +13,13 @@ import compact from 'lodash/compact';
 import first from 'lodash/first';
 import { glob } from 'node:fs/promises';
 import { useEffect, useMemo, useRef } from 'react';
-import { type AgentRuntime, useAgent } from '../context/agent-context';
+import { type AgentContext, useAgent } from '../context/agent-context';
 import { TaskStatus } from '../../task-list';
-import { type ToolBase, ToolSelectionOption } from '../../tools';
-import { allTools } from '../../tools/registry';
+import {
+  type ToolBase,
+  ToolSelectionOption,
+} from '../../tools/common/tool-base';
+import { allTools } from '../../tools/common/tool-registry';
 import { useSignal } from '../context/application-cancellation';
 import { useMessageStore } from '../context/messages';
 import { formatMarkdown, previewArgs } from '../formatting';
@@ -88,7 +91,11 @@ export function useAgentEngine(): void {
         messages: [{ content: prompt, role: 'system' }, ...messages],
         tools,
         providerOptions: {
-          vertex: { includeThoughts: false },
+          google: {
+            thinkingConfig: {
+              thinkingBudget: 0,
+            },
+          },
         },
         stopWhen: stepCountIs(20),
       });
@@ -149,7 +156,7 @@ export function useAgentEngine(): void {
   }, [runtime, model, tools]);
 }
 
-function renderTaskListFragment(runtime: AgentRuntime): string | null {
+function renderTaskListFragment(runtime: AgentContext): string | null {
   if (!runtime.taskList.hasTasks) return null;
 
   const lines = runtime.taskList.tasks.map(task => {
@@ -186,7 +193,7 @@ async function loadSystemPrompt(cwd: string): Promise<string> {
 }
 
 function buildToolset(
-  runtime: AgentRuntime,
+  runtime: AgentContext,
   messageStore: MessageStore,
   tools: ToolBase[]
 ): ToolSet {
@@ -199,7 +206,7 @@ function buildToolset(
 }
 
 function bindTool(
-  runtime: AgentRuntime,
+  runtime: AgentContext,
   messageStore: MessageStore,
   tool: ToolBase
 ): Tool {

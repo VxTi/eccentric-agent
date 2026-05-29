@@ -1,6 +1,6 @@
 import type * as z from 'zod';
-import { type AgentRuntime } from './rendering/context/agent-context';
-import type { ApprovalOption, MaybePromise } from './types';
+import { type AgentContext } from '../../rendering/context/agent-context';
+import type { ApprovalOption, MaybePromise } from '../../types';
 
 export const DEFAULT_APPROVAL_OPTIONS: ApprovalOption[] = [
   { option: 'approve', text: 'Approve' },
@@ -17,36 +17,25 @@ export abstract class ToolBase<
   TOut = unknown,
   TApprovalOption extends string = string,
 > {
-  public readonly internalName: string;
-  public readonly name: string;
-  public readonly description: string;
-  public readonly inputSchema: z.ZodType<TIn>;
-  public readonly outputSchema: z.ZodType<TOut>;
-
   protected constructor(
-    internalName: string,
-    name: string,
-    description: string,
-    inputSchema: z.ZodType<TIn>,
-    outputSchema: z.ZodType<TOut>
-  ) {
-    this.internalName = internalName;
-    this.name = name;
-    this.description = description;
-    this.inputSchema = inputSchema;
-    this.outputSchema = outputSchema;
-  }
+    public internalName: string,
+    public name: string,
+    public description: string,
+    public readonly inputSchema: z.ZodType<TIn>,
+    public readonly outputSchema: z.ZodType<TOut>,
+    public readonly mightRequireApproval: boolean = true
+  ) {}
 
   public approvalOptions(
     _input: TIn,
-    _runtime: AgentRuntime
+    _runtime: AgentContext
   ): MaybePromise<ApprovalOption[]> {
     return DEFAULT_APPROVAL_OPTIONS;
   }
 
   public requiresApproval(
     _input: TIn,
-    _runtime: AgentRuntime
+    _runtime: AgentContext
   ): MaybePromise<boolean> {
     return false;
   }
@@ -54,12 +43,12 @@ export abstract class ToolBase<
   public onOptionSelect(
     _input: TIn,
     _option: TApprovalOption,
-    _runtime: AgentRuntime
+    _runtime: AgentContext
   ): MaybePromise<ToolSelectionOption> {
     return ToolSelectionOption.ALLOW;
   }
 
-  public abstract handle(input: TIn, _runtime: AgentRuntime): Promise<TOut>;
+  public abstract handle(input: TIn, _runtime: AgentContext): Promise<TOut>;
 
   public abstract inputToString(input: TIn): string;
 

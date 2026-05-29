@@ -1,6 +1,6 @@
 import { type Output } from 'ai';
 import { z } from 'zod';
-import { ToolBase } from '../tools';
+import { ToolBase } from './common/tool-base';
 
 export default class WebFetchTool extends ToolBase<Input, Output> {
   constructor() {
