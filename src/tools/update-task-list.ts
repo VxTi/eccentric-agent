@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { type AgentContext } from '../rendering/context/agent-context';
-import { TaskStatus } from '../task-list';
+import { TaskStatus } from '../lib/task-list';
 import { ToolBase } from './common/tool-base';
 
 export default class UpdateTaskListTool extends ToolBase<Input, Output> {

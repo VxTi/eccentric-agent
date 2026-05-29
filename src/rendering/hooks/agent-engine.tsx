@@ -14,7 +14,7 @@ import first from 'lodash/first';
 import { glob } from 'node:fs/promises';
 import { useEffect, useMemo, useRef } from 'react';
 import { type AgentContext, useAgent } from '../context/agent-context';
-import { TaskStatus } from '../../task-list';
+import { TaskStatus } from '../../lib/task-list';
 import { toolRegistry, type ToolBase, ToolSelectionOption } from '../../tools';
 import { useSignal } from '../context/application-cancellation';
 import { useMessageStore } from '../context/messages';

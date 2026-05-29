@@ -4,9 +4,9 @@ import {
   createUserMessageQueue,
   type ManagedUserInputQueue,
   type UserMessageQueue,
-} from '../../agent-runtime';
-import { TaskList } from '../../task-list';
-import { createFileSelector, type FileSelector } from '../../file-selector';
+} from '../../lib/agent-runtime';
+import { TaskList } from '../../lib/task-list';
+import { createFileSelector, type FileSelector } from '../../lib/file-selector';
 import { FileCache } from '../../lib/file-cache';
 
 export interface AgentContext {

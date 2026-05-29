@@ -1,4 +1,4 @@
-import type { UserInputQueue, UserInputRequest } from './types';
+import type { UserInputQueue, UserInputRequest } from '../types';
 
 export interface DequeuedRequest extends UserInputRequest {
   resolve: (option: string) => void;
