@@ -5,7 +5,7 @@ import {
   type ManagedUserInputQueue,
   type UserMessageQueue,
 } from '../../lib/agent-runtime';
-import { TaskList } from '../../lib/task-list';
+import { TaskList } from '../../tools/tasks/task-list';
 import { createFileSelector, type FileSelector } from '../../lib/file-selector';
 import { FileCache } from '../../lib/file-cache';
 
