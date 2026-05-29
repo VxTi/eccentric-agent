@@ -6,17 +6,19 @@ import { dirname } from 'path';
 
 export default class CreateFileTool extends ToolBase<Input, Output> {
   constructor() {
-    super(
-      'create_file',
-      'Create File',
-      'Creates a new file at the specified absolute path with the given textual content. By default fails if a' +
+    super({
+      internalName: 'create_file',
+      name: 'Create File',
+      description:
+        'Creates a new file at the specified absolute path with the given textual content. By default fails if a' +
         ' file already exists at that path; pass `overwrite: true` to replace it. Missing parent directories' +
         ' are created automatically unless `createDirectories` is set to false. Use this tool when you need to' +
         ' produce an entirely new file (e.g. a new module, config file, or script). For editing an existing' +
         ' file, prefer `insert_in_file` instead.',
       inputSchema,
-      outputSchema
-    );
+      outputSchema,
+      mightRequireApproval: false,
+    });
   }
 
   public override async handle(input: Input): Promise<Output> {

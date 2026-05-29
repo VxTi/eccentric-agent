@@ -3,16 +3,18 @@ import { ToolBase } from './common/tool-base';
 
 export default class GetUserTimeTool extends ToolBase<Input, Output> {
   constructor() {
-    super(
-      'get_user_time',
-      'Get user time',
-      "Returns the user's current local date and time as a human-readable string, along with the" +
+    super({
+      internalName: 'get_user_time',
+      name: 'Get user time',
+      description:
+        "Returns the user's current local date and time as a human-readable string, along with the" +
         ' resolved IANA time zone and the raw ISO 8601 timestamp. Use this tool when you need to know' +
         " *when* it is for the user — for example to answer 'what time is it?', to timestamp output," +
         ' or to reason about deadlines relative to "now". Takes no arguments.',
       inputSchema,
-      outputSchema
-    );
+      outputSchema,
+      mightRequireApproval: false,
+    });
   }
 
   public override async handle(): Promise<Output> {

@@ -12,18 +12,20 @@ const MAX_SHOWN_OUTPUT_LINES = 5;
 
 export default class ShellCommandTool extends ToolBase<Input, Output, Option> {
   constructor() {
-    super(
-      'shell',
-      'Shell',
-      'Executes a shell command and returns its stdout, stderr, and exit code. Commands are restricted to an' +
+    super({
+      internalName: 'shell',
+      name: 'Shell',
+      description:
+        'Executes a shell command and returns its stdout, stderr, and exit code. Commands are restricted to an' +
         ' internal allow-list of safe read-only patterns (e.g. `ls`, `cat`, `git status`, `pnpm list`). Any' +
         ' command outside that list is rejected. Use this tool to inspect the environment, list files, read' +
         ' file contents, or query version control state. Do NOT use it to mutate the filesystem, install' +
         ' packages, or run arbitrary user-supplied commands. This tool requires explicit user permission' +
         ' before each invocation.',
       inputSchema,
-      outputSchema
-    );
+      outputSchema,
+      mightRequireApproval: true,
+    });
   }
 
   private isAllowed(command: string): boolean {

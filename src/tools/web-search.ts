@@ -5,10 +5,11 @@ import { ToolBase } from './common/tool-base';
 
 export default class WebSearchTool extends ToolBase<Input, Output> {
   constructor() {
-    super(
-      'web_search',
-      'Web Search',
-      'Performs one or more web searches in parallel and returns, for each query, a list of relevant results' +
+    super({
+      internalName: 'web_search',
+      name: 'Web Search',
+      description:
+        'Performs one or more web searches in parallel and returns, for each query, a list of relevant results' +
         ' containing a title, URL, and a short snippet summarizing the page. Use this tool when the information' +
         ' required to answer the user is not present in the local context, the codebase, or your prior knowledge' +
         ' — for example to look up current events, library documentation, error messages, or external references.' +
@@ -17,8 +18,9 @@ export default class WebSearchTool extends ToolBase<Input, Output> {
         ' needed. ONLY invoke this tool when the current context is insufficient and the answer genuinely requires' +
         ' up-to-date or external information.',
       inputSchema,
-      outputSchema
-    );
+      outputSchema,
+      mightRequireApproval: false,
+    });
   }
 
   public override async handle(input: Input): Promise<Output> {

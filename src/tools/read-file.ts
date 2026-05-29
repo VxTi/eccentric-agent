@@ -7,10 +7,11 @@ import { ToolBase } from './common/tool-base';
 
 export default class ReadFileTool extends ToolBase<Input, Output> {
   constructor() {
-    super(
-      'read_file',
-      'Read file',
-      'Reads the entire UTF-8 text content of a file from disk and returns it as a single string with' +
+    super({
+      internalName: 'read_file',
+      name: 'Read file',
+      description:
+        'Reads the entire UTF-8 text content of a file from disk and returns it as a single string with' +
         ' each line prefixed by its 1-based line number and a tab (`<n>\\t<line>`). These line' +
         ' numbers can be passed to `insert_in_file` to insert new content at a specific position.\n' +
         'Accepts either an absolute path or a path relative to the working directory. Use this tool' +
@@ -20,8 +21,9 @@ export default class ReadFileTool extends ToolBase<Input, Output> {
         ' (use `find_in_file` for that). ONLY invoke this tool when the file content is not already' +
         ' present in the current context; prefer existing context over repeated reads.',
       inputSchema,
-      outputSchema
-    );
+      outputSchema,
+      mightRequireApproval: false,
+    });
   }
 
   public override async handle(

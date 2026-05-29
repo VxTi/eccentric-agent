@@ -5,17 +5,19 @@ import { ToolBase } from './common/tool-base';
 
 export default class UpdateTaskListTool extends ToolBase<Input, Output> {
   constructor() {
-    super(
-      'update_task_list',
-      'Update Task List',
-      'Updates the status of one or more tasks in the current task list. Pass an array of updates, each' +
+    super({
+      internalName: 'update_task_list',
+      name: 'Update Task List',
+      description:
+        'Updates the status of one or more tasks in the current task list. Pass an array of updates, each' +
         ` referencing a task by its \`id\` and giving the new \`status\` ("${TaskStatus.PENDING}", "${TaskStatus.IN_PROGRESS}", or` +
         ` "${TaskStatus.COMPLETED}"). Mark a task "${TaskStatus.IN_PROGRESS}" right before you start working on it and "${TaskStatus.COMPLETED}"` +
         ' immediately after it is finished — do not batch completions at the end. Fails if no task list' +
         ' has been created yet or if an `id` does not match any existing task.',
       inputSchema,
-      outputSchema
-    );
+      outputSchema,
+      mightRequireApproval: false,
+    });
   }
 
   public override async handle(

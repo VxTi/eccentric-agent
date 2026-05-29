@@ -5,18 +5,20 @@ import { readFile } from 'fs/promises';
 
 export default class FindInFile extends ToolBase<Input, Output> {
   constructor() {
-    super(
-      'find_in_file',
-      'Find in file',
-      'Searches the contents of a single file for a substring or regular expression and returns each match' +
+    super({
+      internalName: 'find_in_file',
+      name: 'Find in file',
+      description:
+        'Searches the contents of a single file for a substring or regular expression and returns each match' +
         ' with its line number, column, the matched text, and the full line of context. Use this tool when you' +
         ' already know which file to inspect (for example obtained via `find_file`) and need to locate specific' +
         ' symbols, identifiers, error strings, or text fragments inside it. Prefer this over reading the entire' +
         ' file when only specific occurrences are relevant. ONLY use this tool when the current context does not' +
         ' already contain the information being searched for.',
       inputSchema,
-      outputSchema
-    );
+      outputSchema,
+      mightRequireApproval: false,
+    });
   }
 
   public override async handle(input: Input): Promise<Output> {

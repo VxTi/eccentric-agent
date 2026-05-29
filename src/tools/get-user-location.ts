@@ -40,18 +40,21 @@ function httpsGetJson(url: string): Promise<{ status: number; body: string }> {
 
 export default class GetUserLocationTool extends ToolBase<Input, Output> {
   constructor() {
-    super(
-      'get_user_location',
-      'Get user location',
-      "Returns the user's approximate geographic location, derived from their public IP address via" +
+    super({
+      internalName: 'get_user_location',
+      name: 'Get user location',
+      description:
+        "Returns the user's approximate geographic location, derived from their public IP address via" +
         ' a free IP-geolocation service. The result includes city, region, country, the resolved' +
         ' latitude/longitude, and the IANA time zone. Accuracy is at city level at best — do NOT use' +
         ' this for navigation or anything safety-critical. Use this tool when you need rough locale' +
         ' context, e.g. to localize a recommendation, infer business hours, or interpret a relative' +
         " reference like 'nearby'. Takes no arguments.",
       inputSchema,
-      outputSchema
-    );
+      outputSchema,
+      // TODO: Reconsider
+      mightRequireApproval: false,
+    });
   }
 
   public override async handle(): Promise<Output> {

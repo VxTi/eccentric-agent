@@ -5,10 +5,11 @@ import { ToolBase } from './common/tool-base';
 
 export default class CreateTaskListTool extends ToolBase<Input, Output> {
   constructor() {
-    super(
-      'create_task_list',
-      'Create Task List',
-      'Creates a task list that tracks the work required to fulfil the current user request. Use this tool' +
+    super({
+      internalName: 'create_task_list',
+      name: 'Create Task List',
+      description:
+        'Creates a task list that tracks the work required to fulfil the current user request. Use this tool' +
         ' at the start of any non-trivial request that decomposes into multiple discrete steps. Each task' +
         ' must have a stable string `id` (e.g. "1", "2", "fetch-data") and a short human readable' +
         ' `description`. Newly created tasks start in the "pending" status. While a task list exists with' +
@@ -17,8 +18,9 @@ export default class CreateTaskListTool extends ToolBase<Input, Output> {
         ' begin a task and to "completed" once it is done. Creating a new task list replaces any existing' +
         ' one.',
       inputSchema,
-      outputSchema
-    );
+      outputSchema,
+      mightRequireApproval: false,
+    });
   }
 
   public override async handle(

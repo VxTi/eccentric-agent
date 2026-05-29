@@ -5,10 +5,11 @@ import { ToolBase } from './common/tool-base';
 
 export default class InsertInFileTool extends ToolBase<Input, Output> {
   constructor() {
-    super(
-      'insert_in_file',
-      'Insert in file',
-      'Inserts `content` into `filePath` relative to the 1-based `lineNumber`. The' +
+    super({
+      internalName: 'insert_in_file',
+      name: 'Insert in file',
+      description:
+        'Inserts `content` into `filePath` relative to the 1-based `lineNumber`. The' +
         ' `inclusive` flag controls whether the target line is overwritten or preserved.\n\n' +
         'Modes:\n' +
         '  • `inclusive: false` (default) — insert AFTER `lineNumber`. The line at' +
@@ -25,8 +26,9 @@ export default class InsertInFileTool extends ToolBase<Input, Output> {
         'For arbitrary text substitution use `replace_in_file`. For deletions or other' +
         ' content-based edits, read the file first and use a replace-style tool.',
       inputSchema,
-      outputSchema
-    );
+      outputSchema,
+      mightRequireApproval: false,
+    });
   }
 
   public override async handle(

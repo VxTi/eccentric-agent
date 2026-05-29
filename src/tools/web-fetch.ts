@@ -4,10 +4,11 @@ import { ToolBase } from './common/tool-base';
 
 export default class WebFetchTool extends ToolBase<Input, Output> {
   constructor() {
-    super(
-      'web_fetch',
-      'Web Fetch',
-      'Fetches a specific web page over HTTP(S) and returns its raw textual body together with the' +
+    super({
+      internalName: 'web_fetch',
+      name: 'Web Fetch',
+      description:
+        'Fetches a specific web page over HTTP(S) and returns its raw textual body together with the' +
         ' final URL, HTTP status code, and content type. Use this tool when the user provides a full' +
         ' URL or when a previous `web_search` result needs deeper inspection. The response body is' +
         ' returned verbatim — for HTML pages this means the raw markup, so callers should be prepared' +
@@ -16,8 +17,9 @@ export default class WebFetchTool extends ToolBase<Input, Output> {
         ' local files (use `read_file` for that). ONLY invoke this tool when the URL is known and the' +
         ' page content is not already available in the current context.',
       inputSchema,
-      outputSchema
-    );
+      outputSchema,
+      mightRequireApproval: false,
+    });
   }
 
   public override async handle(input: Input): Promise<Output> {

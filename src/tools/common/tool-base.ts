@@ -12,19 +12,40 @@ export const enum ToolSelectionOption {
   DENY = 'deny',
 }
 
+interface ToolBaseProps<TIn, TOut> {
+  internalName: string;
+  name: string;
+  description: string;
+  readonly inputSchema: z.ZodType<TIn>;
+  readonly outputSchema: z.ZodType<TOut>;
+
+  /**
+   * Whether the tool might require approval.
+   * @default true
+   */
+  readonly mightRequireApproval?: boolean;
+}
+
 export abstract class ToolBase<
   TIn = unknown,
   TOut = unknown,
   TApprovalOption extends string = string,
 > {
-  protected constructor(
-    public internalName: string,
-    public name: string,
-    public description: string,
-    public readonly inputSchema: z.ZodType<TIn>,
-    public readonly outputSchema: z.ZodType<TOut>,
-    public readonly mightRequireApproval: boolean = true
-  ) {}
+  public internalName: string;
+  public name: string;
+  public description: string;
+  public readonly inputSchema: z.ZodType<TIn>;
+  public readonly outputSchema: z.ZodType<TOut>;
+  public readonly mightRequireApproval: boolean;
+
+  protected constructor(props: ToolBaseProps<TIn, TOut>) {
+    this.internalName = props.internalName;
+    this.name = props.name;
+    this.description = props.description;
+    this.inputSchema = props.inputSchema;
+    this.outputSchema = props.outputSchema;
+    this.mightRequireApproval = props.mightRequireApproval ?? true;
+  }
 
   public approvalOptions(
     _input: TIn,

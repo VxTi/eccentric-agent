@@ -4,10 +4,11 @@ import { ToolBase } from './common/tool-base';
 
 export default class PromptUserOptionsTool extends ToolBase<Input, Output> {
   constructor() {
-    super(
-      'prompt_user_options',
-      'Prompt user options',
-      'Asks the user to disambiguate by picking one of several proposed options. Use this tool when' +
+    super({
+      internalName: 'prompt_user_options',
+      name: 'Prompt user options',
+      description:
+        'Asks the user to disambiguate by picking one of several proposed options. Use this tool when' +
         ' you cannot proceed with confidence — the request is ambiguous, you can see multiple equally' +
         ' reasonable interpretations, or a decision is required that you should not make on the' +
         " user's behalf. Provide a short, specific `question` and 2–6 mutually exclusive `options`," +
@@ -18,8 +19,9 @@ export default class PromptUserOptionsTool extends ToolBase<Input, Output> {
         ' an already-clear plan, or as a substitute for thinking. Prefer making a reasonable choice' +
         ' and stating your assumption when the question would be pedantic.',
       inputSchema,
-      outputSchema
-    );
+      outputSchema,
+      mightRequireApproval: false,
+    });
   }
 
   public override async handle(

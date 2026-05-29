@@ -5,10 +5,11 @@ import { ToolBase } from './common/tool-base';
 
 export default class ReplaceInFileTool extends ToolBase<Input, Output> {
   constructor() {
-    super(
-      'replace_in_file',
-      'Replace in file',
-      'Applies one or more single-line replacements to a file atomically. Each replacement has' +
+    super({
+      internalName: 'replace_in_file',
+      name: 'Replace in file',
+      description:
+        'Applies one or more single-line replacements to a file atomically. Each replacement has' +
         ' `find` (the exact single line currently in the file) and `replace` (the single line it' +
         ' should become). Neither `find` nor `replace` may contain newline characters.\n\n' +
         'Use this tool when changing one or more individual lines in a file. To add new lines' +
@@ -26,8 +27,9 @@ export default class ReplaceInFileTool extends ToolBase<Input, Output> {
         '  • If the file changed on disk since it was last read in this session, the operation is' +
         '    rejected so you can re-read and retry against fresh content.',
       inputSchema,
-      outputSchema
-    );
+      outputSchema,
+      mightRequireApproval: false,
+    });
   }
 
   public override async handle(

@@ -6,10 +6,11 @@ import { glob } from 'glob';
 
 export default class FindFileTool extends ToolBase<Input, Output> {
   constructor() {
-    super(
-      'find_file',
-      'Find file',
-      'Locates files on disk by matching their path against a glob pattern (e.g. `src/**/*.ts`,' +
+    super({
+      internalName: 'find_file',
+      name: 'Find file',
+      description:
+        'Locates files on disk by matching their path against a glob pattern (e.g. `src/**/*.ts`,' +
         ' `**/package.json`, `lib/utils/*.{js,ts}`). Returns a list of matching file paths relative to the' +
         ' working directory. Use this tool when you need to discover *where* a file lives — by name, extension,' +
         ' or directory layout — but do NOT use it to search for content *inside* files (use `find_in_file` for' +
@@ -33,8 +34,9 @@ export default class FindFileTool extends ToolBase<Input, Output> {
         ' file is at the root of `directoryPath`. When unsure, prefer broader patterns with `**/` and braces' +
         ' over narrow ones — it is better to return a few extra matches than to return nothing.',
       inputSchema,
-      outputSchema
-    );
+      outputSchema,
+      mightRequireApproval: false,
+    });
   }
 
   public override async handle(input: Input): Promise<Output> {
