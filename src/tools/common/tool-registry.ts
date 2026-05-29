@@ -23,6 +23,8 @@ export const agentTools = [
   new WebFetch(),
   new GetUserTime(),
   new GetUserLocation(),
+  new CreateTaskList(),
+  new UpdateTaskList(),
 ] satisfies ToolBase[];
 
 export const toolRegistry = [
@@ -31,8 +33,6 @@ export const toolRegistry = [
   new InsertInFile(),
   new ReplaceInFile(),
   new CreateFile(),
-  new CreateTaskList(),
-  new UpdateTaskList(),
   new PromptUserOptions(),
   new SpawnAgents(),
 ] satisfies ToolBase[];

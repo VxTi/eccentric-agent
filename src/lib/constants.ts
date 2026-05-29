@@ -16,3 +16,5 @@ A few things to absolutely NEVER do:
 `;
 
 export const MAX_TASK_CONTINUATION_ITERATIONS = 10;
+
+export const CURSOR_BLINK_INTERVAL_MS = 500;

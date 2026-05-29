@@ -6,6 +6,8 @@ const FILE_SUGGESTION_PATTERN = /@(\w+)$/;
 
 export function useInputSuggestionProvider(input: string, cursorOffset: number) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestionCursorIndex, setSuggestionCursorIndex] = useState(0);
+
   const { setMessages } = useAgent();
 
   useEffect(() => {
@@ -13,28 +15,28 @@ export function useInputSuggestionProvider(input: string, cursorOffset: number) 
 
     const preCursorInput = input.slice(0, cursorOffset);
 
-    tryMatch(FILE_SUGGESTION_PATTERN, preCursorInput, async ([, filePath]) => {
-      const files = await glob('**/*', {
+    const fileSuggestionMatch = FILE_SUGGESTION_PATTERN.exec(preCursorInput);
+    if (fileSuggestionMatch?.[1]) {
+      const filePath = fileSuggestionMatch[1];
+      setSuggestionCursorIndex(fileSuggestionMatch.index + 1 /* to exclude @ char*/);
+
+      // MARK: Fails silently
+      void glob('**/*', {
         nodir: true,
         ignore: ['node_modules/**', 'dist/**', '.git/**'],
         dot: false,
         cwd: process.cwd(),
-      });
-      const filtered = filterFiles(files, filePath);
-      setSuggestions(filtered);
-    });
+      })
+        .then(files => filterFiles(files, filePath))
+        .then(files => setSuggestions(files));
+    }
   }, [input, cursorOffset, setMessages]);
 
   return {
     suggestions,
+    suggestionCursorIndex,
+    setSuggestions,
   };
-}
-
-function tryMatch(pattern: RegExp, input: string, callback: (matches: string[]) => void): void {
-  const matches = pattern.exec(input);
-  if (!matches?.[0]) return;
-
-  callback([...matches]);
 }
 
 function filterFiles(files: string[], query: string): string[] {

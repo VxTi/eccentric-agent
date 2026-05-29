@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import { Box, Text, useInput, usePaste } from 'ink';
+import { CURSOR_BLINK_INTERVAL_MS } from '../../../lib/constants';
 import {
   emitEvent,
   EventName,
@@ -18,14 +19,20 @@ import {
   UserInputResponseEvent,
 } from '../../../lib/events';
 import { useAbort, useAgent } from '../../context';
-import { useInputSuggestionProvider } from '../../hooks';
+import { useInputSuggestionProvider, useTerminalSize } from '../../hooks';
 
-const MAX_SHOWN_SUGGESTIONS = 10;
+const MIN_SUGGESTION_COUNT = 8;
 
 export default function InputField(): JSX.Element {
+  const { height } = useTerminalSize();
+  const maxSuggestions = Math.ceil(Math.max(height / 2.5, MIN_SUGGESTION_COUNT));
+
   const [cursorOffset, setCursorOffset] = useState<number>(0);
   const [input, setInput] = useState<string>('');
-  const { suggestions } = useInputSuggestionProvider(input, cursorOffset);
+  const { suggestions, suggestionCursorIndex, setSuggestions } = useInputSuggestionProvider(
+    input,
+    cursorOffset
+  );
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number>(0);
   const controller = useAbort();
   const agent = useAgent();
@@ -81,9 +88,14 @@ export default function InputField(): JSX.Element {
       }
 
       if (key.tab || key.return) {
-        if (selectedSuggestionIndex > -1) {
-          setInput(prev => prev + suggestions[selectedSuggestionIndex]);
-        }
+        setInput(
+          prev =>
+            prev.slice(0, suggestionCursorIndex) +
+            suggestions[selectedSuggestionIndex] +
+            prev.slice(cursorOffset)
+        );
+        setCursorOffset(suggestionCursorIndex + suggestions[selectedSuggestionIndex].length);
+        setSuggestions([]);
         return;
       }
     }
@@ -108,7 +120,8 @@ export default function InputField(): JSX.Element {
     }
 
     if (key.rightArrow) {
-      if (cursorOffset > inputChar.length) return;
+      if (cursorOffset >= input.length) return;
+
       setCursorOffset(prev => prev + 1);
       return;
     }
@@ -126,7 +139,11 @@ export default function InputField(): JSX.Element {
 
   return (
     <Box width="80%" alignSelf="center" flexDirection="column">
-      <Suggestions suggestions={suggestions} selectedIndex={selectedSuggestionIndex} />
+      <Suggestions
+        suggestions={suggestions}
+        selectedIndex={selectedSuggestionIndex}
+        maxSuggestions={maxSuggestions}
+      />
       <Box backgroundColor="gray" paddingY={1} paddingX={1} flexDirection="column">
         <InputText input={input} cursor={cursorOffset} />
       </Box>
@@ -192,16 +209,14 @@ function InputText({ input, cursor }: InputTextProps): ReactNode {
   const [blinkState, setBlinkState] = useState<boolean>(false);
 
   useEffect(() => {
-    const id = setInterval(() => setBlinkState(prev => !prev), 500);
+    const id = setInterval(() => setBlinkState(prev => !prev), CURSOR_BLINK_INTERVAL_MS);
     return () => clearInterval(id);
   }, []);
 
   return (
     <Box>
       <Text>{before}</Text>
-      <Box borderLeftColor="white" borderLeft={blinkState}>
-        <Text>{cursorChar}</Text>
-      </Box>
+      <Text inverse={blinkState}>{cursorChar}</Text>
       <Text>{after}</Text>
     </Box>
   );
@@ -215,7 +230,7 @@ interface SuggestionTextProps {
 function SuggestionText({ children, selected }: SuggestionTextProps): ReactNode {
   return (
     <Text color={selected ? 'redBright' : 'white'}>
-      {selected ? '→ ' : '  '}
+      {selected ? '▶ ' : '  '}
       {children}
     </Text>
   );
@@ -224,45 +239,52 @@ function SuggestionText({ children, selected }: SuggestionTextProps): ReactNode 
 interface SuggestionsProps {
   suggestions: string[];
   selectedIndex: number;
+  maxSuggestions: number;
 }
 
-function Suggestions({ suggestions, selectedIndex }: SuggestionsProps): ReactNode {
+function Suggestions({ suggestions, selectedIndex, maxSuggestions }: SuggestionsProps): ReactNode {
   const state = useMemo(() => {
     if (suggestions.length === 0) return undefined;
 
-    if (suggestions.length <= MAX_SHOWN_SUGGESTIONS) {
+    if (suggestions.length <= maxSuggestions) {
       return {
         shown: suggestions,
-        additional: 0,
+        itemsAfter: 0,
+        itemsBefore: 0,
         offsetIndex: 0,
       };
     }
 
-    const halfWindow = Math.floor(MAX_SHOWN_SUGGESTIONS / 2);
-    const maxOffset = suggestions.length - MAX_SHOWN_SUGGESTIONS;
+    const halfWindow = Math.floor(maxSuggestions / 2);
+    const maxOffset = suggestions.length - maxSuggestions;
 
     const targetOffset = selectedIndex - halfWindow;
 
     const offsetIndex = Math.max(0, Math.min(maxOffset, targetOffset));
-    const offsetUpperBound = offsetIndex + MAX_SHOWN_SUGGESTIONS;
+    const offsetUpperBound = offsetIndex + maxSuggestions;
 
     return {
       offsetIndex,
       shown: suggestions.slice(offsetIndex, offsetUpperBound),
-      additional: suggestions.length - offsetUpperBound,
+      itemsAfter: suggestions.length - offsetUpperBound,
     };
-  }, [suggestions, selectedIndex]);
+  }, [suggestions, maxSuggestions, selectedIndex]);
 
   if (!state) return;
 
+  const { itemsAfter, offsetIndex, shown } = state;
+
   return (
     <Box flexDirection="column">
-      {state.shown.map((suggestion, i) => (
-        <SuggestionText key={i} selected={selectedIndex === i + state.offsetIndex}>
+      {itemsAfter === 0 && suggestions.length > maxSuggestions && (
+        <Text color="gray">{'  ...'}</Text>
+      )}
+      {shown.map((suggestion, i) => (
+        <SuggestionText key={i} selected={selectedIndex === i + offsetIndex}>
           {suggestion}
         </SuggestionText>
       ))}
-      {state.additional > 0 && <Text color="gray">+{state.additional} more</Text>}
+      <Text color="gray">{itemsAfter > 0 ? `+${itemsAfter} more` : ' '}</Text>
     </Box>
   );
 }

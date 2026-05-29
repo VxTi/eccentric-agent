@@ -29,7 +29,7 @@ export class Agent<T = string> {
     private readonly signal: AbortSignal
   ) {
     this.toolset = this.constructToolset();
-    this.model = vertex('gemini-3.1-flash-lite-preview');
+    this.model = vertex('gemini-2.5-flash-lite');
     this.messages = [
       { role: 'system', content: this.constructSystemPrompt() },
       { role: 'user', content: this.goal },

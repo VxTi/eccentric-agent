@@ -23,7 +23,9 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { DEFAULT_SYSTEM_PROMPT, MAX_TASK_CONTINUATION_ITERATIONS } from '../../lib/constants';
 import {
+  type AgentMessageEvent,
   emitEvent,
   EventName,
   subscribeEvent,
@@ -32,14 +34,11 @@ import {
 } from '../../lib/events';
 import { FileCache } from '../../lib/file-cache';
 import { Result } from '../../lib/result';
-import { DEFAULT_SYSTEM_PROMPT, MAX_TASK_CONTINUATION_ITERATIONS } from '../../lib/constants';
 import { TaskList, TaskStatus } from '../../lib/tasks';
 import { emitAgentMessage, requestUserInput } from '../../lib/user-input';
 import { type ToolBase, toolRegistry, ToolSelectionOption } from '../../tools';
 import { formatMarkdown, previewArgs } from '../formatting';
 import { useSignal } from './application-cancellation';
-
-export type Message = Extract<ModelMessage, { role: 'assistant' | 'user' }>;
 
 interface AgentStatus {
   loading: boolean;
@@ -52,7 +51,7 @@ export interface AgentContext {
   submitMessage: (input: string) => void;
   taskList: TaskList;
   fileCache: FileCache;
-  messages: Message[];
+  messages: ModelMessage[];
   setMessages: Dispatch<SetStateAction<ModelMessage[]>>;
 
   status: AgentStatus;
@@ -65,7 +64,10 @@ export function AgentProvider({ children }: { children: ReactNode }): ReactNode 
   const [messageQueue, setMessageQueue] = useState<string[]>([]);
   const [cwd, setCwd] = useState<string>(process.cwd());
   const [messages, setMessages] = useState<ModelMessage[]>([]);
-  const [status, setStatus] = useState<AgentStatus>({ loading: false, text: '' });
+  const [status, setStatus] = useState<AgentStatus>({
+    loading: false,
+    text: '',
+  });
 
   const signal = useSignal();
 
@@ -86,11 +88,23 @@ export function AgentProvider({ children }: { children: ReactNode }): ReactNode 
     };
   }, [taskList, cwd]);
 
+  useEffect(() => {
+    const handler = (event: AgentMessageEvent) => {
+      setMessages(prev => [...prev, event.detail]);
+    };
+    subscribeEvent(EventName.AGENT_MESSAGE, handler);
+
+    return () => {
+      unsubscribeEvent(EventName.AGENT_MESSAGE, handler);
+    };
+  }, []);
+
   const processRequest = useCallback(
     async (prompt: string) => {
       setStatus({ text: 'Processing...', loading: true });
 
       const updatedMessages: ModelMessage[] = [...messages, { role: 'user', content: prompt }];
+      setMessages(updatedMessages);
 
       const result = streamText({
         allowSystemInMessages: true,
@@ -108,22 +122,31 @@ export function AgentProvider({ children }: { children: ReactNode }): ReactNode 
         stopWhen: stepCountIs(20),
       });
 
+      let buffer = '';
       try {
-        const message = { role: 'user', content: `${chalk.blue('◆ ')}` } satisfies Message;
-        updatedMessages.push(message);
         for await (const chunk of result.textStream) {
-          message.content += chunk;
-          message.content = formatMarkdown(message.content);
+          buffer += chunk;
+          setMessages([...updatedMessages, { role: 'assistant', content: buffer }]);
         }
       } catch (err) {
-        setMessages(prev => [
-          ...prev,
-          { role: 'assistant', content: `Something went wrong whilst responding: ${String(err)}` },
+        setMessages([
+          ...updatedMessages,
+          {
+            role: 'assistant',
+            content: `Something went wrong whilst responding: ${String(err)}`,
+          },
         ]);
         return;
       }
+
+      const response = await result.response;
+
       setStatus({ text: '', loading: false });
-      setMessages(updatedMessages);
+      setMessages([
+        ...updatedMessages,
+        ...response.messages,
+        { role: 'assistant', content: buffer },
+      ]);
 
       let taskIterations = 0;
       while (taskList.hasIncompleteTasks() && taskIterations < MAX_TASK_CONTINUATION_ITERATIONS) {
@@ -160,7 +183,7 @@ export function AgentProvider({ children }: { children: ReactNode }): ReactNode 
   return (
     <PrimaryAgentContext.Provider
       value={{
-        messages: messages.filter((m): m is Message => m.role === 'user' || m.role === 'assistant'),
+        messages,
         setMessages,
         cwd,
         setCwd,
