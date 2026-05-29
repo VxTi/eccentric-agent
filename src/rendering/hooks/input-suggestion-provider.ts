@@ -1,5 +1,5 @@
 import { glob } from 'glob';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAgent } from '../context';
 
 const FILE_SUGGESTION_PATTERN = /@(\w+)$/;
@@ -13,11 +13,7 @@ export function useInputSuggestionProvider(input: string, cursorOffset: number) 
 
     const preCursorInput = input.slice(0, cursorOffset);
 
-    tryMatch(FILE_SUGGESTION_PATTERN, preCursorInput, async ([,  filePath]) => {
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: `Creating suggestions - ${filePath}` },
-      ]);
+    tryMatch(FILE_SUGGESTION_PATTERN, preCursorInput, async ([, filePath]) => {
       const files = await glob('**/*', {
         nodir: true,
         ignore: ['node_modules/**', 'dist/**', '.git/**'],
@@ -29,11 +25,8 @@ export function useInputSuggestionProvider(input: string, cursorOffset: number) 
     });
   }, [input, cursorOffset, setMessages]);
 
-  const recomputeSuggestions = useCallback(() => {}, []);
-
   return {
     suggestions,
-    recomputeSuggestions,
   };
 }
 

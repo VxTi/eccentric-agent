@@ -26,7 +26,7 @@ export default function InputField(): JSX.Element {
   const [cursorOffset, setCursorOffset] = useState<number>(0);
   const [input, setInput] = useState<string>('');
   const { suggestions } = useInputSuggestionProvider(input, cursorOffset);
-  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number>(-1);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number>(0);
   const controller = useAbort();
   const agent = useAgent();
 
@@ -213,7 +213,12 @@ interface SuggestionTextProps {
 }
 
 function SuggestionText({ children, selected }: SuggestionTextProps): ReactNode {
-  return <Text color={selected ? 'redBright' : 'white'}>{children}</Text>;
+  return (
+    <Text color={selected ? 'redBright' : 'white'}>
+      {selected ? '→ ' : '  '}
+      {children}
+    </Text>
+  );
 }
 
 interface SuggestionsProps {
@@ -225,28 +230,35 @@ function Suggestions({ suggestions, selectedIndex }: SuggestionsProps): ReactNod
   const state = useMemo(() => {
     if (suggestions.length === 0) return undefined;
 
-    if (suggestions.length < MAX_SHOWN_SUGGESTIONS) {
+    if (suggestions.length <= MAX_SHOWN_SUGGESTIONS) {
       return {
         shown: suggestions,
         additional: 0,
+        offsetIndex: 0,
       };
     }
-    const offsetIndex = suggestions.length - MAX_SHOWN_SUGGESTIONS / 2 + selectedIndex;
 
-    const partialSuggestions = suggestions.slice(offsetIndex, offsetIndex + MAX_SHOWN_SUGGESTIONS);
+    const halfWindow = Math.floor(MAX_SHOWN_SUGGESTIONS / 2);
+    const maxOffset = suggestions.length - MAX_SHOWN_SUGGESTIONS;
+
+    const targetOffset = selectedIndex - halfWindow;
+
+    const offsetIndex = Math.max(0, Math.min(maxOffset, targetOffset));
+    const offsetUpperBound = offsetIndex + MAX_SHOWN_SUGGESTIONS;
 
     return {
-      shown: partialSuggestions,
-      additional: suggestions.length - partialSuggestions.length,
+      offsetIndex,
+      shown: suggestions.slice(offsetIndex, offsetUpperBound),
+      additional: suggestions.length - offsetUpperBound,
     };
   }, [suggestions, selectedIndex]);
 
   if (!state) return;
 
   return (
-    <Box>
+    <Box flexDirection="column">
       {state.shown.map((suggestion, i) => (
-        <SuggestionText key={i} selected={selectedIndex === i}>
+        <SuggestionText key={i} selected={selectedIndex === i + state.offsetIndex}>
           {suggestion}
         </SuggestionText>
       ))}
