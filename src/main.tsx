@@ -14,9 +14,15 @@ import { App } from './rendering/components/App';
 const ANSI_ALT_SCREEN_ENTER = '\x1b[?1049h\x1b[H\x1b[2J';
 const ANSI_ALT_SCREEN_EXIT = '\x1b[3J\x1b[?1049l';
 
+// SGR mouse tracking (button events + SGR encoding) so the terminal reports
+// wheel scrolls; Ink surfaces the resulting sequences through `useInput`.
+const ANSI_MOUSE_ENABLE = '\x1b[?1000h\x1b[?1006h';
+const ANSI_MOUSE_DISABLE = '\x1b[?1006l\x1b[?1000l';
+
 const controller = new AbortController();
 
 function restoreScreen(): void {
+  stdout.write(ANSI_MOUSE_DISABLE);
   stdout.write(ANSI_ALT_SCREEN_EXIT);
 }
 
@@ -26,6 +32,7 @@ async function main(): Promise<void> {
   }
 
   stdout.write(ANSI_ALT_SCREEN_ENTER);
+  stdout.write(ANSI_MOUSE_ENABLE);
 
   controller.signal.addEventListener('abort', () =>
     handleExit(

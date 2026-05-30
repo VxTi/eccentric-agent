@@ -10,6 +10,16 @@ const inputSchema = z.object({
     .describe(
       'The path to the file to read. May be absolute or relative to the working directory.'
     ),
+  fromLine: z
+    .number()
+    .describe('The starting line position of which frame to read')
+    .default(0),
+  lineCount: z
+    .number()
+    .describe(
+      "The amount of lines to read. If it's clear that you require all content, this can be skipped"
+    )
+    .optional(),
 });
 
 const outputSchema = z.object({

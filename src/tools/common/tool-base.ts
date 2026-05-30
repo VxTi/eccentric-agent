@@ -55,15 +55,21 @@ export interface IToolBase<
   outputToString(output: TOut): string;
 }
 
+type ToolProps<
+  TIn = unknown,
+  TOut = unknown,
+  TApprovalOption extends string = string,
+> = MakeOptional<
+  IToolBase<TIn, TOut, TApprovalOption>,
+  'approvalOptions' | 'requiresApproval' | 'onOptionSelect'
+> & {};
+
 export function createTool<
   TIn = unknown,
   TOut = unknown,
   TApprovalOption extends string = string,
 >(
-  props: MakeOptional<
-    IToolBase<TIn, TOut, TApprovalOption>,
-    'approvalOptions' | 'requiresApproval' | 'onOptionSelect'
-  >
+  props: ToolProps<TIn, TOut, TApprovalOption>
 ): IToolBase<TIn, TOut, TApprovalOption> {
   return {
     ...props,

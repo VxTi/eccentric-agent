@@ -35,7 +35,7 @@ export function App(): ReactNode {
       flexDirection="column"
       width={width}
       height={height}
-      borderColor="red"
+      borderColor="redBright"
       borderStyle="round"
     >
       <WelcomingText />
