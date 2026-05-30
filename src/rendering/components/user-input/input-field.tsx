@@ -98,12 +98,13 @@ export default function InputField(): JSX.Element {
       if (key.tab || key.return) {
         setInput(
           prev =>
-            prev.slice(0, suggestionCursorIndex) +
-            suggestions[suggestionIndex] +
-            prev.slice(cursorOffset)
+            `${
+              prev.slice(0, suggestionCursorIndex) +
+              suggestions[suggestionIndex]
+            } ${prev.slice(cursorOffset)}`
         );
         setCursorOffset(
-          suggestionCursorIndex + suggestions[suggestionIndex].length
+          suggestionCursorIndex + suggestions[suggestionIndex].length + 1
         );
         setSuggestions([]);
         return;
@@ -159,7 +160,13 @@ export default function InputField(): JSX.Element {
   }
 
   return (
-    <Box width="80%" alignSelf="center" flexDirection="column" flexShrink={0}>
+    <Box
+      width="80%"
+      alignSelf="center"
+      flexDirection="column"
+      flexShrink={0}
+      paddingTop={1}
+    >
       <Suggestions maxSuggestions={maxSuggestions} />
       <Box
         borderStyle="round"

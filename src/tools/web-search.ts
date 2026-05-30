@@ -2,10 +2,16 @@ import * as cheerio from 'cheerio';
 import * as z from 'zod';
 import { createTool } from './common';
 
+const LANGUAGE_CODE_ALL = 'all';
+const enum SafeSearch {
+  DISABLED = '0',
+  MODERATE = '1',
+  STRICT = '2',
+}
+
 const inputSchema = z.object({
-  queries: z
+  query: z
     .string()
-    .array()
     .describe(
       'The search queries to send to the web search engine. This can be a single query or a list of queries if the' +
         ' request demands multiple independent searches; they will be executed in parallel.'
@@ -20,28 +26,22 @@ const inputSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Optional region/locale code applied to all queries (e.g. `us-en`, `nl-nl`, `wt-wt` for no region).' +
+      `Optional region/locale code applied to all queries (e.g. \`us-en\`, \`nl-nl\`, \`${LANGUAGE_CODE_ALL}\` for no region).` +
         ' Defaults to `wt-wt` (worldwide) when omitted.'
     ),
 });
 
 const resultSchema = z.object({
-  title: z.string().describe('The title of the search result'),
-  url: z.string().describe('The URL of the search result'),
-  snippet: z
-    .string()
-    .describe('A short text snippet summarizing the contents of the result'),
+  title: z.string(),
+  url: z.string(),
+  snippet: z.string(),
 });
 type SearchResult = z.infer<typeof resultSchema>;
 
-const outputSchema = z
-  .object({
-    query: z.string().describe('The query that was executed'),
-    results: z
-      .array(resultSchema)
-      .describe('The list of search results returned by the search engine'),
-  })
-  .array();
+const outputSchema = z.object({
+  query: z.string(),
+  results: z.array(resultSchema),
+});
 
 function resolveDuckDuckGoUrl(href: string): string {
   try {
@@ -63,15 +63,15 @@ function extractSearchResults(html: string, limit: number): SearchResult[] {
   const $ = cheerio.load(html);
   const results: SearchResult[] = [];
 
-  $('div.result').each((_, el) => {
+  $('div#urls>article').each((_, article) => {
     if (results.length >= limit) return false;
 
-    const anchor = $(el).find('a.result__a').first();
+    const anchor = $(article).find('h3>a').first();
     const title = anchor.text().trim();
     const href = anchor.attr('href');
     if (!title || !href) return;
 
-    const snippet = $(el).find('.result__snippet').first().text().trim();
+    const snippet = $(article).find('p').first().text().trim();
     results.push({
       title,
       url: resolveDuckDuckGoUrl(href),
@@ -90,9 +90,13 @@ async function makeRequest(
   const params = new URLSearchParams({
     q: query,
     kl: regionCode,
+    language: regionCode,
+    safesearch: SafeSearch.STRICT,
+    categories: 'general',
+    time_range: '',
   });
 
-  const response = await fetch(`https://html.duckduckgo.com/html/?${params}`, {
+  const response = await fetch(`https://opnxng.com/search?${params}`, {
     headers: {
       'User-Agent':
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
@@ -128,45 +132,26 @@ export default createTool({
   outputSchema,
   mightRequireApproval: false,
 
-  async handle(input) {
-    const { queries, maxResults, region } = input;
-
-    if (queries.length === 0) {
-      throw new Error('List of queries must be greater than 0 ');
-    }
-
+  async handle({ query, maxResults, region }) {
     const limit = maxResults ?? 10;
-    const regionCode = region ?? 'wt-wt';
+    const regionCode = region ?? 'all';
 
-    return await Promise.all(
-      queries.map(async query => makeRequest(query, regionCode, limit))
-    );
+    return await makeRequest(query, regionCode, limit);
   },
 
-  inputToString(input): string {
+  inputToString({ query, region }) {
     const regionSuffix =
-      !input.region || input.region === 'wt-wt'
+      !region || region === 'wt-wt'
         ? ''
-        : ` in region \`${getCountryName(input.region)}\``;
+        : ` in region \`${getCountryName(region)}\``;
 
-    if (input.queries.length === 1) {
-      return `Searching the web for \`${input.queries[0]}\`${regionSuffix}`;
-    }
-
-    return `Searching the web for \`${input.queries.length}\` queries${regionSuffix}`;
+    return `Searching the web for \`${query}\`${regionSuffix}`;
   },
 
-  outputToString(output): string {
-    if (output.length === 1) {
-      const { query, results } = output[0];
-      return `\`${query}\` returned \`${results.length} result${results.length === 1 ? '' : 's'}\``;
+  outputToString({ query, results }) {
+    if (results.length === 0) {
+      return `\`${query}\` returned no results`;
     }
-
-    const totalResults = output.reduce(
-      (sum, { results }) => sum + results.length,
-      0
-    );
-
-    return `\`${output.length}\` queries returned \`${totalResults} result${totalResults === 1 ? '' : 's'}\` in total`;
+    return `\`${query}\` returned \`${results.length} result${results.length === 1 ? '' : 's'}\``;
   },
 });

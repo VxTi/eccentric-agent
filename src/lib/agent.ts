@@ -63,6 +63,9 @@ ${message.content}`,
       content: `Running agent task ${this.goal}`,
     });
     while (iterations++ < AGENT_MAX_LOOP_ITERATIONS) {
+      if (this.goalAccomplished) {
+        return this.result as T;
+      }
       const { response } = await generateText({
         tools: this.toolset,
         allowSystemInMessages: true,
@@ -85,10 +88,6 @@ ${message.content}`,
           this.channel.notify({ content: msg.content });
         }
       });
-
-      if (this.goalAccomplished) {
-        return this.result as T;
-      }
     }
 
     throw new Error(

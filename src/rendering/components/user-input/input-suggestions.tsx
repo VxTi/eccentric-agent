@@ -57,7 +57,7 @@ export function Suggestions({ maxSuggestions }: SuggestionsProps): ReactNode {
   const { itemsAfter, offsetIndex, shown } = state;
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" paddingTop={1}>
       {suggestions.length > maxSuggestions && (
         <Text color="gray">{'  ...'}</Text>
       )}

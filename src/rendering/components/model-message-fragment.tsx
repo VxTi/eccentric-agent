@@ -36,7 +36,7 @@ function ModelMessageText({ message }: { message: Message }) {
 function User({ message }: { message: UserMessage }) {
   return (
     <Box flexDirection="column">
-      <Box>
+      <Box flexShrink={0}>
         <Text>Me</Text>
         <Text color="gray"> ▶ </Text>
         <Text>{formatMarkdown(message.content)}</Text>
@@ -47,7 +47,7 @@ function User({ message }: { message: UserMessage }) {
 
 function Assistant({ message }: { message: AssistantMessage }) {
   return (
-    <Box>
+    <Box flexDirection="row" flexShrink={0}>
       <Text color="blue">◆</Text>
       <Text> {formatMarkdown(message.content)}</Text>
     </Box>
@@ -56,7 +56,7 @@ function Assistant({ message }: { message: AssistantMessage }) {
 
 function Generic({ message }: { message: GenericMessage }) {
   return (
-    <Box maxWidth="80%">
+    <Box maxWidth="80%" flexShrink={0}>
       {message.failure ? (
         <Text color="red" bold>
           ✖
