@@ -1,4 +1,3 @@
-import { type Output } from 'ai';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as z from 'zod';
@@ -12,12 +11,11 @@ const inputSchema = z.object({
       'The path to the file to read. May be absolute or relative to the working directory.'
     ),
 });
-type Input = z.infer<typeof inputSchema>;
 
 const outputSchema = z.object({
   content: z.string().describe('The full text content of the file.'),
+  filePath: z.string().describe('Path of the file that was read'),
 });
-type Output = z.infer<typeof outputSchema>;
 
 export default createTool({
   internalName: 'read_file',
@@ -36,7 +34,7 @@ export default createTool({
   outputSchema,
   mightRequireApproval: false,
 
-  async handle(input: Input): Promise<Output> {
+  async handle(input) {
     const context = await acquireContextInstance();
     const resolved = path.isAbsolute(input.filePath)
       ? input.filePath
@@ -59,11 +57,11 @@ export default createTool({
     return { content: numbered };
   },
 
-  inputToString(input: Input): string {
+  inputToString(input) {
     return `Reading \`${input.filePath}\``;
   },
 
-  outputToString(_output: Output): string {
-    return `Successfully read file`;
+  outputToString(output) {
+    return `Read \`${output.filePath}\``;
   },
 });

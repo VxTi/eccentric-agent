@@ -1,5 +1,12 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { Box, Text } from 'ink';
+import {
+  AgentContextSyncResult,
+  emitEvent,
+  EventName,
+  subscribeEvent,
+  unsubscribeEvent,
+} from '../../lib/events';
 import { useAgent } from '../context';
 import { useTerminalSize } from '../hooks';
 import { MessageList } from './MessageList';
@@ -8,6 +15,20 @@ import InputField from './user-input/input-field';
 
 export function App(): ReactNode {
   const { width, height } = useTerminalSize();
+
+  const context = useAgent();
+
+  useEffect(() => {
+    const handleContextRetrieval = () => {
+      emitEvent(new AgentContextSyncResult(context));
+    };
+
+    subscribeEvent(EventName.SYNC_AGENT_CONTEXT, handleContextRetrieval);
+
+    return () => {
+      unsubscribeEvent(EventName.SYNC_AGENT_CONTEXT, handleContextRetrieval);
+    };
+  }, [context]);
 
   return (
     <Box

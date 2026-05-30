@@ -22,11 +22,10 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { v7 as uuid } from 'uuid';
+import { DEFAULT_SYSTEM_PROMPT } from '../../lib/constants';
 import {
-  DEFAULT_SYSTEM_PROMPT,
-  MAX_TASK_CONTINUATION_ITERATIONS,
-} from '../../lib/constants';
-import {
+  type AgentContextSyncResult,
   type AgentMessageEvent,
   emitEvent,
   EventName,
@@ -43,7 +42,6 @@ import { emitAgentMessage, requestUserInput } from '../../lib/user-input';
 import { type IToolBase, toolRegistry, ToolSelectionOption } from '../../tools';
 import { formatMarkdown, previewArgs } from '../formatting';
 import { useSignal } from './application-cancellation';
-import { v7 as uuid } from 'uuid';
 
 interface AgentStatus {
   loading: boolean;
@@ -95,6 +93,9 @@ export function AgentProvider({
     DEFAULT_SYSTEM_PROMPT
   );
 
+  /**
+   * System prompt construction
+   */
   useEffect(() => {
     let cancelled = false;
     void constructSystemPrompt(taskList, cwd).then(prompt => {
@@ -135,7 +136,7 @@ export function AgentProvider({
   }, [setMessage]);
 
   const processRequest = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, quiet: boolean) => {
       setStatus({ text: 'Processing...', loading: true });
 
       const updatedMessages: ModelMessage[] = [
@@ -143,10 +144,13 @@ export function AgentProvider({
         { role: 'user', content: prompt },
       ];
       setModelMessages(updatedMessages);
-      setMessages(prev => [
-        ...prev,
-        { type: 'user', id: uuid(), content: prompt } satisfies UserMessage,
-      ]);
+
+      if (!quiet) {
+        setMessages(prev => [
+          ...prev,
+          { type: 'user', id: uuid(), content: prompt } satisfies UserMessage,
+        ]);
+      }
 
       const result = streamText({
         allowSystemInMessages: true,
@@ -189,11 +193,15 @@ export function AgentProvider({
         setMessage({
           type: 'generic',
           id: uuid(),
+          failure: true,
           content: `Something went wrong whilst responding: ${String(err)}`,
         });
         setStatus({ text: chalk.red('Fatal error'), loading: false });
         return;
       }
+
+      /*
+      TODO: Properly implement
 
       let taskIterations = 0;
       while (
@@ -204,13 +212,14 @@ export function AgentProvider({
         await processRequest(
           'The task list still has incomplete tasks. Continue working on the' +
             ' next pending or in-progress task and update the task list as you' +
-            ' make progress. Do not wait for further user input.'
+            ' make progress. Do not wait for further user input.',
+          true
         );
-      }
+      }*/
 
       const firstQueuedMessage = messageQueue.shift();
       if (firstQueuedMessage) {
-        await processRequest(firstQueuedMessage);
+        await processRequest(firstQueuedMessage, false);
       }
     },
     [
@@ -220,7 +229,6 @@ export function AgentProvider({
       setMessage,
       signal,
       systemPrompt,
-      taskList,
       tools,
     ]
   );
@@ -232,7 +240,7 @@ export function AgentProvider({
         setMessageQueue(prev => [...prev, input]);
         return;
       }
-      void processRequest(input);
+      void processRequest(input, false);
     },
     [processRequest, status.loading]
   );
@@ -329,6 +337,11 @@ function constructTool(tool: IToolBase): Tool {
 
       if (requiresApproval) {
         const options = await tool.approvalOptions(input);
+        emitAgentMessage({
+          type: 'generic',
+          id: uuid(),
+          content: 'Tool requires input',
+        });
 
         const chosen = await requestUserInput({
           title: 'Approval required',
@@ -380,14 +393,12 @@ function constructTool(tool: IToolBase): Tool {
 
 export async function acquireContextInstance(): Promise<AgentContext> {
   return new Promise(resolve => {
-    const handler = (event: SyncAgentContextEvent) => {
-      if (event.detail.type === 'sync-context-response') {
-        unsubscribeEvent(EventName.SYNC_AGENT_CONTEXT, handler);
-        resolve(event.detail.context);
-      }
+    const handler = (event: AgentContextSyncResult) => {
+      unsubscribeEvent(EventName.SYNC_AGENT_CONTEXT, handler);
+      resolve(event.detail);
     };
 
-    emitEvent(new SyncAgentContextEvent({ type: 'sync-context' }));
     subscribeEvent(EventName.SYNC_AGENT_CONTEXT, handler);
+    emitEvent(new SyncAgentContextEvent());
   });
 }

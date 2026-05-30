@@ -51,9 +51,7 @@ export interface IToolBase<
   ): MaybePromise<ToolSelectionOption>;
 
   handle(input: TIn): Promise<TOut>;
-
   inputToString(input: TIn): string;
-
   outputToString(output: TOut): string;
 }
 

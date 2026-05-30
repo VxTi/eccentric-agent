@@ -57,26 +57,23 @@ function Assistant({ message }: { message: AssistantMessage }) {
 function Generic({ message }: { message: GenericMessage }) {
   return (
     <Box maxWidth="80%">
-      <LoadingSpinner loading={message.loading} />
-      <Text>{message.content}</Text>
+      {message.failure ? (
+        <Text color="red" bold>
+          ✖
+        </Text>
+      ) : (
+        <LoadingSpinner loading={message.loading} />
+      )}
+      <Text> {message.content}</Text>
     </Box>
   );
 }
 
 function LoadingSpinner({ loading }: { loading?: boolean | undefined }) {
-  const [content, setContent] = useState('▰▱▱▱▱▱▱');
+  const [content, setContent] = useState('◎');
 
   useEffect(() => {
-    const frames = [
-      '▰▱▱▱▱▱▱',
-      '▰▰▱▱▱▱▱',
-      '▰▰▰▱▱▱▱',
-      '▰▰▰▰▱▱▱',
-      '▰▰▰▰▰▱▱',
-      '▰▰▰▰▰▰▱',
-      '▰▰▰▰▰▰▰',
-      '▰▱▱▱▱▱▱',
-    ];
+    const frames = ['◉', '◎'];
 
     let frame = 0;
 

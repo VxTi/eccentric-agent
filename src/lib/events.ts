@@ -26,6 +26,7 @@ export const enum EventName {
   USER_INPUT_RESPONSE = 'user-input-response',
   AGENT_MESSAGE = 'agent-message',
   SYNC_AGENT_CONTEXT = 'sync-agent-context-context',
+  AGENT_CONTEXT_SYNC_RESULT = 'agent-context-sync-result',
 }
 
 export interface InputOption {
@@ -55,15 +56,14 @@ export class AgentMessageEvent extends CustomEvent<Message> {
   }
 }
 
-type SyncContextRequest = { type: 'sync-context' };
-type SyncContextResult = {
-  type: 'sync-context-response';
-  context: AgentContext;
-};
-export type SyncAgentContextProps = SyncContextRequest | SyncContextResult;
+export class SyncAgentContextEvent extends CustomEvent<never> {
+  constructor() {
+    super(EventName.SYNC_AGENT_CONTEXT);
+  }
+}
 
-export class SyncAgentContextEvent extends CustomEvent<SyncAgentContextProps> {
-  constructor(props: SyncAgentContextProps) {
-    super(EventName.SYNC_AGENT_CONTEXT, { detail: props });
+export class AgentContextSyncResult extends CustomEvent<AgentContext> {
+  constructor(context: AgentContext) {
+    super(EventName.AGENT_CONTEXT_SYNC_RESULT, { detail: context });
   }
 }
