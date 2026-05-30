@@ -1,4 +1,4 @@
-import { type ToolBase } from './tool-base';
+import { type IToolBase } from './tool-base';
 import CreateFile from '../create-file';
 import CreateTaskList from '../tasks/create-task-list';
 import FindFile from '../find-file';
@@ -16,22 +16,23 @@ import WebFetch from '../web-fetch';
 import WebSearch from '../web-search';
 
 export const agentTools = [
-  new FindFile(),
-  new FindInFile(),
-  new ReadFile(),
-  new WebSearch(),
-  new WebFetch(),
-  new GetUserTime(),
-  new GetUserLocation(),
-  new CreateTaskList(),
-  new UpdateTaskList(),
-] satisfies ToolBase[];
+  FindFile,
+  FindInFile,
+  ReadFile,
+  WebSearch,
+  WebFetch,
+  GetUserTime,
+  GetUserLocation,
+  CreateTaskList,
+  UpdateTaskList,
+] satisfies IToolBase[];
 
 export const toolRegistry = [
-  new Shell(),
-  new InsertInFile(),
-  new ReplaceInFile(),
-  new CreateFile(),
-  new PromptUserOptions(),
-  new SpawnAgents(),
-] satisfies ToolBase[];
+  ...agentTools,
+  Shell,
+  InsertInFile,
+  ReplaceInFile,
+  CreateFile,
+  PromptUserOptions,
+  SpawnAgents,
+] satisfies IToolBase[];

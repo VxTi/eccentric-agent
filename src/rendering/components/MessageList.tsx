@@ -4,7 +4,7 @@ import { stdin, stdout } from 'node:process';
 import { useAgent } from '../context';
 import { ModelMessageFragment } from './model-message-fragment';
 
-const SCROLL_STEP = 3;
+const SCROLL_STEP = 1;
 
 // SGR mouse tracking: button-event + any-motion + SGR encoding
 const MOUSE_ENABLE = '\x1b[?1000h\x1b[?1002h\x1b[?1006h';
@@ -76,8 +76,19 @@ export function MessageList(): JSX.Element {
   const marginTop = -(overflow - clampedOffset);
 
   return (
-    <Box ref={viewportRef} flexDirection="column" flexGrow={1} flexShrink={1} overflowY="hidden">
-      <Box ref={contentRef} flexDirection="column" flexShrink={0} marginTop={marginTop}>
+    <Box
+      ref={viewportRef}
+      flexDirection="column"
+      flexGrow={1}
+      flexShrink={1}
+      overflowY="hidden"
+    >
+      <Box
+        ref={contentRef}
+        flexDirection="column"
+        flexShrink={0}
+        marginTop={marginTop}
+      >
         {messages.map((message, idx) => (
           <Box key={idx} flexShrink={0} flexDirection="column">
             <ModelMessageFragment message={message} />

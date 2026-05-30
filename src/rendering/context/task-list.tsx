@@ -35,7 +35,8 @@ export function TaskProvider({ children }: { children: ReactNode }) {
 
   const hasTasks = tasks.length > 0;
 
-  const hasIncompleteTasks = hasTasks && tasks.some(t => t.status !== TaskStatus.COMPLETED);
+  const hasIncompleteTasks =
+    hasTasks && tasks.some(t => t.status !== TaskStatus.COMPLETED);
 
   const update = useCallback(
     (updates: TaskUpdate[]) => {
@@ -46,7 +47,9 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       updates.forEach((update: TaskUpdate) => {
         const task = tasks.find(t => t.id === update.id);
         if (!task) {
-          throw new Error(`No task with id "${update.id}" exists in the task list.`);
+          throw new Error(
+            `No task with id "${update.id}" exists in the task list.`
+          );
         }
         task.status = update.status;
       });

@@ -3,11 +3,17 @@ import { type AgentContext } from '../rendering/context';
 
 export const eventTarget = new EventTarget();
 
-export function subscribeEvent<E extends Event>(name: EventName, handler: (event: E) => any) {
+export function subscribeEvent<E extends Event>(
+  name: EventName,
+  handler: (event: E) => any
+) {
   eventTarget.addEventListener(name, handler as never);
 }
 
-export function unsubscribeEvent<E extends Event>(name: EventName, handler: (event: E) => any) {
+export function unsubscribeEvent<E extends Event>(
+  name: EventName,
+  handler: (event: E) => any
+) {
   eventTarget.removeEventListener(name, handler as never);
 }
 

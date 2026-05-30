@@ -7,7 +7,7 @@ const config: Config = {
   singleQuote: true,
   arrowParens: 'avoid',
   tabWidth: 2,
-  printWidth: 100,
+  printWidth: 80,
   trailingComma: 'es5',
   plugins: [],
 };

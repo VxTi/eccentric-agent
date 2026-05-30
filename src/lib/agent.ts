@@ -3,12 +3,13 @@ import {
   generateText,
   type LanguageModel,
   type ModelMessage,
+  stepCountIs,
   tool as createTool,
   type Tool,
   type ToolSet,
 } from 'ai';
 import * as z from 'zod';
-import { type ToolBase, agentTools } from '../tools';
+import { agentTools, type IToolBase } from '../tools';
 import { Result } from './result';
 import { emitAgentMessage } from './user-input';
 
@@ -42,6 +43,7 @@ export class Agent<T = string> {
 
   private async process(): Promise<T> {
     let iterations = 0;
+    emitAgentMessage(`Running agent task ${this.goal}`);
     while (iterations++ < AGENT_MAX_LOOP_ITERATIONS) {
       const { response } = await generateText({
         tools: this.toolset,
@@ -49,10 +51,20 @@ export class Agent<T = string> {
         model: this.model,
         messages: this.messages,
         abortSignal: this.signal,
+        providerOptions: {
+          google: {
+            thinkingConfig: {
+              thinkingBudget: 0,
+            },
+          },
+        },
+        stopWhen: stepCountIs(20),
       });
 
       this.messages.push(...response.messages);
-      response.messages.map(msg => emitAgentMessage(msg.content as string, msg.role));
+      response.messages.map(msg =>
+        emitAgentMessage(msg.content as string, msg.role)
+      );
 
       if (this.goalAccomplished) {
         return this.result as T;
@@ -84,13 +96,16 @@ export class Agent<T = string> {
   private constructToolset(): ToolSet {
     return {
       ...Object.fromEntries(
-        agentTools.map((tool: ToolBase) => [tool.internalName, this.constructTool(tool)])
+        agentTools.map((tool: IToolBase) => [
+          tool.internalName,
+          this.constructTool(tool),
+        ])
       ),
       [PRIMARY_GOAL_TOOL_NAME]: this.constructPrimaryGoalTool(),
     };
   }
 
-  private constructTool(tool: ToolBase): Tool {
+  private constructTool(tool: IToolBase): Tool {
     const { inputSchema, description, outputSchema } = tool;
 
     return createTool({
@@ -109,7 +124,9 @@ export class Agent<T = string> {
 
   private constructPrimaryGoalTool(): Tool {
     const inputSchema = z.object({
-      result: z.string().describe('The final result of accomplishing the goal.'),
+      result: z
+        .string()
+        .describe('The final result of accomplishing the goal.'),
     });
 
     return createTool({

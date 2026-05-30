@@ -3,7 +3,10 @@ import isNumber from 'lodash/isNumber';
 import { stdin, stdout } from 'node:process';
 import { config } from 'dotenv';
 import { render } from 'ink';
-import { AgentProvider, ApplicationCancellationProvider } from './rendering/context';
+import {
+  AgentProvider,
+  ApplicationCancellationProvider,
+} from './rendering/context';
 import { App } from './rendering/components/App';
 
 config({ quiet: true });
@@ -25,7 +28,9 @@ async function main(): Promise<void> {
   stdout.write(ANSI_ALT_SCREEN_ENTER);
 
   controller.signal.addEventListener('abort', () =>
-    handleExit(isNumber(controller.signal.reason) ? controller.signal.reason : 0)
+    handleExit(
+      isNumber(controller.signal.reason) ? controller.signal.reason : 0
+    )
   );
 
   const { waitUntilExit } = render(

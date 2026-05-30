@@ -1,16 +1,16 @@
 import { glob } from 'glob';
-import { useEffect, useState } from 'react';
-import { useAgent } from '../context';
+import { useCallback, useEffect, useState } from 'react';
 
 const FILE_SUGGESTION_PATTERN = /@(\w+)$/;
 
-export function useInputSuggestionProvider(input: string, cursorOffset: number) {
+export function useInputSuggestionProvider(
+  input: string,
+  cursorOffset: number
+) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [suggestionCursorIndex, setSuggestionCursorIndex] = useState(0);
 
-  const { setMessages } = useAgent();
-
-  useEffect(() => {
+  const computeSuggestions = useCallback(() => {
     if (cursorOffset === 0) return;
 
     const preCursorInput = input.slice(0, cursorOffset);
@@ -18,7 +18,9 @@ export function useInputSuggestionProvider(input: string, cursorOffset: number) 
     const fileSuggestionMatch = FILE_SUGGESTION_PATTERN.exec(preCursorInput);
     if (fileSuggestionMatch?.[1]) {
       const filePath = fileSuggestionMatch[1];
-      setSuggestionCursorIndex(fileSuggestionMatch.index + 1 /* to exclude @ char*/);
+      setSuggestionCursorIndex(
+        fileSuggestionMatch.index + 1 /* to exclude @ char*/
+      );
 
       // MARK: Fails silently
       void glob('**/*', {
@@ -30,12 +32,17 @@ export function useInputSuggestionProvider(input: string, cursorOffset: number) 
         .then(files => filterFiles(files, filePath))
         .then(files => setSuggestions(files));
     }
-  }, [input, cursorOffset, setMessages]);
+  }, [cursorOffset, input]);
+
+  useEffect(() => {
+    computeSuggestions();
+  }, [computeSuggestions]);
 
   return {
     suggestions,
     suggestionCursorIndex,
     setSuggestions,
+    computeSuggestions,
   };
 }
 

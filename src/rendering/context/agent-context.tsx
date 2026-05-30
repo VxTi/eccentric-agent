@@ -23,7 +23,10 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { DEFAULT_SYSTEM_PROMPT, MAX_TASK_CONTINUATION_ITERATIONS } from '../../lib/constants';
+import {
+  DEFAULT_SYSTEM_PROMPT,
+  MAX_TASK_CONTINUATION_ITERATIONS,
+} from '../../lib/constants';
 import {
   type AgentMessageEvent,
   emitEvent,
@@ -36,7 +39,7 @@ import { FileCache } from '../../lib/file-cache';
 import { Result } from '../../lib/result';
 import { TaskList, TaskStatus } from '../../lib/tasks';
 import { emitAgentMessage, requestUserInput } from '../../lib/user-input';
-import { type ToolBase, toolRegistry, ToolSelectionOption } from '../../tools';
+import { type IToolBase, toolRegistry, ToolSelectionOption } from '../../tools';
 import { formatMarkdown, previewArgs } from '../formatting';
 import { useSignal } from './application-cancellation';
 
@@ -60,7 +63,11 @@ export interface AgentContext {
 
 const PrimaryAgentContext = createContext<AgentContext | null>(null);
 
-export function AgentProvider({ children }: { children: ReactNode }): ReactNode {
+export function AgentProvider({
+  children,
+}: {
+  children: ReactNode;
+}): ReactNode {
   const [messageQueue, setMessageQueue] = useState<string[]>([]);
   const [cwd, setCwd] = useState<string>(process.cwd());
   const [messages, setMessages] = useState<ModelMessage[]>([]);
@@ -76,7 +83,9 @@ export function AgentProvider({ children }: { children: ReactNode }): ReactNode 
 
   const tools = useMemo<ToolSet>(() => constructToolset(toolRegistry), []);
   const model = useMemo<LanguageModel>(() => vertex('gemini-2.5-flash'), []);
-  const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SYSTEM_PROMPT);
+  const [systemPrompt, setSystemPrompt] = useState<string>(
+    DEFAULT_SYSTEM_PROMPT
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -103,14 +112,20 @@ export function AgentProvider({ children }: { children: ReactNode }): ReactNode 
     async (prompt: string) => {
       setStatus({ text: 'Processing...', loading: true });
 
-      const updatedMessages: ModelMessage[] = [...messages, { role: 'user', content: prompt }];
+      const updatedMessages: ModelMessage[] = [
+        ...messages,
+        { role: 'user', content: prompt },
+      ];
       setMessages(updatedMessages);
 
       const result = streamText({
         allowSystemInMessages: true,
         abortSignal: signal,
         model,
-        messages: [{ content: systemPrompt, role: 'system' }, ...updatedMessages],
+        messages: [
+          { content: systemPrompt, role: 'system' },
+          ...updatedMessages,
+        ],
         tools,
         providerOptions: {
           google: {
@@ -126,7 +141,7 @@ export function AgentProvider({ children }: { children: ReactNode }): ReactNode 
       try {
         for await (const chunk of result.textStream) {
           buffer += chunk;
-          setMessages([...updatedMessages, { role: 'assistant', content: buffer }]);
+          // setMessages([...updatedMessages, { role: 'assistant', content: buffer }]);
         }
       } catch (err) {
         setMessages([
@@ -142,14 +157,17 @@ export function AgentProvider({ children }: { children: ReactNode }): ReactNode 
       const response = await result.response;
 
       setStatus({ text: '', loading: false });
-      setMessages([
-        ...updatedMessages,
+      setMessages(prev => [
+        ...prev,
         ...response.messages,
         { role: 'assistant', content: buffer },
       ]);
 
       let taskIterations = 0;
-      while (taskList.hasIncompleteTasks() && taskIterations < MAX_TASK_CONTINUATION_ITERATIONS) {
+      while (
+        taskList.hasIncompleteTasks() &&
+        taskIterations < MAX_TASK_CONTINUATION_ITERATIONS
+      ) {
         taskIterations += 1;
         messages.push({
           content:
@@ -207,14 +225,19 @@ export function useAgent(): AgentContext {
   return runtime;
 }
 
-async function constructSystemPrompt(taskList: TaskList, cwd: string): Promise<string> {
+async function constructSystemPrompt(
+  taskList: TaskList,
+  cwd: string
+): Promise<string> {
   const systemPrompt = await loadSystemPrompt(cwd);
 
   const taskFragment = constructTaskListSystemPromptFragment(taskList);
   return compact([systemPrompt, taskFragment]).join('\n');
 }
 
-function constructTaskListSystemPromptFragment(taskList: TaskList): string | null {
+function constructTaskListSystemPromptFragment(
+  taskList: TaskList
+): string | null {
   if (!taskList.hasTasks) return null;
 
   const lines = taskList.tasks.map(task => {
@@ -244,15 +267,19 @@ async function loadSystemPrompt(cwd: string): Promise<string> {
     'claude',
     'copilot-instructions',
   ];
-  const agentFile = await Array.fromAsync(glob(`**/{${supportedFileNames.join(',')}}.md`, { cwd }));
+  const agentFile = await Array.fromAsync(
+    glob(`**/{${supportedFileNames.join(',')}}.md`, { cwd })
+  );
   return first(agentFile) ?? DEFAULT_SYSTEM_PROMPT;
 }
 
-function constructToolset(tools: ToolBase[]): ToolSet {
-  return Object.fromEntries(tools.map(tool => [tool.internalName, constructTool(tool)]));
+function constructToolset(tools: IToolBase[]): ToolSet {
+  return Object.fromEntries(
+    tools.map(tool => [tool.internalName, constructTool(tool)])
+  );
 }
 
-function constructTool(tool: ToolBase): Tool {
+function constructTool(tool: IToolBase): Tool {
   const { description, inputSchema, outputSchema } = tool;
   return createTool({
     description,
@@ -272,7 +299,9 @@ function constructTool(tool: ToolBase): Tool {
         const selectionOption = await tool.onOptionSelect(input, chosen.id);
 
         if (selectionOption !== ToolSelectionOption.ALLOW) {
-          return Result.Error(`User denied permission to run tool "${tool.internalName}".`);
+          return Result.Error(
+            `User denied permission to run tool "${tool.internalName}".`
+          );
         }
       }
       emitAgentMessage(formatMarkdown(tool.inputToString(input)));

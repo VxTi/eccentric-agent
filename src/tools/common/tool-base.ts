@@ -1,5 +1,9 @@
 import type * as z from 'zod';
-import type { ApprovalOption, MaybePromise } from '../../types';
+import {
+  type ApprovalOption,
+  type MakeOptional,
+  type MaybePromise,
+} from '../../types';
 
 export const DEFAULT_APPROVAL_OPTIONS: ApprovalOption[] = [
   { option: 'approve', text: 'Approve' },
@@ -11,10 +15,14 @@ export const enum ToolSelectionOption {
   DENY = 'deny',
 }
 
-interface ToolBaseProps<TIn, TOut> {
-  internalName: string;
-  name: string;
-  description: string;
+export interface IToolBase<
+  TIn = unknown,
+  TOut = unknown,
+  TApprovalOption extends string = string,
+> {
+  readonly internalName: string;
+  readonly name: string;
+  readonly description: string;
   readonly inputSchema: z.ZodType<TIn>;
   readonly outputSchema: z.ZodType<TOut>;
 
@@ -23,44 +31,46 @@ interface ToolBaseProps<TIn, TOut> {
    * @default true
    */
   readonly mightRequireApproval?: boolean;
+
+  /**
+   * @returns {@link DEFAULT_APPROVAL_OPTIONS} if not provided upon tool creation
+   */
+  approvalOptions(input: TIn): MaybePromise<ApprovalOption[]>;
+
+  /**
+   * @returns `false` if not provided upon tool creation
+   */
+  requiresApproval(input: TIn): MaybePromise<boolean>;
+
+  /**
+   * @returns {@link ToolSelectionOption.ALLOW} if no function is provided
+   */
+  onOptionSelect(
+    input: TIn,
+    option: TApprovalOption
+  ): MaybePromise<ToolSelectionOption>;
+
+  handle(input: TIn): Promise<TOut>;
+
+  inputToString(input: TIn): string;
+
+  outputToString(output: TOut): string;
 }
 
-export abstract class ToolBase<
+export function createTool<
   TIn = unknown,
   TOut = unknown,
   TApprovalOption extends string = string,
-> {
-  public internalName: string;
-  public name: string;
-  public description: string;
-  public readonly inputSchema: z.ZodType<TIn>;
-  public readonly outputSchema: z.ZodType<TOut>;
-  public readonly mightRequireApproval: boolean;
-
-  protected constructor(props: ToolBaseProps<TIn, TOut>) {
-    this.internalName = props.internalName;
-    this.name = props.name;
-    this.description = props.description;
-    this.inputSchema = props.inputSchema;
-    this.outputSchema = props.outputSchema;
-    this.mightRequireApproval = props.mightRequireApproval ?? true;
-  }
-
-  public approvalOptions(_input: TIn): MaybePromise<ApprovalOption[]> {
-    return DEFAULT_APPROVAL_OPTIONS;
-  }
-
-  public requiresApproval(_input: TIn): MaybePromise<boolean> {
-    return false;
-  }
-
-  public onOptionSelect(_input: TIn, _option: TApprovalOption): MaybePromise<ToolSelectionOption> {
-    return ToolSelectionOption.ALLOW;
-  }
-
-  public abstract handle(input: TIn): Promise<TOut>;
-
-  public abstract inputToString(input: TIn): string;
-
-  public abstract outputToString(output: TOut): string;
+>(
+  props: MakeOptional<
+    IToolBase<TIn, TOut, TApprovalOption>,
+    'approvalOptions' | 'requiresApproval' | 'onOptionSelect'
+  >
+): IToolBase<TIn, TOut, TApprovalOption> {
+  return {
+    ...props,
+    approvalOptions: props.approvalOptions ?? (() => DEFAULT_APPROVAL_OPTIONS),
+    requiresApproval: props.requiresApproval ?? (() => false),
+    onOptionSelect: props.onOptionSelect ?? (() => ToolSelectionOption.ALLOW),
+  };
 }

@@ -8,7 +8,13 @@ export function ModelMessageFragment({ message }: { message: ModelMessage }) {
   }
 
   return (
-    <Box width="80%" alignSelf="center" justifyContent="flex-start" flexShrink={0} marginBottom={2}>
+    <Box
+      width="80%"
+      alignSelf="center"
+      justifyContent="flex-start"
+      flexShrink={0}
+      marginBottom={1}
+    >
       <ModelMessageText message={message} />
     </Box>
   );
@@ -21,8 +27,8 @@ function ModelMessageText({ message }: { message: ModelMessage }) {
     case 'user':
       return (
         <Box>
-          <Text>Me </Text>
-          <Text color="gray">▶ </Text>
+          <Text>Me</Text>
+          <Text color="gray"> ▶ </Text>
           <Text>{formatMarkdown(message.content)}</Text>
         </Box>
       );
@@ -35,7 +41,13 @@ function ModelMessageText({ message }: { message: ModelMessage }) {
       );
     case 'tool':
       return (
-        <Box borderColor="blue" borderStyle="round">
+        <Box
+          borderColor="gray"
+          borderStyle="round"
+          paddingY={1}
+          paddingX={2}
+          maxWidth="80%"
+        >
           <Text>{message.content}</Text>
         </Box>
       );

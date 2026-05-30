@@ -1,63 +1,6 @@
 import * as z from 'zod';
 import { requestUserInput } from '../lib/user-input';
-import { ToolBase } from './common';
-
-export default class PromptUserOptionsTool extends ToolBase<Input, Output> {
-  constructor() {
-    super({
-      internalName: 'prompt_user_options',
-      name: 'Prompt user options',
-      description:
-        'Asks the user to disambiguate by picking one of several proposed options. Use this tool when' +
-        ' you cannot proceed with confidence — the request is ambiguous, you can see multiple equally' +
-        ' reasonable interpretations, or a decision is required that you should not make on the' +
-        " user's behalf. Provide a short, specific `question` and 2–6 mutually exclusive `options`," +
-        ' each with a stable `id` (used by you to read the answer) and a human-readable `label`' +
-        ' (shown to the user). The tool blocks until the user picks one, then returns the chosen' +
-        ' `id` and `label`.\n\n' +
-        'Do NOT use this tool for trivial choices you can resolve from context, for confirmation of' +
-        ' an already-clear plan, or as a substitute for thinking. Prefer making a reasonable choice' +
-        ' and stating your assumption when the question would be pedantic.',
-      inputSchema,
-      outputSchema,
-      mightRequireApproval: false,
-    });
-  }
-
-  public override async handle(input: Input): Promise<Output> {
-    const ids = new Set<string>();
-    for (const option of input.options) {
-      if (ids.has(option.id)) {
-        throw new Error(`Duplicate option id "${option.id}". Each option must have a unique id.`);
-      }
-      ids.add(option.id);
-    }
-
-    const chosen = await requestUserInput({
-      title: 'Your attention is needed',
-      description: input.question,
-      options: input.options,
-    });
-
-    const match = input.options.find(option => option.id === chosen.id);
-    if (!match) {
-      throw new Error(
-        `User selected an unrecognised option id "${chosen.id}". Expected one of:` +
-          ` ${input.options.map(option => option.id).join(', ')}.`
-      );
-    }
-
-    return { selectedId: match.id, selectedLabel: match.label };
-  }
-
-  public override inputToString(input: Input): string {
-    return `Asking user: ${input.question}`;
-  }
-
-  public override outputToString(output: Output): string {
-    return `User selected: ${output.selectedLabel}`;
-  }
-}
+import { createTool } from './common';
 
 const optionSchema = z.object({
   id: z
@@ -93,11 +36,64 @@ const inputSchema = z.object({
     ),
 });
 
-type Input = z.infer<typeof inputSchema>;
-
 const outputSchema = z.object({
   selectedId: z.string().describe('The `id` of the option the user selected.'),
-  selectedLabel: z.string().describe('The `label` of the option the user selected.'),
+  selectedLabel: z
+    .string()
+    .describe('The `label` of the option the user selected.'),
 });
 
-type Output = z.infer<typeof outputSchema>;
+export default createTool({
+  internalName: 'prompt_user_options',
+  name: 'Prompt user options',
+  description:
+    'Asks the user to disambiguate by picking one of several proposed options. Use this tool when' +
+    ' you cannot proceed with confidence — the request is ambiguous, you can see multiple equally' +
+    ' reasonable interpretations, or a decision is required that you should not make on the' +
+    " user's behalf. Provide a short, specific `question` and 2–6 mutually exclusive `options`," +
+    ' each with a stable `id` (used by you to read the answer) and a human-readable `label`' +
+    ' (shown to the user). The tool blocks until the user picks one, then returns the chosen' +
+    ' `id` and `label`.\n\n' +
+    'Do NOT use this tool for trivial choices you can resolve from context, for confirmation of' +
+    ' an already-clear plan, or as a substitute for thinking. Prefer making a reasonable choice' +
+    ' and stating your assumption when the question would be pedantic.',
+  inputSchema,
+  outputSchema,
+  mightRequireApproval: false,
+
+  async handle(input) {
+    const ids = new Set<string>();
+    for (const option of input.options) {
+      if (ids.has(option.id)) {
+        throw new Error(
+          `Duplicate option id "${option.id}". Each option must have a unique id.`
+        );
+      }
+      ids.add(option.id);
+    }
+
+    const chosen = await requestUserInput({
+      title: 'Your attention is needed',
+      description: input.question,
+      options: input.options,
+    });
+
+    const match = input.options.find(option => option.id === chosen.id);
+    if (!match) {
+      throw new Error(
+        `User selected an unrecognised option id "${chosen.id}". Expected one of:` +
+          ` ${input.options.map(option => option.id).join(', ')}.`
+      );
+    }
+
+    return { selectedId: match.id, selectedLabel: match.label };
+  },
+
+  inputToString(input) {
+    return `Asking user: ${input.question}`;
+  },
+
+  outputToString(output) {
+    return `User selected: ${output.selectedLabel}`;
+  },
+});

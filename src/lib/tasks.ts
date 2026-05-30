@@ -40,7 +40,9 @@ export class TaskList {
     updates.forEach((update: TaskUpdate) => {
       const task = this.taskList.find(t => t.id === update.id);
       if (!task) {
-        throw new Error(`No task with id "${update.id}" exists in the task list.`);
+        throw new Error(
+          `No task with id "${update.id}" exists in the task list.`
+        );
       }
       task.status = update.status;
     });

@@ -1,5 +1,10 @@
 import type { UniqueArray } from '../types';
-import type { BackgroundColor, TextAlignment, TextColor, TextStyle } from './styling';
+import type {
+  BackgroundColor,
+  TextAlignment,
+  TextColor,
+  TextStyle,
+} from './styling';
 
 export interface TextFragment {
   type: 'text';
@@ -22,7 +27,9 @@ export interface LineFragment {
 
 export type BufferFragments = LineFragment | TextBlockFragment;
 
-export function textBlock(props: Omit<TextBlockFragment, 'type'>): TextBlockFragment {
+export function textBlock(
+  props: Omit<TextBlockFragment, 'type'>
+): TextBlockFragment {
   return { ...props, type: 'text-block' };
 }
 

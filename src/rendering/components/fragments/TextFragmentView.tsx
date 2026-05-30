@@ -26,7 +26,9 @@ interface TextFragmentViewProps {
   fragment: TextFragment;
 }
 
-export function TextFragmentView({ fragment }: TextFragmentViewProps): JSX.Element {
+export function TextFragmentView({
+  fragment,
+}: TextFragmentViewProps): JSX.Element {
   const color = fragment.color ? COLOR_MAP[fragment.color] : undefined;
   const bg =
     fragment.background && fragment.background !== 'none'

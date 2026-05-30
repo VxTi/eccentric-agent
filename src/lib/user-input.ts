@@ -11,7 +11,9 @@ import {
   type UserInputResponseEvent,
 } from './events';
 
-export function requestUserInput(props: UserInputRequest): Promise<InputOption> {
+export function requestUserInput(
+  props: UserInputRequest
+): Promise<InputOption> {
   return new Promise(resolve => {
     const handler = (event: UserInputResponseEvent) => {
       unsubscribeEvent(EventName.USER_INPUT_RESPONSE, handler);
@@ -23,6 +25,9 @@ export function requestUserInput(props: UserInputRequest): Promise<InputOption> 
   });
 }
 
-export function emitAgentMessage(content: string, role: ModelMessage['role'] = 'tool'): void {
+export function emitAgentMessage(
+  content: string,
+  role: ModelMessage['role'] = 'tool'
+): void {
   emitEvent(new AgentMessageEvent({ role, content } as ModelMessage));
 }

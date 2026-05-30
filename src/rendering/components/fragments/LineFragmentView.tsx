@@ -7,7 +7,9 @@ interface LineFragmentViewProps {
   fragment: LineFragment;
 }
 
-export function LineFragmentView({ fragment }: LineFragmentViewProps): JSX.Element {
+export function LineFragmentView({
+  fragment,
+}: LineFragmentViewProps): JSX.Element {
   return (
     <Box width="80%" alignSelf="center" flexShrink={0}>
       <Text>

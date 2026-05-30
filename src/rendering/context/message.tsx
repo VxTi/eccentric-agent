@@ -1,4 +1,10 @@
-import { createContext, type ReactNode, useCallback, useContext, useState } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useState,
+} from 'react';
 import { formatMarkdown } from '../formatting';
 
 interface MessageContextProps {
@@ -20,12 +26,9 @@ export function useMessage() {
 export function MessageProvider({ children }: { children: ReactNode }) {
   const [value, setValueInternal] = useState<string>('');
 
-  const setValue = useCallback(
-    (value: string) => {
-      setValueInternal(formatMarkdown(value));
-    },
-    [value]
-  );
+  const setValue = useCallback((value: string) => {
+    setValueInternal(formatMarkdown(value));
+  }, []);
 
   return (
     <MessageContext.Provider

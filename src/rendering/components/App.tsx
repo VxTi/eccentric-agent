@@ -10,7 +10,13 @@ export function App(): ReactNode {
   const { width, height } = useTerminalSize();
 
   return (
-    <Box flexDirection="column" width={width} height={height} borderColor="red" borderStyle="round">
+    <Box
+      flexDirection="column"
+      width={width}
+      height={height}
+      borderColor="red"
+      borderStyle="round"
+    >
       <WelcomingText />
       <MessageList />
       <StatusLine />
