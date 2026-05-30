@@ -55,7 +55,6 @@ function WelcomingText() {
       <Box marginTop={1}>
         <Text color="blue">◆</Text>
         <Text bold> Eccentric Agent</Text>
-        <Text dimColor> — type @ for files, Ctrl+C to exit</Text>
       </Box>
     </Box>
   );

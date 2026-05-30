@@ -36,6 +36,7 @@ export default createTool({
 
   async handle(input) {
     const context = await acquireContextInstance();
+
     const resolved = path.isAbsolute(input.filePath)
       ? input.filePath
       : path.join(context.cwd, input.filePath);
@@ -54,7 +55,10 @@ export default createTool({
 
     context.fileCache.set(resolved, stats.mtimeMs);
 
-    return { content: numbered };
+    return {
+      content: numbered,
+      filePath: input.filePath,
+    };
   },
 
   inputToString(input) {

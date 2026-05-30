@@ -21,6 +21,7 @@ import { useAbort, useAgent } from '../../context';
 import { useInputSuggestionProvider, useTerminalSize } from '../../hooks';
 import { Suggestions } from './input-suggestions';
 
+const INPUT_PLACEHOLDER = 'Reference files with @, and type commands using /';
 const MIN_SUGGESTION_COUNT = 8;
 
 export default function InputField(): JSX.Element {
@@ -60,7 +61,7 @@ export default function InputField(): JSX.Element {
   }, []);
 
   const submitMessage = () => {
-    agent.submitMessage(input);
+    agent.submitMessage(formatReferencedFiles(input));
     setInput('');
     setCursorOffset(0);
   };
@@ -259,6 +260,18 @@ function InputText({ input, cursor }: InputTextProps): ReactNode {
     );
     return () => clearInterval(id);
   }, []);
+
+  if (input.length === 0) {
+    return (
+      <Box>
+        <Text inverse={blinkState}>{cursorChar}</Text>
+        <Text color="gray" italic>
+          {' '}
+          {INPUT_PLACEHOLDER}
+        </Text>
+      </Box>
+    );
+  }
 
   return (
     <Box flexWrap="wrap">

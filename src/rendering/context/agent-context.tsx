@@ -117,8 +117,10 @@ export function AgentProvider({
       }
 
       setMessages(prev => {
-        prev[existingMessage] = message;
-        return prev;
+        const copy = [...prev];
+
+        copy[existingMessage] = message;
+        return copy;
       });
     },
     [messages]
@@ -370,7 +372,9 @@ function constructTool(tool: IToolBase): Tool {
       try {
         output = await tool.handle(input);
       } catch (err) {
-        const message = `Tool "${tool.internalName}" failed: ${String(err)}`;
+        const errMsg = err instanceof Error ? err.message : 'unknown';
+        const message = `Tool "${tool.name}" failed: ${errMsg}`;
+
         emitAgentMessage({
           type: 'generic',
           id: toolCallId,
@@ -384,7 +388,7 @@ function constructTool(tool: IToolBase): Tool {
         type: 'generic',
         id: toolCallId,
         loading: false,
-        content: `↳ ${formatMarkdown(tool.outputToString(output))}\n`,
+        content: `→ ${formatMarkdown(tool.outputToString(output))}\n`,
       });
       return output;
     },
@@ -394,11 +398,11 @@ function constructTool(tool: IToolBase): Tool {
 export async function acquireContextInstance(): Promise<AgentContext> {
   return new Promise(resolve => {
     const handler = (event: AgentContextSyncResult) => {
-      unsubscribeEvent(EventName.SYNC_AGENT_CONTEXT, handler);
+      unsubscribeEvent(EventName.AGENT_CONTEXT_SYNC_RESULT, handler);
       resolve(event.detail);
     };
 
-    subscribeEvent(EventName.SYNC_AGENT_CONTEXT, handler);
+    subscribeEvent(EventName.AGENT_CONTEXT_SYNC_RESULT, handler);
     emitEvent(new SyncAgentContextEvent());
   });
 }

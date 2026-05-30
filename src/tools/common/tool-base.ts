@@ -50,7 +50,7 @@ export interface IToolBase<
     option: TApprovalOption
   ): MaybePromise<ToolSelectionOption>;
 
-  handle(input: TIn): Promise<TOut>;
+  handle(input: NoInfer<TIn>): Promise<NoInfer<TOut>>;
   inputToString(input: TIn): string;
   outputToString(output: TOut): string;
 }

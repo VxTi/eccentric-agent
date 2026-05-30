@@ -48,8 +48,8 @@ function User({ message }: { message: UserMessage }) {
 function Assistant({ message }: { message: AssistantMessage }) {
   return (
     <Box>
-      <Text color="blue">◆ </Text>
-      <Text>{formatMarkdown(message.content)}</Text>
+      <Text color="blue">◆</Text>
+      <Text> {formatMarkdown(message.content)}</Text>
     </Box>
   );
 }
@@ -79,7 +79,7 @@ function LoadingSpinner({ loading }: { loading?: boolean | undefined }) {
 
     setInterval(() => {
       setContent(frames[++frame % frames.length]);
-    }, 1000 / frames.length);
+    }, frames.length * 200);
   }, []);
 
   if (!loading) return;
