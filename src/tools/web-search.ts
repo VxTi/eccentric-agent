@@ -89,9 +89,8 @@ async function makeRequest(
 ): Promise<{ query: string; results: SearchResult[] }> {
   const params = new URLSearchParams({
     q: query,
-    kl: regionCode,
     language: regionCode,
-    safesearch: SafeSearch.STRICT,
+    safesearch: SafeSearch.DISABLED,
     categories: 'general',
     time_range: '',
   });

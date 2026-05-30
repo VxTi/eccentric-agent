@@ -1,8 +1,8 @@
 import {
-  generateText,
   type LanguageModel,
   type ModelMessage,
   stepCountIs,
+  streamText,
   tool as createTool,
   type Tool,
   type ToolSet,
@@ -66,12 +66,17 @@ ${message.content}`,
       if (this.goalAccomplished) {
         return this.result as T;
       }
-      const { response } = await generateText({
+      const result = streamText({
         tools: this.toolset,
         allowSystemInMessages: true,
         model: this.model,
         messages: this.messages,
         abortSignal: this.signal,
+        onError: ({ error }) => {
+          this.channel.notify({
+            content: `An error occurred in agent task - ${String(error)}`,
+          });
+        },
         providerOptions: {
           google: {
             thinkingConfig: {
@@ -82,12 +87,22 @@ ${message.content}`,
         stopWhen: stepCountIs(20),
       });
 
-      this.messages.push(...response.messages);
-      response.messages.forEach(msg => {
-        if (typeof msg.content === 'string') {
-          this.channel.notify({ content: msg.content });
+      try {
+        let buffer = '';
+        for await (const chunk of result.textStream) {
+          buffer += chunk;
         }
-      });
+        const response = await result.response;
+        this.channel.notify({ content: buffer });
+        this.messages.push(...response.messages, {
+          role: 'assistant',
+          content: buffer,
+        });
+      } catch (e) {
+        this.channel.notify({
+          content: `An error occurred in agent task - ${String(e)}`,
+        });
+      }
     }
 
     throw new Error(
@@ -132,11 +147,15 @@ ${message.content}`,
       inputSchema,
       outputSchema,
       execute: async (input: unknown) => {
-        return await tool.handle(input, this.channel).catch((err: Error) => {
-          const message = `Tool "${tool.internalName}" failed: ${String(err)}`;
-
-          return Result.Error(message);
+        this.channel.notify({
+          content: tool.inputToString(input, this.channel),
         });
+        const output = await tool.handle(input, this.channel);
+        this.channel.notify({
+          content: tool.outputToString(output, this.channel),
+        });
+
+        return output;
       },
     });
   }

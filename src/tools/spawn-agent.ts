@@ -20,16 +20,10 @@ const agentSpecSchema = z.object({
 });
 
 const inputSchema = z.object({
-  agents: z
-    .array(agentSpecSchema)
-    .min(1)
-    .describe(
-      'The list of sub-agents to spawn. Each runs independently and in parallel; there is no shared state' +
-        ' between them, so do not split a single task that requires coordination across two agents. Spawn as little as possible, and only spawn more if explicitly necessary.'
-    ),
+  agent: agentSpecSchema,
 });
 
-const agentResultSchema = z.discriminatedUnion('ok', [
+const outputSchema = z.discriminatedUnion('ok', [
   z.object({
     name: z.string().describe('The label of the sub-agent.'),
     ok: z.literal(true),
@@ -44,17 +38,11 @@ const agentResultSchema = z.discriminatedUnion('ok', [
   }),
 ]);
 
-const outputSchema = z
-  .array(agentResultSchema)
-  .describe(
-    'One result entry per spawned sub-agent, in the same order as the input.'
-  );
-
 async function runSubAgent(
   name: string,
   goal: string,
   channel: NotifierChannel<ToolChannelParams>
-): Promise<z.infer<typeof agentResultSchema>> {
+): Promise<z.infer<typeof outputSchema>> {
   return new Promise(resolve => {
     const controller = new AbortController();
 
@@ -95,30 +83,19 @@ export default createTool({
   outputSchema,
   mightRequireApproval: false,
 
-  async handle({ agents }, channel) {
-    if (agents.length === 0) {
-      throw new Error('At least one sub-agent must be provided.');
-    }
-
-    return await Promise.all(
-      agents.map(({ name, goal }) => runSubAgent(name, goal, channel))
-    );
+  async handle({ agent: { goal, name } }, channel) {
+    return await runSubAgent(name, goal, channel);
   },
 
-  inputToString({ agents }): string {
-    if (agents.length === 1) {
-      return `Spawning sub-agent \`${agents[0].name}\``;
-    }
-    return `Spawning \`${agents.length}\` sub-agents in parallel`;
+  inputToString({ agent: { goal } }): string {
+    return `Running side task \`${goal}\``;
   },
 
-  outputToString(output) {
-    const succeeded = output.filter(r => r.ok).length;
-    const failed = output.length - succeeded;
-
-    if (failed === 0) {
-      return `\`${succeeded}\` sub-agent${succeeded === 1 ? '' : 's'} completed successfully`;
+  outputToString({ ok, name }) {
+    if (!ok) {
+      return `Failed to finalize side task \`${name}\``;
     }
-    return `\`${succeeded}\` succeeded, \`${failed}\` failed`;
+
+    return `Side task \`${name}\` succeeded`;
   },
 });
