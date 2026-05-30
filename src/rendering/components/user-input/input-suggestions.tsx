@@ -1,5 +1,6 @@
 import { type ReactNode, useMemo } from 'react';
 import { Box, Text } from 'ink';
+import { useUserInputField } from '../../context/user-input';
 
 interface SuggestionTextProps {
   children: string;
@@ -19,16 +20,11 @@ function SuggestionText({
 }
 
 interface SuggestionsProps {
-  suggestions: string[];
-  selectedIndex: number;
   maxSuggestions: number;
 }
 
-export function Suggestions({
-  suggestions,
-  selectedIndex,
-  maxSuggestions,
-}: SuggestionsProps): ReactNode {
+export function Suggestions({ maxSuggestions }: SuggestionsProps): ReactNode {
+  const { suggestions, suggestionIndex } = useUserInputField();
   const state = useMemo(() => {
     if (suggestions.length === 0) return undefined;
 
@@ -44,7 +40,7 @@ export function Suggestions({
     const halfWindow = Math.floor(maxSuggestions / 2);
     const maxOffset = suggestions.length - maxSuggestions;
 
-    const targetOffset = selectedIndex - halfWindow;
+    const targetOffset = suggestionIndex - halfWindow;
 
     const offsetIndex = Math.max(0, Math.min(maxOffset, targetOffset));
     const offsetUpperBound = offsetIndex + maxSuggestions;
@@ -54,7 +50,7 @@ export function Suggestions({
       shown: suggestions.slice(offsetIndex, offsetUpperBound),
       itemsAfter: suggestions.length - offsetUpperBound,
     };
-  }, [suggestions, maxSuggestions, selectedIndex]);
+  }, [suggestions, maxSuggestions, suggestionIndex]);
 
   if (!state) return;
 
@@ -66,7 +62,7 @@ export function Suggestions({
         <Text color="gray">{'  ...'}</Text>
       )}
       {shown.map((suggestion, i) => (
-        <SuggestionText key={i} selected={selectedIndex === i + offsetIndex}>
+        <SuggestionText key={i} selected={suggestionIndex === i + offsetIndex}>
           {suggestion}
         </SuggestionText>
       ))}

@@ -3,7 +3,12 @@ import * as z from 'zod';
 import { acquireContextInstance } from '../rendering/context';
 import { createTool } from './common';
 
-const replacementSchema = z.object({
+const inputSchema = z.object({
+  filePath: z
+    .string()
+    .describe(
+      'The path of the file to edit. May be absolute or relative to the working directory.'
+    ),
   find: z
     .string()
     .min(1)
@@ -20,26 +25,11 @@ const replacementSchema = z.object({
     ),
 });
 
-const inputSchema = z.object({
-  filePath: z
-    .string()
-    .describe(
-      'The path of the file to edit. May be absolute or relative to the working directory.'
-    ),
-  replacements: z
-    .array(replacementSchema)
-    .min(1)
-    .describe(
-      'Single-line replacements to apply. Each is validated and applied in order against an' +
-        ' in-memory copy of the file; the file on disk is written once at the end so the batch' +
-        ' is atomic.'
-    ),
-});
-
 const outputSchema = z.object({
   success: z.boolean(),
-  replacementsApplied: z.number(),
-  bytesWritten: z.number(),
+  find: z.string(),
+  replace: z.string(),
+  filePath: z.string(),
 });
 
 export default createTool({
@@ -68,68 +58,51 @@ export default createTool({
   mightRequireApproval: false,
 
   async handle(input) {
+    const { find, replace, filePath } = input;
+
     const context = await acquireContextInstance();
-    const absolutePath = await context.fileCache.getCachedFilePath(
-      input.filePath
-    );
+    const absolutePath = await context.fileCache.getCachedFilePath(filePath);
 
-    let working = await readFile(absolutePath, 'utf-8');
-    for (let i = 0; i < input.replacements.length; i += 1) {
-      const replacement = input.replacements[i];
-      const label = `replacement #${i}`;
+    const fileContent = await readFile(absolutePath, 'utf-8');
 
-      if (replacement.find.length === 0) {
-        throw new Error(`${label}: \`find\` must not be empty.`);
-      }
-      if (replacement.find.includes('\n')) {
-        throw new Error(
-          `${label}: \`find\` must be a single line (no newline characters).`
-        );
-      }
-      if (replacement.replace.includes('\n')) {
-        throw new Error(
-          `${label}: \`replace\` must be a single line (no newline characters).`
-        );
-      }
-
-      const firstIdx = working.indexOf(replacement.find);
-      if (firstIdx === -1) {
-        throw new Error(
-          `${label}: \`find\` text was not found in the file. Make sure it matches exactly,` +
-            ` including indentation and whitespace.\n--- find ---\n${replacement.find}`
-        );
-      }
-      const secondIdx = working.indexOf(replacement.find, firstIdx + 1);
-      if (secondIdx !== -1) {
-        throw new Error(
-          `${label}: \`find\` text appears more than once in the file. This tool requires each` +
-            ` \`find\` to be unique within the file.\n--- find ---\n${replacement.find}`
-        );
-      }
-
-      working =
-        working.slice(0, firstIdx) +
-        replacement.replace +
-        working.slice(firstIdx + replacement.find.length);
+    const firstIdx = fileContent.indexOf(find);
+    if (firstIdx === -1) {
+      throw new Error(
+        `\`find\` text was not found in the file. Make sure it matches exactly,` +
+          ` including indentation and whitespace.\n--- find ---\n${find}`
+      );
+    }
+    const secondIdx = fileContent.indexOf(find, firstIdx + 1);
+    if (secondIdx !== -1) {
+      throw new Error(
+        `\`find\` text appears more than once in the file. This tool requires each` +
+          ` \`find\` to be unique within the file.\n--- find ---\n${find}`
+      );
     }
 
-    await writeFile(absolutePath, working, 'utf-8');
+    const result =
+      fileContent.slice(0, firstIdx) +
+      replace +
+      fileContent.slice(firstIdx + find.length);
+
+    await writeFile(absolutePath, result, 'utf-8');
     await context.fileCache.update(absolutePath);
 
     return {
       success: true,
-      replacementsApplied: input.replacements.length,
-      bytesWritten: Buffer.byteLength(working, 'utf-8'),
+      bytesWritten: Buffer.byteLength(result, 'utf-8'),
+      find,
+      replace,
+      filePath,
     };
   },
 
-  inputToString(input) {
-    const count = input.replacements.length;
-    return `Replacing in \`${input.filePath}\` (${count} replacement${count === 1 ? '' : 's'})`;
+  inputToString({ filePath, find, replace }) {
+    return `Replacing \`${find} with \`${replace}\` in \`${filePath}\``;
   },
 
-  outputToString(output) {
-    if (!output.success) return `Unable to replace in file`;
-    return `Applied ${output.replacementsApplied} replacement${output.replacementsApplied === 1 ? '' : 's'}.`;
+  outputToString({ success, find, replace, filePath }) {
+    if (!success) return `Unable to replace in file`;
+    return `Replaced \`${find} with \`${replace}\` in \`${filePath}\``;
   },
 });

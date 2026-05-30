@@ -1,7 +1,7 @@
 import { glob } from 'glob';
 import { useEffect, useState } from 'react';
 
-const FILE_SUGGESTION_PATTERN = /(?:\s|^)@(\w+)$/;
+const FILE_SUGGESTION_PATTERN = /(?:\s|^)@([\w_.-]+)$/;
 
 export function useInputSuggestionProvider(
   input: string,

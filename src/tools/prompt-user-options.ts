@@ -29,7 +29,7 @@ const inputSchema = z.object({
   options: z
     .array(optionSchema)
     .min(2)
-    .max(6)
+    .max(9)
     .describe(
       'Between 2 and 6 mutually exclusive options for the user to choose from. Each must have a' +
         ' unique `id`.'
