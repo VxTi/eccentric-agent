@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { Agent } from '../lib/agent';
-import { createTool } from './common';
+import { type NotifierChannel } from '../lib/notifier';
+import { createTool, type ToolChannelParams } from './common';
 
 const agentSpecSchema = z.object({
   name: z
@@ -51,7 +52,8 @@ const outputSchema = z
 
 async function runSubAgent(
   name: string,
-  goal: string
+  goal: string,
+  channel: NotifierChannel<ToolChannelParams>
 ): Promise<z.infer<typeof agentResultSchema>> {
   return new Promise(resolve => {
     const controller = new AbortController();
@@ -65,7 +67,8 @@ async function runSubAgent(
           resolve({ name, ok: false, error: result.error.message });
         }
       },
-      controller.signal
+      controller.signal,
+      channel
     );
   });
 }
@@ -92,21 +95,21 @@ export default createTool({
   outputSchema,
   mightRequireApproval: false,
 
-  async handle(input) {
-    if (input.agents.length === 0) {
+  async handle({ agents }, channel) {
+    if (agents.length === 0) {
       throw new Error('At least one sub-agent must be provided.');
     }
 
     return await Promise.all(
-      input.agents.map(({ name, goal }) => runSubAgent(name, goal))
+      agents.map(({ name, goal }) => runSubAgent(name, goal, channel))
     );
   },
 
-  inputToString(input): string {
-    if (input.agents.length === 1) {
-      return `Spawning sub-agent \`${input.agents[0].name}\``;
+  inputToString({ agents }): string {
+    if (agents.length === 1) {
+      return `Spawning sub-agent \`${agents[0].name}\``;
     }
-    return `Spawning \`${input.agents.length}\` sub-agents in parallel`;
+    return `Spawning \`${agents.length}\` sub-agents in parallel`;
   },
 
   outputToString(output) {

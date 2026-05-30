@@ -4,7 +4,9 @@ export class NotifierChannel<T extends any[]> {
   constructor(
     public readonly channelId: string,
     private readonly notifier: NotifierFn<T>
-  ) {}
+  ) {
+    notifier.bind(this);
+  }
 
   public notify(...parameters: T): void {
     this.notifier(...parameters);

@@ -8,7 +8,8 @@ import {
   type ToolSet,
 } from 'ai';
 import * as z from 'zod';
-import { agentTools, type IToolBase } from '../tools';
+import { agentTools, type IToolBase, type ToolChannelParams } from '../tools';
+import { type NotifierChannel } from './notifier';
 import { geminiProvider } from './provider';
 import { Result } from './result';
 import { emitAgentMessage } from './user-input';
@@ -25,12 +26,13 @@ export class Agent<T = string> {
 
   private goalAccomplished = false;
   private result: string | undefined;
-  private taskId: string;
+  private readonly taskId: string;
 
   constructor(
     private readonly goal: string,
     private readonly callback: (data: Result<T, Error>) => void,
-    private readonly signal: AbortSignal
+    private readonly signal: AbortSignal,
+    private readonly channel: NotifierChannel<ToolChannelParams>
   ) {
     this.taskId = uuid();
     this.toolset = this.constructToolset();
@@ -71,11 +73,7 @@ export class Agent<T = string> {
       this.messages.push(...response.messages);
       response.messages.forEach(msg => {
         if (typeof msg.content === 'string') {
-          emitAgentMessage({
-            type: 'assistant',
-            id: this.taskId,
-            content: msg.content,
-          });
+          this.channel.notify({ content: msg.content });
         }
       });
 
@@ -108,13 +106,13 @@ export class Agent<T = string> {
 
   private constructToolset(): ToolSet {
     return {
+      [PRIMARY_GOAL_TOOL_NAME]: this.constructPrimaryGoalTool(),
       ...Object.fromEntries(
         agentTools.map((tool: IToolBase) => [
           tool.internalName,
           this.constructTool(tool),
         ])
       ),
-      [PRIMARY_GOAL_TOOL_NAME]: this.constructPrimaryGoalTool(),
     };
   }
 
@@ -126,7 +124,7 @@ export class Agent<T = string> {
       inputSchema,
       outputSchema,
       execute: async (input: unknown) => {
-        return await tool.handle(input).catch((err: Error) => {
+        return await tool.handle(input, this.channel).catch((err: Error) => {
           const message = `Tool "${tool.internalName}" failed: ${String(err)}`;
 
           return Result.Error(message);

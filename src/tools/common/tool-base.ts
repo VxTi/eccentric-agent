@@ -17,6 +17,8 @@ export const enum ToolSelectionOption {
   DENY = 'deny',
 }
 
+export type ToolChannelParams = [Omit<Message, 'id' | 'type'>];
+
 export interface IToolBase<
   TIn = unknown,
   TOut = unknown,
@@ -39,7 +41,7 @@ export interface IToolBase<
    */
   approvalOptions(
     input: TIn,
-    channel: NotifierChannel<[Message]>
+    channel: NotifierChannel<ToolChannelParams>
   ): MaybePromise<ApprovalOption[]>;
 
   /**
@@ -47,7 +49,7 @@ export interface IToolBase<
    */
   requiresApproval(
     input: TIn,
-    channel: NotifierChannel<[Message]>
+    channel: NotifierChannel<ToolChannelParams>
   ): MaybePromise<boolean>;
 
   /**
@@ -56,15 +58,21 @@ export interface IToolBase<
   onOptionSelect(
     input: TIn,
     option: TApprovalOption,
-    channel: NotifierChannel<[Message]>
+    channel: NotifierChannel<ToolChannelParams>
   ): MaybePromise<ToolSelectionOption>;
 
   handle(
     input: NoInfer<TIn>,
-    channel: NotifierChannel<[Message]>
+    channel: NotifierChannel<ToolChannelParams>
   ): Promise<NoInfer<TOut>>;
-  inputToString(input: TIn, channel: NotifierChannel<[Message]>): string;
-  outputToString(output: TOut, channel: NotifierChannel<[Message]>): string;
+  inputToString(
+    input: TIn,
+    channel: NotifierChannel<ToolChannelParams>
+  ): string;
+  outputToString(
+    output: TOut,
+    channel: NotifierChannel<ToolChannelParams>
+  ): string;
 }
 
 type ToolProps<

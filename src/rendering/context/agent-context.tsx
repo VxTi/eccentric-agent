@@ -40,7 +40,12 @@ import { geminiProvider } from '../../lib/provider';
 import { Result } from '../../lib/result';
 import { TaskList, TaskStatus } from '../../lib/tasks';
 import { emitAgentMessage, requestUserInput } from '../../lib/user-input';
-import { type IToolBase, toolRegistry, ToolSelectionOption } from '../../tools';
+import {
+  type IToolBase,
+  type ToolChannelParams,
+  toolRegistry,
+  ToolSelectionOption,
+} from '../../tools';
 import { formatMarkdown, previewArgs } from '../formatting';
 import { useSignal } from './application-cancellation';
 
@@ -348,8 +353,14 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
     execute: async (input: unknown) => {
       const toolCallId = uuid();
 
-      const channel = notifier.subscribe(toolCallId, (message: Message) =>
-        emitAgentMessage(message)
+      const channel = notifier.subscribe(
+        toolCallId,
+        (...[message]: ToolChannelParams) =>
+          emitAgentMessage({
+            ...message,
+            type: 'generic',
+            id: toolCallId,
+          })
       );
 
       const requiresApproval = await tool.requiresApproval(input, channel);

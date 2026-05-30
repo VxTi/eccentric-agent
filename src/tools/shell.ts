@@ -1,9 +1,6 @@
 import * as z from 'zod';
 import { createTool, ToolSelectionOption } from './common';
 import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
 
 const inputSchema = z.object({
   command: z
@@ -79,14 +76,24 @@ export default createTool({
   outputSchema,
   mightRequireApproval: true,
 
-  async handle({ command, timeoutMs, cwd }) {
+  async handle({ command, timeoutMs, cwd }, channel) {
     try {
-      const { stdout, stderr } = await execAsync(command, {
-        cwd,
-        timeout: timeoutMs ?? 30_000,
-        maxBuffer: 10 * 1024 * 1024,
+      return new Promise(resolve => {
+        const process = exec(
+          command,
+          { cwd, timeout: timeoutMs ?? 30_000, maxBuffer: 10 * 1024 * 1024 },
+          (error, stdout, stderr) => {
+            const totalErr = error
+              ? [stderr, error.message].join('\n')
+              : stderr;
+
+            resolve({ stdout, stderr: totalErr, exitCode: 0 });
+          }
+        );
+        process.on('message', msg => {
+          channel.notify({ content: JSON.stringify(msg) });
+        });
       });
-      return { stdout, stderr, exitCode: 0 };
     } catch (err: unknown) {
       const e = err as {
         stdout?: string;
