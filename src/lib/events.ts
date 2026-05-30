@@ -1,5 +1,5 @@
-import type { ModelMessage } from 'ai';
 import { type AgentContext } from '../rendering/context';
+import { type Message } from './messages';
 
 export const eventTarget = new EventTarget();
 
@@ -49,8 +49,8 @@ export class UserInputResponseEvent extends CustomEvent<InputOption> {
     super(EventName.USER_INPUT_RESPONSE, { detail: option });
   }
 }
-export class AgentMessageEvent extends CustomEvent<ModelMessage> {
-  constructor(message: ModelMessage) {
+export class AgentMessageEvent extends CustomEvent<Message> {
+  constructor(message: Message) {
     super(EventName.AGENT_MESSAGE, { detail: message });
   }
 }

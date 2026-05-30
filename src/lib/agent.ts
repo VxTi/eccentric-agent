@@ -12,6 +12,7 @@ import { agentTools, type IToolBase } from '../tools';
 import { geminiProvider } from './provider';
 import { Result } from './result';
 import { emitAgentMessage } from './user-input';
+import { v7 as uuid } from 'uuid';
 
 const AGENT_MAX_LOOP_ITERATIONS = 200;
 
@@ -24,12 +25,14 @@ export class Agent<T = string> {
 
   private goalAccomplished = false;
   private result: string | undefined;
+  private taskId: string;
 
   constructor(
     private readonly goal: string,
     private readonly callback: (data: Result<T, Error>) => void,
     private readonly signal: AbortSignal
   ) {
+    this.taskId = uuid();
     this.toolset = this.constructToolset();
     this.model = geminiProvider('gemini-2.5-flash');
     this.messages = [
@@ -43,7 +46,11 @@ export class Agent<T = string> {
 
   private async process(): Promise<T> {
     let iterations = 0;
-    emitAgentMessage(`Running agent task ${this.goal}`);
+    emitAgentMessage({
+      type: 'generic',
+      id: this.taskId,
+      content: `Running agent task ${this.goal}`,
+    });
     while (iterations++ < AGENT_MAX_LOOP_ITERATIONS) {
       const { response } = await generateText({
         tools: this.toolset,
@@ -62,9 +69,15 @@ export class Agent<T = string> {
       });
 
       this.messages.push(...response.messages);
-      response.messages.map(msg =>
-        emitAgentMessage(msg.content as string, msg.role)
-      );
+      response.messages.forEach(msg => {
+        if (typeof msg.content === 'string') {
+          emitAgentMessage({
+            type: 'assistant',
+            id: this.taskId,
+            content: msg.content,
+          });
+        }
+      });
 
       if (this.goalAccomplished) {
         return this.result as T;

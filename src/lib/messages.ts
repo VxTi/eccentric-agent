@@ -1,10 +1,11 @@
 interface IMessage {
+  id: string;
   content: string;
 }
 
 export interface UserMessage extends IMessage {
   type: 'user';
-  attachedFiles: string[];
+  attachedFiles?: string[];
 }
 
 export interface AssistantMessage extends IMessage {
@@ -14,6 +15,8 @@ export interface AssistantMessage extends IMessage {
 
 export interface GenericMessage extends IMessage {
   type: 'generic';
+  loading?: boolean;
+  failure?: boolean;
 }
 
 export type Message = UserMessage | AssistantMessage | GenericMessage;

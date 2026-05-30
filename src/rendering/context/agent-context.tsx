@@ -35,6 +35,7 @@ import {
   unsubscribeEvent,
 } from '../../lib/events';
 import { FileCache } from '../../lib/file-cache';
+import type { Message, UserMessage } from '../../lib/messages';
 import { geminiProvider } from '../../lib/provider';
 import { Result } from '../../lib/result';
 import { TaskList, TaskStatus } from '../../lib/tasks';
@@ -42,6 +43,7 @@ import { emitAgentMessage, requestUserInput } from '../../lib/user-input';
 import { type IToolBase, toolRegistry, ToolSelectionOption } from '../../tools';
 import { formatMarkdown, previewArgs } from '../formatting';
 import { useSignal } from './application-cancellation';
+import { v7 as uuid } from 'uuid';
 
 interface AgentStatus {
   loading: boolean;
@@ -54,8 +56,8 @@ export interface AgentContext {
   submitMessage: (input: string) => void;
   taskList: TaskList;
   fileCache: FileCache;
-  messages: ModelMessage[];
-  setMessages: Dispatch<SetStateAction<ModelMessage[]>>;
+  messages: Message[];
+  setMessages: Dispatch<SetStateAction<Message[]>>;
 
   status: AgentStatus;
   setStatus: Dispatch<SetStateAction<AgentStatus>>;
@@ -70,7 +72,10 @@ export function AgentProvider({
 }): ReactNode {
   const [messageQueue, setMessageQueue] = useState<string[]>([]);
   const [cwd, setCwd] = useState<string>(process.cwd());
-  const [messages, setMessages] = useState<ModelMessage[]>([]);
+
+  const [modelMessages, setModelMessages] = useState<ModelMessage[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+
   const [status, setStatus] = useState<AgentStatus>({
     loading: false,
     text: '',
@@ -100,26 +105,48 @@ export function AgentProvider({
     };
   }, [taskList, cwd]);
 
+  const setMessage = useCallback(
+    (message: Message) => {
+      const existingMessage = messages.findIndex(msg => msg.id === message.id);
+
+      // If it doesn't exist already ,append it to the existing one
+      if (existingMessage < 0) {
+        setMessages(prev => [...prev, message]);
+        return;
+      }
+
+      setMessages(prev => {
+        prev[existingMessage] = message;
+        return prev;
+      });
+    },
+    [messages]
+  );
+
   useEffect(() => {
     const handler = (event: AgentMessageEvent) => {
-      setMessages(prev => [...prev, event.detail]);
+      setMessage(event.detail);
     };
     subscribeEvent(EventName.AGENT_MESSAGE, handler);
 
     return () => {
       unsubscribeEvent(EventName.AGENT_MESSAGE, handler);
     };
-  }, []);
+  }, [setMessage]);
 
   const processRequest = useCallback(
     async (prompt: string) => {
       setStatus({ text: 'Processing...', loading: true });
 
       const updatedMessages: ModelMessage[] = [
-        ...messages,
+        ...modelMessages,
         { role: 'user', content: prompt },
       ];
-      setMessages(updatedMessages);
+      setModelMessages(updatedMessages);
+      setMessages(prev => [
+        ...prev,
+        { type: 'user', id: uuid(), content: prompt } satisfies UserMessage,
+      ]);
 
       const result = streamText({
         allowSystemInMessages: true,
@@ -148,19 +175,22 @@ export function AgentProvider({
         const response = await result.response;
 
         setStatus({ text: '', loading: false });
-        setMessages(prev => [
+        setModelMessages(prev => [
           ...prev,
           ...response.messages,
           { role: 'assistant', content: buffer },
         ]);
+        setMessage({
+          type: 'assistant',
+          id: uuid(),
+          content: buffer,
+        });
       } catch (err) {
-        setMessages([
-          ...updatedMessages,
-          {
-            role: 'assistant',
-            content: `Something went wrong whilst responding: ${String(err)}`,
-          },
-        ]);
+        setMessage({
+          type: 'generic',
+          id: uuid(),
+          content: `Something went wrong whilst responding: ${String(err)}`,
+        });
         setStatus({ text: chalk.red('Fatal error'), loading: false });
         return;
       }
@@ -171,13 +201,11 @@ export function AgentProvider({
         taskIterations < MAX_TASK_CONTINUATION_ITERATIONS
       ) {
         taskIterations += 1;
-        messages.push({
-          content:
-            'The task list still has incomplete tasks. Continue working on the' +
+        await processRequest(
+          'The task list still has incomplete tasks. Continue working on the' +
             ' next pending or in-progress task and update the task list as you' +
-            ' make progress. Do not wait for further user input.',
-          role: 'user',
-        });
+            ' make progress. Do not wait for further user input.'
+        );
       }
 
       const firstQueuedMessage = messageQueue.shift();
@@ -185,7 +213,16 @@ export function AgentProvider({
         await processRequest(firstQueuedMessage);
       }
     },
-    [messageQueue, messages, model, signal, systemPrompt, taskList, tools]
+    [
+      messageQueue,
+      model,
+      modelMessages,
+      setMessage,
+      signal,
+      systemPrompt,
+      taskList,
+      tools,
+    ]
   );
 
   const submitMessage = useCallback(
@@ -306,18 +343,36 @@ function constructTool(tool: IToolBase): Tool {
           );
         }
       }
-      emitAgentMessage(formatMarkdown(tool.inputToString(input)));
+
+      const toolCallId = uuid();
+
+      emitAgentMessage({
+        type: 'generic',
+        id: toolCallId,
+        loading: true,
+        content: formatMarkdown(tool.inputToString(input)),
+      });
 
       let output: unknown;
       try {
         output = await tool.handle(input);
       } catch (err) {
         const message = `Tool "${tool.internalName}" failed: ${String(err)}`;
-        emitAgentMessage(chalk.red(`${message}\n`));
+        emitAgentMessage({
+          type: 'generic',
+          id: toolCallId,
+          failure: true,
+          content: chalk.red(`${message}\n`),
+        });
         return Result.Error(message);
       }
 
-      emitAgentMessage(`↳ ${formatMarkdown(tool.outputToString(output))}\n`);
+      emitAgentMessage({
+        type: 'generic',
+        id: toolCallId,
+        loading: false,
+        content: `↳ ${formatMarkdown(tool.outputToString(output))}\n`,
+      });
       return output;
     },
   });

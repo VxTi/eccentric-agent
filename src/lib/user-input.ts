@@ -1,4 +1,3 @@
-import type { ModelMessage } from 'ai';
 import {
   AgentMessageEvent,
   emitEvent,
@@ -10,6 +9,7 @@ import {
   UserInputRequestEvent,
   type UserInputResponseEvent,
 } from './events';
+import { type Message } from './messages';
 
 export function requestUserInput(
   props: UserInputRequest
@@ -25,9 +25,6 @@ export function requestUserInput(
   });
 }
 
-export function emitAgentMessage(
-  content: string,
-  role: ModelMessage['role'] = 'tool'
-): void {
-  emitEvent(new AgentMessageEvent({ role, content } as ModelMessage));
+export function emitAgentMessage(message: Message): void {
+  emitEvent(new AgentMessageEvent(message));
 }
