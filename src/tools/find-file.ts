@@ -1,4 +1,3 @@
-import { type Output } from 'ai';
 import * as path from 'node:path';
 import * as z from 'zod';
 import { createTool } from './common';
@@ -27,13 +26,9 @@ const inputSchema = z.object({
     ),
 });
 
-type Input = z.infer<typeof inputSchema>;
-
 const outputSchema = z.object({
-  files: z.array(z.string()).describe('A list of the files in a directory'),
+  files: z.array(z.string()),
 });
-
-type Output = z.infer<typeof outputSchema>;
 
 export default createTool({
   internalName: 'find_file',
@@ -66,8 +61,7 @@ export default createTool({
   outputSchema,
   mightRequireApproval: false,
 
-  async handle(input: Input): Promise<Output> {
-    const { filePattern, directoryPath, maxResults } = input;
+  async handle({ filePattern, directoryPath, maxResults }) {
     const cwd = path.resolve(process.cwd(), directoryPath);
 
     const results: string[] = await glob(filePattern, {
@@ -79,12 +73,11 @@ export default createTool({
     };
   },
 
-  inputToString(input: Input): string {
-    return `Looking for file pattern \`${input.filePattern}\` in \`${input.directoryPath}\``;
+  inputToString({ filePattern, directoryPath }): string {
+    return `Looking for file pattern \`${filePattern}\` in \`${directoryPath}\``;
   },
 
-  outputToString(output: Output): string {
-    const { files } = output;
+  outputToString({ files }): string {
     if (files.length === 0) {
       return `Unable to find any files`;
     }

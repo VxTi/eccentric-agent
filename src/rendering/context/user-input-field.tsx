@@ -19,8 +19,8 @@ interface UserInputContextType {
   setSuggestionIndex: Dispatch<SetStateAction<number>>;
   cursorOffset: number;
   setCursorOffset: Dispatch<SetStateAction<number>>;
-  inputRequest: UserInputRequest | undefined;
-  setInputRequest: Dispatch<SetStateAction<UserInputRequest | undefined>>;
+  inputRequest: UserInputRequest;
+  setInputRequest: Dispatch<SetStateAction<UserInputRequest>>;
 }
 
 const UserInputContext = createContext<UserInputContextType | undefined>(
@@ -41,9 +41,9 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
   const [input, setInput] = useState<string>('');
   const { suggestions, suggestionCursorIndex, setSuggestions } =
     useInputSuggestionProvider(input, cursorOffset);
-  const [inputRequest, setInputRequest] = useState<
-    UserInputRequest | undefined
-  >(undefined);
+  const [inputRequest, setInputRequest] = useState<UserInputRequest>({
+    options: [],
+  });
 
   const [suggestionIndex, setSuggestionIndex] = useState<number>(0);
 

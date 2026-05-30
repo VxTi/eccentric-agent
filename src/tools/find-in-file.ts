@@ -1,4 +1,3 @@
-import { type Output } from 'ai';
 import * as z from 'zod';
 import { createTool } from './common';
 import { readFile } from 'fs/promises';
@@ -27,7 +26,6 @@ const inputSchema = z.object({
       'The maximum number of matches to return. When omitted, all matches are returned.'
     ),
 });
-type Input = z.infer<typeof inputSchema>;
 
 const matchSchema = z.object({
   line: z.number().describe('The 1-based line number where the match occurred'),
@@ -46,7 +44,6 @@ const outputSchema = z.object({
     .array(matchSchema)
     .describe('All locations within the file where the pattern was found'),
 });
-type Output = z.infer<typeof outputSchema>;
 
 export default createTool({
   internalName: 'find_in_file',
@@ -62,17 +59,17 @@ export default createTool({
   outputSchema,
   mightRequireApproval: false,
 
-  async handle(input: Input): Promise<Output> {
-    const content = await readFile(input.filePath, 'utf-8');
+  async handle({ filePath, caseSensitive, isRegex, maxResults, pattern }) {
+    const content = await readFile(filePath, 'utf-8');
     const lines = content.split(/\r?\n/);
 
-    const flags = input.caseSensitive === false ? 'gi' : 'g';
-    const regex = input.isRegex
-      ? new RegExp(input.pattern, flags)
-      : new RegExp(input.pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+    const flags = caseSensitive === false ? 'gi' : 'g';
+    const regex = isRegex
+      ? new RegExp(pattern, flags)
+      : new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
 
     const matches: Match[] = [];
-    const limit = input.maxResults ?? Infinity;
+    const limit = maxResults ?? Infinity;
 
     for (let i = 0; i < lines.length && matches.length < limit; i++) {
       const line = lines[i];
@@ -92,13 +89,11 @@ export default createTool({
     return { matches };
   },
 
-  inputToString(input: Input): string {
-    return `Looking for pattern \`${input.pattern}\` in \`${input.filePath}\``;
+  inputToString({ pattern, filePath }) {
+    return `Looking for pattern \`${pattern}\` in \`${filePath}\``;
   },
 
-  outputToString(output: Output): string {
-    const { matches } = output;
-
+  outputToString({ matches }): string {
     return `Found \`${matches.length === 0 ? 'no' : matches.length}\` matches.`;
   },
 });

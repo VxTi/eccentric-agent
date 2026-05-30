@@ -34,9 +34,10 @@ export interface InputOption {
   label: string;
 }
 export interface UserInputRequest {
-  title: string;
-  description: string;
+  title?: string;
+  description?: string;
   options: InputOption[];
+  allowMultiple?: boolean;
 }
 
 export class UserInputRequestEvent extends CustomEvent<UserInputRequest> {
@@ -45,11 +46,12 @@ export class UserInputRequestEvent extends CustomEvent<UserInputRequest> {
   }
 }
 
-export class UserInputResponseEvent extends CustomEvent<InputOption> {
-  constructor(option: InputOption) {
-    super(EventName.USER_INPUT_RESPONSE, { detail: option });
+export class UserInputResponseEvent extends CustomEvent<InputOption[]> {
+  constructor(options: InputOption[]) {
+    super(EventName.USER_INPUT_RESPONSE, { detail: options });
   }
 }
+
 export class AgentMessageEvent extends CustomEvent<Message> {
   constructor(message: Message) {
     super(EventName.AGENT_MESSAGE, { detail: message });

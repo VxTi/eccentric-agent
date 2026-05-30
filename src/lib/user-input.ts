@@ -13,7 +13,7 @@ import { type Message } from './messages';
 
 export function requestUserInput(
   props: UserInputRequest
-): Promise<InputOption> {
+): Promise<InputOption[]> {
   return new Promise(resolve => {
     const handler = (event: UserInputResponseEvent) => {
       unsubscribeEvent(EventName.USER_INPUT_RESPONSE, handler);

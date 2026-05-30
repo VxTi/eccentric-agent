@@ -154,7 +154,7 @@ export default function InputField(): JSX.Element {
     }
   });
 
-  if (inputRequest) {
+  if (inputRequest.options.length > 0) {
     return <InputRequest />;
   }
 

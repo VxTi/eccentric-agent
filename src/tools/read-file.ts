@@ -23,9 +23,16 @@ const inputSchema = z.object({
 });
 
 const outputSchema = z.object({
-  content: z.string().describe('The full text content of the file.'),
-  filePath: z.string().describe('Path of the file that was read'),
+  content: z.string(),
+  filePath: z.string(),
 });
+
+function prefixWithLineNumbers(lines: string[], newline: string): string {
+  const width = String(lines.length).length;
+  return lines
+    .map((line, i) => `${String(i + 1).padStart(width, ' ')}\t${line}`)
+    .join(newline);
+}
 
 export default createTool({
   internalName: 'read_file',
@@ -44,38 +51,52 @@ export default createTool({
   outputSchema,
   mightRequireApproval: false,
 
-  async handle(input) {
+  async handle({ filePath, fromLine, lineCount }) {
     const context = await acquireContextInstance();
 
-    const resolved = path.isAbsolute(input.filePath)
-      ? input.filePath
-      : path.join(context.cwd, input.filePath);
+    const absolutePath = path.isAbsolute(filePath)
+      ? filePath
+      : path.join(context.cwd, filePath);
 
-    const stats = await fs.stat(resolved);
-    const raw = await fs.readFile(resolved, 'utf8');
+    const stats = await fs.stat(absolutePath);
+    const raw = await fs.readFile(absolutePath, 'utf8');
+
+    context.fileCache.set(absolutePath, stats.mtimeMs);
 
     const newline = raw.match(/\r?\n/)?.[0] ?? '\n';
     const lines = raw.split(/\r?\n/);
-    if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
 
-    const width = String(lines.length).length;
-    const numbered = lines
-      .map((line, i) => `${String(i + 1).padStart(width, ' ')}\t${line}`)
-      .join(newline);
+    if (lineCount === undefined) {
+      // Returns all the file's contents
+      if (fromLine === 0) {
+        return {
+          filePath,
+          content: prefixWithLineNumbers(lines, newline),
+        };
+      }
 
-    context.fileCache.set(resolved, stats.mtimeMs);
+      // Returns file content starting from line
+      return {
+        filePath,
+        content: prefixWithLineNumbers(lines.slice(fromLine), newline),
+      };
+    }
 
+    // Returns file content frame from a -> b
     return {
-      content: numbered,
-      filePath: input.filePath,
+      content: prefixWithLineNumbers(
+        lines.slice(fromLine, fromLine + lineCount),
+        newline
+      ),
+      filePath,
     };
   },
 
-  inputToString(input) {
-    return `Reading \`${input.filePath}\``;
+  inputToString({ filePath }) {
+    return `Reading \`${filePath}\``;
   },
 
-  outputToString(output) {
-    return `Read \`${output.filePath}\``;
+  outputToString({ filePath }) {
+    return `Read \`${filePath}\``;
   },
 });

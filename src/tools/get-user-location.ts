@@ -4,29 +4,13 @@ import { createTool } from './common';
 
 const inputSchema = z.object();
 const outputSchema = z.object({
-  city: z
-    .string()
-    .describe("The user's approximate city, or empty if unknown."),
-  region: z
-    .string()
-    .describe("The user's state, province, or region, or empty if unknown."),
-  country: z
-    .string()
-    .describe("The full name of the user's country, or empty if unknown."),
-  countryCode: z
-    .string()
-    .describe('The ISO 3166-1 alpha-2 country code, or empty if unknown.'),
-  latitude: z
-    .number()
-    .nullable()
-    .describe('Approximate latitude in decimal degrees, or null if unknown.'),
-  longitude: z
-    .number()
-    .nullable()
-    .describe('Approximate longitude in decimal degrees, or null if unknown.'),
-  timeZone: z
-    .string()
-    .describe('The IANA time zone for the location, or empty if unknown.'),
+  city: z.string(),
+  region: z.string(),
+  country: z.string(),
+  countryCode: z.string(),
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
+  timeZone: z.string(),
 });
 
 const GEO_ENDPOINT = 'https://ipwho.is/';
@@ -125,11 +109,11 @@ export default createTool({
     return 'Looking up user location';
   },
 
-  outputToString(output) {
-    const parts = [output.city, output.region, output.country].filter(
-      part => part.length > 0
-    );
+  outputToString({ city, region, country }) {
+    const parts = [city, region, country].filter(part => part.length > 0);
+
     if (parts.length === 0) return 'Location unavailable';
+
     return `User location: ${parts.map(p => `\`${p}\``).join(', ')}`;
   },
 });

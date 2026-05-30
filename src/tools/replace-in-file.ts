@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'fs/promises';
+import path from 'node:path';
 import * as z from 'zod';
 import { acquireContextInstance } from '../rendering/context';
 import { createTool } from './common';
@@ -57,40 +58,20 @@ export default createTool({
   outputSchema,
   mightRequireApproval: false,
 
-  async handle(input) {
-    const { find, replace, filePath } = input;
-
+  async handle({ find, replace, filePath }) {
     const context = await acquireContextInstance();
     const absolutePath = await context.fileCache.getCachedFilePath(filePath);
 
     const fileContent = await readFile(absolutePath, 'utf-8');
 
-    const firstIdx = fileContent.indexOf(find);
-    if (firstIdx === -1) {
-      throw new Error(
-        `\`find\` text was not found in the file. Make sure it matches exactly,` +
-          ` including indentation and whitespace.\n--- find ---\n${find}`
-      );
-    }
-    const secondIdx = fileContent.indexOf(find, firstIdx + 1);
-    if (secondIdx !== -1) {
-      throw new Error(
-        `\`find\` text appears more than once in the file. This tool requires each` +
-          ` \`find\` to be unique within the file.\n--- find ---\n${find}`
-      );
-    }
+    const replacedContent = fileContent.replaceAll(find, replace);
 
-    const result =
-      fileContent.slice(0, firstIdx) +
-      replace +
-      fileContent.slice(firstIdx + find.length);
-
-    await writeFile(absolutePath, result, 'utf-8');
+    await writeFile(absolutePath, replacedContent, 'utf-8');
     await context.fileCache.update(absolutePath);
 
     return {
       success: true,
-      bytesWritten: Buffer.byteLength(result, 'utf-8'),
+      bytesWritten: Buffer.byteLength(replacedContent, 'utf-8'),
       find,
       replace,
       filePath,
@@ -98,11 +79,14 @@ export default createTool({
   },
 
   inputToString({ filePath, find, replace }) {
-    return `Replacing \`${find} with \`${replace}\` in \`${filePath}\``;
+    const fileName = path.basename(filePath);
+    return `Replacing \`${find} with \`${replace}\` in \`${fileName}\``;
   },
 
   outputToString({ success, find, replace, filePath }) {
     if (!success) return `Unable to replace in file`;
-    return `Replaced \`${find} with \`${replace}\` in \`${filePath}\``;
+
+    const fileName = path.basename(filePath);
+    return `Replaced \`${find}\` with \`${replace}\` in \`${fileName}\``;
   },
 });

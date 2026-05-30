@@ -64,37 +64,35 @@ export default createTool({
   outputSchema,
   mightRequireApproval: false,
 
-  async handle(input) {
-    const overwrite = input.overwrite ?? false;
-    const createDirs = input.createDirectories ?? true;
+  async handle({ overwrite, createDirectories, filePath, content }) {
+    const override = overwrite ?? false;
+    const createDirs = createDirectories ?? true;
 
-    const alreadyExists = await safeExists(input.filePath);
-    if (alreadyExists && !overwrite) {
+    const alreadyExists = await safeExists(filePath);
+    if (alreadyExists && !override) {
       throw new Error(
-        `File already exists at ${input.filePath}. Pass overwrite: true to replace it.`
+        `File already exists at ${filePath}. Pass overwrite: true to replace it.`
       );
     }
 
     if (createDirs) {
-      await mkdir(dirname(input.filePath), { recursive: true });
+      await mkdir(dirname(filePath), { recursive: true });
     }
 
-    await writeFile(input.filePath, input.content, 'utf-8');
+    await writeFile(filePath, content, 'utf-8');
 
     return {
-      filePath: input.filePath,
-      bytesWritten: Buffer.byteLength(input.content, 'utf-8'),
+      filePath,
+      bytesWritten: Buffer.byteLength(content, 'utf-8'),
       created: !alreadyExists,
     };
   },
 
-  inputToString(input) {
-    return `Create file \`${input.filePath}\``;
+  inputToString({ filePath }) {
+    return `Create file \`${filePath}\``;
   },
 
-  outputToString(output) {
-    const { filePath, created, bytesWritten } = output;
-
+  outputToString({ filePath, created, bytesWritten }) {
     return `${created ? 'Created' : 'Wrote to'} file '${filePath}' (${formatBytes(bytesWritten)})`;
   },
 });

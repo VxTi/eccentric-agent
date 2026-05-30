@@ -35,6 +35,7 @@ import {
 } from '../../lib/events';
 import { FileCache } from '../../lib/file-cache';
 import type { Message, UserMessage } from '../../lib/messages';
+import { Notifier } from '../../lib/notifier';
 import { geminiProvider } from '../../lib/provider';
 import { Result } from '../../lib/result';
 import { TaskList, TaskStatus } from '../../lib/tasks';
@@ -84,7 +85,11 @@ export function AgentProvider({
   const fileCache = useMemo(() => new FileCache(cwd), [cwd]);
   const taskList = useMemo(() => new TaskList(), []);
 
-  const tools = useMemo<ToolSet>(() => constructToolset(toolRegistry), []);
+  const notifier = useMemo(() => new Notifier(), []);
+  const tools = useMemo<ToolSet>(
+    () => constructToolset(toolRegistry, notifier),
+    [notifier]
+  );
   const model = useMemo<LanguageModel>(
     () => geminiProvider('gemini-2.5-flash'),
     []
@@ -106,6 +111,9 @@ export function AgentProvider({
     };
   }, [taskList, cwd]);
 
+  /**
+   * Message addition / updates
+   */
   const setMessage = useCallback(
     (message: Message) => {
       const existingMessage = messages.findIndex(msg => msg.id === message.id);
@@ -126,6 +134,9 @@ export function AgentProvider({
     [messages]
   );
 
+  /**
+   * Handling incoming messages from non-react world
+   */
   useEffect(() => {
     const handler = (event: AgentMessageEvent) => {
       setMessage(event.detail);
@@ -322,55 +333,64 @@ async function loadSystemPrompt(cwd: string): Promise<string> {
   return first(agentFile) ?? DEFAULT_SYSTEM_PROMPT;
 }
 
-function constructToolset(tools: IToolBase[]): ToolSet {
+function constructToolset(tools: IToolBase[], notifier: Notifier): ToolSet {
   return Object.fromEntries(
-    tools.map(tool => [tool.internalName, constructTool(tool)])
+    tools.map(tool => [tool.internalName, constructTool(tool, notifier)])
   );
 }
 
-function constructTool(tool: IToolBase): Tool {
+function constructTool(tool: IToolBase, notifier: Notifier): Tool {
   const { description, inputSchema, outputSchema } = tool;
   return createTool({
     description,
     inputSchema,
     outputSchema,
     execute: async (input: unknown) => {
-      const requiresApproval = await tool.requiresApproval(input);
+      const toolCallId = uuid();
 
+      const channel = notifier.subscribe(toolCallId, (message: Message) =>
+        emitAgentMessage(message)
+      );
+
+      const requiresApproval = await tool.requiresApproval(input, channel);
       if (requiresApproval) {
-        const options = await tool.approvalOptions(input);
+        const options = await tool.approvalOptions(input, channel);
         emitAgentMessage({
           type: 'generic',
           id: uuid(),
           content: 'Tool requires input',
         });
 
-        const chosen = await requestUserInput({
+        const [chosen] = await requestUserInput({
           title: 'Approval required',
-          description: `Tool "${tool.internalName}" requires approval\n ↳ ${previewArgs(input)}`,
+          description: `Tool "${tool.name}" requires approval\n ↳ ${previewArgs(input)}`,
           options: options.map(opt => ({ label: opt.text, id: opt.option })),
+          allowMultiple: false,
         });
-        const selectionOption = await tool.onOptionSelect(input, chosen.id);
+        const selectionOption = await tool.onOptionSelect(
+          input,
+          chosen.id,
+          channel
+        );
 
         if (selectionOption !== ToolSelectionOption.ALLOW) {
+          notifier.unsubscribe(toolCallId);
           return Result.Error(
             `User denied permission to run tool "${tool.internalName}".`
           );
         }
       }
 
-      const toolCallId = uuid();
-
       emitAgentMessage({
         type: 'generic',
         id: toolCallId,
         loading: true,
-        content: formatMarkdown(tool.inputToString(input)),
+        content: formatMarkdown(tool.inputToString(input, channel)),
       });
 
       let output: unknown;
       try {
-        output = await tool.handle(input);
+        output = await tool.handle(input, channel);
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'unknown';
         const message = `Tool "${tool.name}" failed: ${errMsg}`;
@@ -381,6 +401,7 @@ function constructTool(tool: IToolBase): Tool {
           failure: true,
           content: chalk.red(`${message}\n`),
         });
+        notifier.unsubscribe(toolCallId);
         return Result.Error(message);
       }
 
@@ -388,8 +409,9 @@ function constructTool(tool: IToolBase): Tool {
         type: 'generic',
         id: toolCallId,
         loading: false,
-        content: `→ ${formatMarkdown(tool.outputToString(output))}\n`,
+        content: `→ ${formatMarkdown(tool.outputToString(output, channel))}\n`,
       });
+      notifier.unsubscribe(toolCallId);
       return output;
     },
   });

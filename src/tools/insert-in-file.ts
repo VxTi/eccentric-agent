@@ -65,11 +65,9 @@ export default createTool({
   outputSchema,
   mightRequireApproval: false,
 
-  async handle(input) {
+  async handle({ filePath, content, inclusive, lineNumber }) {
     const context = await acquireContextInstance();
-    const absolutePath = await context.fileCache.getCachedFilePath(
-      input.filePath
-    );
+    const absolutePath = await context.fileCache.getCachedFilePath(filePath);
 
     const original = await readFile(absolutePath, 'utf-8');
     const lines = original.length === 0 ? [] : original.split('\n');
@@ -79,29 +77,29 @@ export default createTool({
     // it so `lines.length` equals the number of actual content lines.
     if (hadTrailingNewline) lines.pop();
 
-    const insertLines = input.content.split('\n');
+    const insertLines = content.split('\n');
     // A trailing '\n' in content would otherwise inject a blank line between
     // the inserted block and the following file content.
     if (insertLines.length > 1 && insertLines[insertLines.length - 1] === '') {
       insertLines.pop();
     }
 
-    if (input.inclusive) {
-      if (input.lineNumber < 1 || input.lineNumber > lines.length) {
+    if (inclusive) {
+      if (lineNumber < 1 || lineNumber > lines.length) {
         throw new Error(
-          `\`lineNumber\` ${input.lineNumber} is out of range for inclusive mode.` +
+          `\`lineNumber\` ${lineNumber} is out of range for inclusive mode.` +
             ` File has ${lines.length} line(s); valid range is 1..${lines.length}.`
         );
       }
-      lines.splice(input.lineNumber - 1, 1, ...insertLines);
+      lines.splice(lineNumber - 1, 1, ...insertLines);
     } else {
-      if (input.lineNumber < 0 || input.lineNumber > lines.length) {
+      if (lineNumber < 0 || lineNumber > lines.length) {
         throw new Error(
-          `\`lineNumber\` ${input.lineNumber} is out of range. File has` +
+          `\`lineNumber\` ${lineNumber} is out of range. File has` +
             ` ${lines.length} line(s); valid range is 0..${lines.length}.`
         );
       }
-      lines.splice(input.lineNumber, 0, ...insertLines);
+      lines.splice(lineNumber, 0, ...insertLines);
     }
 
     let updated = lines.join('\n');
@@ -117,13 +115,13 @@ export default createTool({
     };
   },
 
-  inputToString(input) {
-    const action = input.inclusive ? 'Replacing line' : 'Inserting after line';
-    return `${action} ${input.lineNumber} in \`${input.filePath}\``;
+  inputToString({ lineNumber, inclusive, filePath }) {
+    const action = inclusive ? 'Replacing line' : 'Inserting after line';
+    return `${action} ${lineNumber} in \`${filePath}\``;
   },
 
-  outputToString(output) {
-    if (!output.success) return `Unable to insert into file`;
-    return `Inserted ${output.linesInserted} line(s) (${output.bytesWritten} bytes total).`;
+  outputToString({ linesInserted, success, bytesWritten }) {
+    if (!success) return `Unable to insert into file`;
+    return `Inserted \`${linesInserted}\` line(s) (\`${bytesWritten}\` bytes total).`;
   },
 });

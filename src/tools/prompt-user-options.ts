@@ -35,13 +35,22 @@ const inputSchema = z.object({
         ' unique `id`. Always include a catch-all option (e.g. `other` / `something_else`) so the' +
         ' user can escape if none of your proposed options fit.'
     ),
+  selectMultiple: z
+    .boolean()
+    .describe(
+      'Whether the selection of multiple options is required. By default, this is not the case'
+    )
+    .optional()
+    .default(false),
 });
 
 const outputSchema = z.object({
-  selectedId: z.string().describe('The `id` of the option the user selected.'),
-  selectedLabel: z
-    .string()
-    .describe('The `label` of the option the user selected.'),
+  selectedOptions: z.array(
+    z.object({
+      selectedId: z.string(),
+      selectedLabel: z.string(),
+    })
+  ),
 });
 
 export default createTool({
@@ -68,9 +77,9 @@ export default createTool({
   outputSchema,
   mightRequireApproval: false,
 
-  async handle(input) {
+  async handle({ options, question, selectMultiple }) {
     const ids = new Set<string>();
-    for (const option of input.options) {
+    for (const option of options) {
       if (ids.has(option.id)) {
         throw new Error(
           `Duplicate option id "${option.id}". Each option must have a unique id.`
@@ -81,26 +90,45 @@ export default createTool({
 
     const chosen = await requestUserInput({
       title: 'Your attention is needed',
-      description: input.question,
-      options: input.options,
+      description: question,
+      options,
+      allowMultiple: selectMultiple,
     });
 
-    const match = input.options.find(option => option.id === chosen.id);
-    if (!match) {
+    const matches = options.filter(option =>
+      chosen.filter(choice => option.id === choice.id)
+    );
+
+    if (matches.length > 1 && !selectMultiple) {
       throw new Error(
-        `User selected an unrecognised option id "${chosen.id}". Expected one of:` +
-          ` ${input.options.map(option => option.id).join(', ')}.`
+        'More than one option was selected, without multiple choice being enabled'
       );
     }
 
-    return { selectedId: match.id, selectedLabel: match.label };
+    if (matches.length === 0) {
+      throw new Error(
+        `User selected an unrecognised option(s) id "${chosen.map(({ id }) => id).join(', ')}". Expected one of:` +
+          ` ${options.map(option => option.id).join(', ')}.`
+      );
+    }
+
+    return {
+      selectedOptions: matches.map(match => ({
+        selectedId: match.id,
+        selectedLabel: match.label,
+      })),
+    };
   },
 
-  inputToString(input) {
-    return `Asking user: ${input.question}`;
+  inputToString({ question }) {
+    return `Asking user: ${question}`;
   },
 
-  outputToString(output) {
-    return `User selected: ${output.selectedLabel}`;
+  outputToString({ selectedOptions }) {
+    const selected = selectedOptions
+      .map(opt => `${opt.selectedLabel}`)
+      .join(', ');
+
+    return `User selected: ${selected}`;
   },
 });

@@ -3,17 +3,9 @@ import { createTool } from './common';
 
 const inputSchema = z.object();
 const outputSchema = z.object({
-  formatted: z
-    .string()
-    .describe("The user's current local date and time, human-readable."),
-  timeZone: z
-    .string()
-    .describe(
-      'The resolved IANA time zone identifier (e.g. `Europe/Amsterdam`).'
-    ),
-  iso: z
-    .string()
-    .describe('The current instant as an ISO 8601 timestamp (UTC).'),
+  formatted: z.string(),
+  timeZone: z.string(),
+  iso: z.string(),
 });
 
 export default createTool({
@@ -49,7 +41,7 @@ export default createTool({
     return 'Getting current user time';
   },
 
-  outputToString(output): string {
-    return `Current user time: ${output.formatted}`;
+  outputToString({ formatted }) {
+    return `Current user time: ${formatted}`;
   },
 });

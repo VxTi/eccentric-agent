@@ -1,4 +1,6 @@
 import type * as z from 'zod';
+import { type Message } from '../../lib/messages';
+import { type NotifierChannel } from '../../lib/notifier';
 import {
   type ApprovalOption,
   type MakeOptional,
@@ -35,24 +37,34 @@ export interface IToolBase<
   /**
    * @returns {@link DEFAULT_APPROVAL_OPTIONS} if not provided upon tool creation
    */
-  approvalOptions(input: TIn): MaybePromise<ApprovalOption[]>;
+  approvalOptions(
+    input: TIn,
+    channel: NotifierChannel<[Message]>
+  ): MaybePromise<ApprovalOption[]>;
 
   /**
    * @returns `false` if not provided upon tool creation
    */
-  requiresApproval(input: TIn): MaybePromise<boolean>;
+  requiresApproval(
+    input: TIn,
+    channel: NotifierChannel<[Message]>
+  ): MaybePromise<boolean>;
 
   /**
    * @returns {@link ToolSelectionOption.ALLOW} if no function is provided
    */
   onOptionSelect(
     input: TIn,
-    option: TApprovalOption
+    option: TApprovalOption,
+    channel: NotifierChannel<[Message]>
   ): MaybePromise<ToolSelectionOption>;
 
-  handle(input: NoInfer<TIn>): Promise<NoInfer<TOut>>;
-  inputToString(input: TIn): string;
-  outputToString(output: TOut): string;
+  handle(
+    input: NoInfer<TIn>,
+    channel: NotifierChannel<[Message]>
+  ): Promise<NoInfer<TOut>>;
+  inputToString(input: TIn, channel: NotifierChannel<[Message]>): string;
+  outputToString(output: TOut, channel: NotifierChannel<[Message]>): string;
 }
 
 type ToolProps<

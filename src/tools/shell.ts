@@ -79,8 +79,7 @@ export default createTool({
   outputSchema,
   mightRequireApproval: true,
 
-  async handle(input) {
-    const { command, timeoutMs, cwd } = input;
+  async handle({ command, timeoutMs, cwd }) {
     try {
       const { stdout, stderr } = await execAsync(command, {
         cwd,
@@ -103,30 +102,30 @@ export default createTool({
     }
   },
 
-  requiresApproval(input) {
-    return isAllowed(input.command);
+  requiresApproval({ command }) {
+    return isAllowed(command);
   },
 
-  onOptionSelect(input, option: Option) {
+  onOptionSelect({ command }, option: Option) {
     if (option === Option.DENY) return ToolSelectionOption.DENY;
 
     if (option === Option.TRUST) {
-      ALLOWED_COMMAND_PATTERNS.push(new RegExp(input.command));
+      ALLOWED_COMMAND_PATTERNS.push(new RegExp(command));
     }
 
     return ToolSelectionOption.ALLOW;
   },
 
-  approvalOptions(input) {
+  approvalOptions({ command }) {
     return [
       { option: Option.APPROVE, text: 'Allow' },
       { option: Option.DENY, text: 'Deny' },
-      { option: Option.TRUST, text: `Trust '${input.command}'` },
+      { option: Option.TRUST, text: `Trust '${command}'` },
     ];
   },
 
-  inputToString(input) {
-    return `Executing \`${input.command}\``;
+  inputToString({ command }) {
+    return `Executing \`${command}\``;
   },
 
   outputToString(output) {
