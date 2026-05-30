@@ -31,8 +31,9 @@ const inputSchema = z.object({
     .min(2)
     .max(9)
     .describe(
-      'Between 2 and 6 mutually exclusive options for the user to choose from. Each must have a' +
-        ' unique `id`.'
+      'Between 2 and 9 mutually exclusive options for the user to choose from. Each must have a' +
+        ' unique `id`. Always include a catch-all option (e.g. `other` / `something_else`) so the' +
+        ' user can escape if none of your proposed options fit.'
     ),
 });
 
@@ -47,16 +48,22 @@ export default createTool({
   internalName: 'prompt_user_options',
   name: 'Prompt user options',
   description:
-    'Asks the user to disambiguate by picking one of several proposed options. Use this tool when' +
-    ' you cannot proceed with confidence — the request is ambiguous, you can see multiple equally' +
-    ' reasonable interpretations, or a decision is required that you should not make on the' +
-    " user's behalf. Provide a short, specific `question` and 2–6 mutually exclusive `options`," +
-    ' each with a stable `id` (used by you to read the answer) and a human-readable `label`' +
-    ' (shown to the user). The tool blocks until the user picks one, then returns the chosen' +
-    ' `id` and `label`.\n\n' +
-    'Do NOT use this tool for trivial choices you can resolve from context, for confirmation of' +
-    ' an already-clear plan, or as a substitute for thinking. Prefer making a reasonable choice' +
-    ' and stating your assumption when the question would be pedantic.',
+    'THE ONLY way to ask the user a question. You MUST use this tool ANY time you need input,' +
+    ' clarification, confirmation, or a decision from the user — never ask questions in plain' +
+    ' assistant text. If your next message would contain a question mark directed at the user,' +
+    ' stop and call this tool instead.\n\n' +
+    'This includes: disambiguating an unclear request, choosing between multiple reasonable' +
+    ' interpretations, confirming a destructive or irreversible action, picking a file/path/name,' +
+    ' selecting a library or approach, resolving conflicts, or any other decision that should not' +
+    " be made on the user's behalf.\n\n" +
+    'Provide a short, specific `question` and 2–9 mutually exclusive `options`, each with a' +
+    ' stable `id` (used by you to read the answer) and a human-readable `label` (shown to the' +
+    ' user). Always include a catch-all option (e.g. `other`) so the user is never boxed in. The' +
+    ' tool blocks until the user picks one, then returns the chosen `id` and `label`.\n\n' +
+    'The ONLY exception: do not use this tool for questions you can answer yourself from context,' +
+    ' the codebase, or sensible defaults. Prefer making a reasonable choice and stating your' +
+    ' assumption when the question would be pedantic. But once you have decided a question is' +
+    ' genuinely needed, it MUST go through this tool — no exceptions.',
   inputSchema,
   outputSchema,
   mightRequireApproval: false,

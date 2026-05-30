@@ -43,11 +43,11 @@ async function main(): Promise<void> {
 
   const { waitUntilExit } = render(
     <ApplicationCancellationProvider controller={controller}>
-      <AgentProvider>
-        <UserInputProvider>
+      <UserInputProvider>
+        <AgentProvider>
           <App />
-        </UserInputProvider>
-      </AgentProvider>
+        </AgentProvider>
+      </UserInputProvider>
     </ApplicationCancellationProvider>,
     {
       stdout,

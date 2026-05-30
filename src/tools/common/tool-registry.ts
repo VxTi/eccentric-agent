@@ -28,11 +28,11 @@ export const agentTools = [
 ] satisfies IToolBase[];
 
 export const toolRegistry = [
-  ...agentTools,
+  PromptUserOptions,
   Shell,
   InsertInFile,
   ReplaceInFile,
   CreateFile,
-  PromptUserOptions,
   SpawnAgents,
+  ...agentTools,
 ] satisfies IToolBase[];

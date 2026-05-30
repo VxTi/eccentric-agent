@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { Box, measureElement, useInput, type DOMElement } from 'ink';
 import { useAgent } from '../context';
+import { useUserInputField } from '../context/user-input';
 import { ModelMessageFragment } from './model-message-fragment';
 
 const SCROLL_STEP = 1;
@@ -13,6 +14,7 @@ const WHEEL_DOWN_ANSI_CODE = 65;
 
 export function MessageList(): JSX.Element {
   const { messages } = useAgent();
+  const { inputRequest } = useUserInputField();
 
   const viewportRef = useRef<DOMElement | null>(null);
   const contentRef = useRef<DOMElement | null>(null);
@@ -29,7 +31,7 @@ export function MessageList(): JSX.Element {
       const { height } = measureElement(contentRef.current);
       if (height !== contentHeight) setContentHeight(height);
     }
-  }, [messages, viewportHeight, contentHeight]);
+  }, [messages, viewportHeight, contentHeight, inputRequest]);
 
   const overflow = Math.max(0, contentHeight - viewportHeight);
   const clampedOffset = Math.min(Math.max(0, scrollOffset), overflow);
