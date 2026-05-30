@@ -8,7 +8,7 @@ import {
   type UserInputRequestEvent,
 } from '../../../lib/events';
 import { useAbort, useAgent } from '../../context';
-import { useUserInputField } from '../../context/user-input';
+import { useUserInputField } from '../../context/user-input-field';
 import { useTerminalSize } from '../../hooks';
 import { Suggestions } from './input-suggestions';
 import { InputRequest } from './option-request';

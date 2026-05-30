@@ -1,7 +1,7 @@
 import { Box, Text, useInput } from 'ink';
 import { type ReactNode, useState } from 'react';
 import { emitEvent, UserInputResponseEvent } from '../../../lib/events';
-import { useUserInputField } from '../../context/user-input';
+import { useUserInputField } from '../../context/user-input-field';
 
 export function InputRequest(): ReactNode {
   const { inputRequest, setInputRequest } = useUserInputField();

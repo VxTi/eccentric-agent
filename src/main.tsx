@@ -10,7 +10,7 @@ import {
   ApplicationCancellationProvider,
 } from './rendering/context';
 import { App } from './rendering/components/App';
-import { UserInputProvider } from './rendering/context/user-input';
+import { UserInputProvider } from './rendering/context/user-input-field';
 
 const ANSI_ALT_SCREEN_ENTER = '\x1b[?1049h\x1b[H\x1b[2J';
 const ANSI_ALT_SCREEN_EXIT = '\x1b[3J\x1b[?1049l';

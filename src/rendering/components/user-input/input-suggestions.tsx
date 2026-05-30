@@ -1,6 +1,6 @@
 import { type ReactNode, useMemo } from 'react';
 import { Box, Text } from 'ink';
-import { useUserInputField } from '../../context/user-input';
+import { useUserInputField } from '../../context/user-input-field';
 
 interface SuggestionTextProps {
   children: string;
