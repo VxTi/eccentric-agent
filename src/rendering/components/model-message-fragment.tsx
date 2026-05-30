@@ -41,13 +41,7 @@ function ModelMessageText({ message }: { message: ModelMessage }) {
       );
     case 'tool':
       return (
-        <Box
-          borderColor="gray"
-          borderStyle="round"
-          paddingY={1}
-          paddingX={2}
-          maxWidth="80%"
-        >
+        <Box maxWidth="80%">
           <Text>{message.content}</Text>
         </Box>
       );

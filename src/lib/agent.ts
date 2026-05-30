@@ -1,4 +1,3 @@
-import { vertex } from '@ai-sdk/google-vertex';
 import {
   generateText,
   type LanguageModel,
@@ -10,6 +9,7 @@ import {
 } from 'ai';
 import * as z from 'zod';
 import { agentTools, type IToolBase } from '../tools';
+import { geminiProvider } from './provider';
 import { Result } from './result';
 import { emitAgentMessage } from './user-input';
 
@@ -31,7 +31,7 @@ export class Agent<T = string> {
     private readonly signal: AbortSignal
   ) {
     this.toolset = this.constructToolset();
-    this.model = vertex('gemini-2.5-flash');
+    this.model = geminiProvider('gemini-2.5-flash');
     this.messages = [
       { role: 'system', content: this.constructSystemPrompt() },
       { role: 'user', content: this.goal },

@@ -2,7 +2,7 @@ import * as https from 'node:https';
 import * as z from 'zod';
 import { createTool } from './common';
 
-const inputSchema = z.any();
+const inputSchema = z.object();
 const outputSchema = z.object({
   city: z
     .string()

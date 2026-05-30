@@ -1,4 +1,3 @@
-import { vertex } from '@ai-sdk/google-vertex';
 import {
   type LanguageModel,
   type ModelMessage,
@@ -36,6 +35,7 @@ import {
   unsubscribeEvent,
 } from '../../lib/events';
 import { FileCache } from '../../lib/file-cache';
+import { geminiProvider } from '../../lib/provider';
 import { Result } from '../../lib/result';
 import { TaskList, TaskStatus } from '../../lib/tasks';
 import { emitAgentMessage, requestUserInput } from '../../lib/user-input';
@@ -82,7 +82,10 @@ export function AgentProvider({
   const taskList = useMemo(() => new TaskList(), []);
 
   const tools = useMemo<ToolSet>(() => constructToolset(toolRegistry), []);
-  const model = useMemo<LanguageModel>(() => vertex('gemini-2.5-flash'), []);
+  const model = useMemo<LanguageModel>(
+    () => geminiProvider('gemini-2.5-flash'),
+    []
+  );
   const [systemPrompt, setSystemPrompt] = useState<string>(
     DEFAULT_SYSTEM_PROMPT
   );
@@ -141,8 +144,15 @@ export function AgentProvider({
       try {
         for await (const chunk of result.textStream) {
           buffer += chunk;
-          // setMessages([...updatedMessages, { role: 'assistant', content: buffer }]);
         }
+        const response = await result.response;
+
+        setStatus({ text: '', loading: false });
+        setMessages(prev => [
+          ...prev,
+          ...response.messages,
+          { role: 'assistant', content: buffer },
+        ]);
       } catch (err) {
         setMessages([
           ...updatedMessages,
@@ -151,17 +161,9 @@ export function AgentProvider({
             content: `Something went wrong whilst responding: ${String(err)}`,
           },
         ]);
+        setStatus({ text: chalk.red('Fatal error'), loading: false });
         return;
       }
-
-      const response = await result.response;
-
-      setStatus({ text: '', loading: false });
-      setMessages(prev => [
-        ...prev,
-        ...response.messages,
-        { role: 'assistant', content: buffer },
-      ]);
 
       let taskIterations = 0;
       while (

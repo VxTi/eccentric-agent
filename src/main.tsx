@@ -1,15 +1,15 @@
+import { config } from 'dotenv';
+config({ quiet: true });
+
 import chalk from 'chalk';
 import isNumber from 'lodash/isNumber';
 import { stdin, stdout } from 'node:process';
-import { config } from 'dotenv';
 import { render } from 'ink';
 import {
   AgentProvider,
   ApplicationCancellationProvider,
 } from './rendering/context';
 import { App } from './rendering/components/App';
-
-config({ quiet: true });
 
 const ANSI_ALT_SCREEN_ENTER = '\x1b[?1049h\x1b[H\x1b[2J';
 const ANSI_ALT_SCREEN_EXIT = '\x1b[3J\x1b[?1049l';
