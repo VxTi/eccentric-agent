@@ -3,13 +3,22 @@ type NotifierFn<T extends any[]> = (...parameters: T) => any;
 export class NotifierChannel<T extends any[]> {
   constructor(
     public readonly channelId: string,
-    private readonly notifier: NotifierFn<T>
+    private readonly notifier: NotifierFn<T>,
+    private readonly interceptors: ((...args: T) => T)[] = []
   ) {
     notifier.bind(this);
   }
 
+  public addInterceptor(interceptor: (...args: T) => T) {
+    this.interceptors.push(interceptor);
+  }
+
   public notify(...parameters: T): void {
-    this.notifier(...parameters);
+    const args: T = this.interceptors.reduce<T>(
+      (preInterceptedArgs, interceptor) => interceptor(...preInterceptedArgs),
+      parameters
+    );
+    this.notifier(...args);
   }
 }
 

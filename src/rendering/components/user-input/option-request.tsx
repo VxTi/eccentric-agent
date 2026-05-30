@@ -50,10 +50,9 @@ export function InputRequest(): ReactNode {
       setUserSelectedInputIndex(-1);
     }
   });
-  if (!inputRequest) return; // Shouldn't happen
 
   return (
-    <Box width="80%" alignSelf="center" flexDirection="column">
+    <Box width="80%" alignSelf="center" flexDirection="column" flexShrink={0}>
       <Box flexDirection="column" alignItems="center">
         {title?.length && (
           <Text bold color="white">

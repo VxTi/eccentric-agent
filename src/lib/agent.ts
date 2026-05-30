@@ -41,6 +41,15 @@ export class Agent<T = string> {
       { role: 'system', content: this.constructSystemPrompt() },
       { role: 'user', content: this.goal },
     ];
+
+    this.channel.addInterceptor((...[message]) => [
+      {
+        content: `Agent - \`${goal}\`
+
+${message.content}`,
+      },
+    ]);
+
     this.process()
       .then((result: T) => this.callback(Result.Ok(result)))
       .catch((error: Error) => this.callback(Result.Error(error)));

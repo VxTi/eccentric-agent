@@ -95,17 +95,7 @@ export default createTool({
       allowMultiple: selectMultiple,
     });
 
-    const matches = options.filter(option =>
-      chosen.filter(choice => option.id === choice.id)
-    );
-
-    if (matches.length > 1 && !selectMultiple) {
-      throw new Error(
-        'More than one option was selected, without multiple choice being enabled'
-      );
-    }
-
-    if (matches.length === 0) {
+    if (chosen.length === 0) {
       throw new Error(
         `User selected an unrecognised option(s) id "${chosen.map(({ id }) => id).join(', ')}". Expected one of:` +
           ` ${options.map(option => option.id).join(', ')}.`
@@ -113,7 +103,7 @@ export default createTool({
     }
 
     return {
-      selectedOptions: matches.map(match => ({
+      selectedOptions: chosen.map(match => ({
         selectedId: match.id,
         selectedLabel: match.label,
       })),

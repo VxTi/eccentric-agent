@@ -72,7 +72,7 @@ export default function InputField(): JSX.Element {
     }
 
     // Handled in another component
-    if (inputRequest) return;
+    if (inputRequest.options.length > 0) return;
 
     // Suggestion handling
     if (suggestions.length > 0) {
