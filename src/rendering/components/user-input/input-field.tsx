@@ -31,17 +31,17 @@ export default function InputField(): JSX.Element {
 
   const [cursorOffset, setCursorOffset] = useState<number>(0);
   const [input, setInput] = useState<string>('');
-  const {
-    suggestions,
-    suggestionCursorIndex,
-    setSuggestions,
-    computeSuggestions,
-  } = useInputSuggestionProvider(input, cursorOffset);
+  const { suggestions, suggestionCursorIndex, setSuggestions } =
+    useInputSuggestionProvider(input, cursorOffset);
 
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] =
     useState<number>(0);
   const controller = useAbort();
   const agent = useAgent();
+
+  useEffect(() => {
+    setSelectedSuggestionIndex(0);
+  }, [suggestions]);
 
   // Handling of user input requests
   const [inputRequest, setInputRequest] = useState<
@@ -127,7 +127,6 @@ export default function InputField(): JSX.Element {
         prev => prev.slice(0, cursorOffset - 1) + prev.slice(cursorOffset)
       );
       setCursorOffset(prev => prev - 1);
-      computeSuggestions();
       return;
     }
 

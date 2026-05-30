@@ -62,7 +62,7 @@ export function Suggestions({
 
   return (
     <Box flexDirection="column">
-      {itemsAfter === 0 && suggestions.length > maxSuggestions && (
+      {suggestions.length > maxSuggestions && (
         <Text color="gray">{'  ...'}</Text>
       )}
       {shown.map((suggestion, i) => (
@@ -70,7 +70,9 @@ export function Suggestions({
           {suggestion}
         </SuggestionText>
       ))}
-      <Text color="gray">{itemsAfter > 0 ? `+${itemsAfter} more` : ' '}</Text>
+      <Text color="gray">
+        {itemsAfter > 0 ? `+${itemsAfter} more` : '  ...'}
+      </Text>
     </Box>
   );
 }

@@ -1,7 +1,7 @@
 import { glob } from 'glob';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
-const FILE_SUGGESTION_PATTERN = /@(\w+)$/;
+const FILE_SUGGESTION_PATTERN = /(?:\s|^)@(\w+)$/;
 
 export function useInputSuggestionProvider(
   input: string,
@@ -10,7 +10,7 @@ export function useInputSuggestionProvider(
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [suggestionCursorIndex, setSuggestionCursorIndex] = useState(0);
 
-  const computeSuggestions = useCallback(() => {
+  useEffect(() => {
     if (cursorOffset === 0) return;
 
     const preCursorInput = input.slice(0, cursorOffset);
@@ -34,15 +34,10 @@ export function useInputSuggestionProvider(
     }
   }, [cursorOffset, input]);
 
-  useEffect(() => {
-    computeSuggestions();
-  }, [computeSuggestions]);
-
   return {
     suggestions,
     suggestionCursorIndex,
     setSuggestions,
-    computeSuggestions,
   };
 }
 
