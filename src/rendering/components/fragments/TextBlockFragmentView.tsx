@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
-import { Box, Text } from 'ink';
-import { formatMarkdown } from '../../formatting';
+import { Box } from 'ink';
+import { MarkdownView } from '../MarkdownView';
 import type { TextBlockFragment } from '../../fragments';
 
 interface TextBlockFragmentViewProps {
@@ -19,7 +19,7 @@ export function TextBlockFragmentView({
 
   return (
     <Box width="80%" alignSelf="center" justifyContent={justify} flexShrink={0}>
-      <Text>{formatMarkdown(fragment.content)}</Text>
+      <MarkdownView content={fragment.content} />
     </Box>
   );
 }

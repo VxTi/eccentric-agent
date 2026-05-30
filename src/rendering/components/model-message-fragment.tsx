@@ -6,7 +6,7 @@ import {
   type Message,
   type UserMessage,
 } from '../../lib/messages';
-import { formatMarkdown } from '../formatting';
+import { MarkdownLines, MarkdownView } from './MarkdownView';
 
 export function ModelMessageFragment({ message }: { message: Message }) {
   return (
@@ -35,36 +35,34 @@ function ModelMessageText({ message }: { message: Message }) {
 
 function User({ message }: { message: UserMessage }) {
   return (
-    <Box flexDirection="column">
-      <Box flexShrink={0}>
-        <Text>Me</Text>
-        <Text color="gray"> ▶ </Text>
-        <Text>{formatMarkdown(message.content)}</Text>
-      </Box>
+    <Box flexDirection="row" flexShrink={0} flexWrap="wrap">
+      <Text>Me</Text>
+      <Text color="gray"> ▶ </Text>
+      <MarkdownView content={message.content} />
     </Box>
   );
 }
 
 function Assistant({ message }: { message: AssistantMessage }) {
   return (
-    <Box flexDirection="row" flexShrink={0}>
-      <Text color="blue">◆</Text>
-      <Text> {formatMarkdown(message.content)}</Text>
+    <Box flexDirection="row" flexShrink={0} flexWrap="wrap">
+      <Text color="blue">◆ </Text>
+      <MarkdownView content={message.content} />
     </Box>
   );
 }
 
 function Generic({ message }: { message: GenericMessage }) {
   return (
-    <Box maxWidth="80%" flexShrink={0}>
+    <Box maxWidth="80%" flexShrink={0} flexDirection="row" flexWrap="wrap">
       {message.failure ? (
         <Text color="red" bold>
-          ✖
+          ✖{' '}
         </Text>
       ) : (
         <LoadingSpinner loading={message.loading} />
       )}
-      <Text> {message.content}</Text>
+      <MarkdownLines text={message.content} />
     </Box>
   );
 }
@@ -84,5 +82,5 @@ function LoadingSpinner({ loading }: { loading?: boolean | undefined }) {
 
   if (!loading) return;
 
-  return <Text>{content}</Text>;
+  return <Text>{content} </Text>;
 }

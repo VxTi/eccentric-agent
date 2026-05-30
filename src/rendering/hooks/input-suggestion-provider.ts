@@ -31,6 +31,9 @@ export function useInputSuggestionProvider(
       })
         .then(files => filterFiles(files, filePath))
         .then(files => setSuggestions(files));
+    } else {
+      setSuggestions([]);
+      setSuggestionCursorIndex(0);
     }
   }, [cursorOffset, input]);
 
