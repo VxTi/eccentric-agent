@@ -6,7 +6,7 @@ config({ quiet: true });
 
 export const geminiProvider = createVertex();
 
-type InferModelName<T> = T extends Record<any, any> ? never : T;
+type InferModelName<T> = T extends `${string}/${infer F}` ? F : never;
 export type ModelName = InferModelName<LanguageModel>;
 
 export interface LanguageModelMetadata {
@@ -16,12 +16,12 @@ export interface LanguageModelMetadata {
 }
 
 export const MODEL_METADATA = {
-  'google/gemini-2.5-flash': {
+  'gemini-2.5-flash': {
     inputTokenPricing: 0.3,
     outputTokenPricing: 2.5,
     contextWindow: 1_048_576,
   },
-  'google/gemini-2.5-flash-lite': {
+  'gemini-2.5-flash-lite': {
     inputTokenPricing: 0.1,
     outputTokenPricing: 0.4,
     contextWindow: 1_048_576,

@@ -1,5 +1,5 @@
-import { Box, Text } from 'ink';
-import { type ReactNode, useEffect, useState } from 'react';
+import { Box, Spacer, Text } from 'ink';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import {
   getModelMetadata,
   type LanguageModelMetadata,
@@ -10,7 +10,10 @@ import {
   subscribeEvent,
   unsubscribeEvent,
 } from '../../lib/events/events';
-import { formatTokenCount } from '../../lib/text-formatting';
+import {
+  formatPercentageSymbol,
+  formatTokenCount,
+} from '../../lib/text-formatting';
 import { useAgent } from '../context';
 
 export function TokenUsageCounter(): ReactNode {
@@ -32,7 +35,10 @@ export function TokenUsageCounter(): ReactNode {
     };
   }, []);
 
-  const metadata: LanguageModelMetadata = getModelMetadata(model);
+  const metadata: LanguageModelMetadata = useMemo(
+    () => getModelMetadata(model),
+    [model]
+  );
   const contextWindowUsedPercentage =
     100 * ((input + output) / metadata.contextWindow);
   const cost =
@@ -40,12 +46,21 @@ export function TokenUsageCounter(): ReactNode {
     (output / 1_000_000) * metadata.outputTokenPricing;
 
   return (
-    <Box flexDirection="row" flexShrink={0} gap={1}>
+    <Box flexDirection="row" flexShrink={0} gap={1} width="100%">
       <Text color="gray">
         ↑ {formatTokenCount(input)} - ↓ {formatTokenCount(output)}
       </Text>
-      <Text>{contextWindowUsedPercentage.toFixed(1)}%</Text>
-      <Text>${cost.toFixed(1)}</Text>
+      <Spacer />
+      <Box gap={1}>
+        <Box paddingRight={1} gap={2}>
+          <Text underline>{model}</Text>
+          <Text>${cost.toFixed(1)}</Text>
+        </Box>
+        <Box width={8}>
+          <Text>{formatPercentageSymbol(contextWindowUsedPercentage)} </Text>
+          <Text>{contextWindowUsedPercentage.toFixed(1)}% </Text>
+        </Box>
+      </Box>
     </Box>
   );
 }

@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { formatBytes } from './text-formatting';
+import {
+  formatBytes,
+  formatPercentageSymbol,
+  formatTokenCount,
+} from './text-formatting';
 
 describe('formatBytes', () => {
   it.each`
@@ -16,6 +20,49 @@ describe('formatBytes', () => {
     'should format $bytes into $formatted',
     ({ bytes, formatted }: { bytes: number; formatted: string }) => {
       expect(formatBytes(bytes)).toEqual(formatted);
+    }
+  );
+});
+
+describe('formatTokenCount', () => {
+  it.each`
+    count    | formatted
+    ${10}    | ${'10'}
+    ${1000}  | ${'1K'}
+    ${1100}  | ${'1.1K'}
+    ${5600}  | ${'5.6K'}
+    ${12400} | ${'12K'}
+  `(
+    'should format token counts correctly',
+    ({ count, formatted }: { count: number; formatted: string }) => {
+      expect(formatTokenCount(count)).toEqual(formatted);
+    },
+  );
+});
+
+describe('formatPercentageSymbol', () => {
+  it.each`
+    percentage | symbol
+    ${10}      | ${'○'}
+    ${20}      | ${'○'}
+    ${24}      | ${'○'}
+    ${25}      | ${'◔'}
+    ${30}      | ${'◔'}
+    ${40}      | ${'◔'}
+    ${45}      | ${'◔'}
+    ${50}      | ${'◑'}
+    ${60}      | ${'◑'}
+    ${70}      | ${'◑'}
+    ${74}      | ${'◑'}
+    ${75}      | ${'◕'}
+    ${80}      | ${'◕'}
+    ${90}      | ${'◕'}
+    ${99}      | ${'●'}
+    ${100}     | ${'●'}
+  `(
+    'should produce symbol $symbol from $percentage%',
+    ({ symbol, percentage }: { symbol: string; percentage: number }) => {
+      expect(formatPercentageSymbol(percentage)).toEqual(symbol);
     }
   );
 });

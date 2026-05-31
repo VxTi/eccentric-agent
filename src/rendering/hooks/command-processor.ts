@@ -1,13 +1,6 @@
 import { useCallback } from 'react';
-import { type Suggestion } from './input-suggestion-provider';
+import { isCommand } from '../../lib/commands';
 import { useAbort, useAgent } from '../context';
-
-export const SUPPORTED_COMMANDS = [
-  { value: 'clear', description: 'Clears the context window' },
-  { value: 'exit' },
-  { value: 'quit' },
-] as const satisfies Suggestion[];
-type Command = (typeof SUPPORTED_COMMANDS)[number]['value'];
 
 export function useCommandProcessor() {
   const { setMessages, setModelMessages } = useAgent();
@@ -15,7 +8,9 @@ export function useCommandProcessor() {
 
   const processCommand = useCallback(
     (command: string) => {
-      switch (command as Command) {
+      if (!isCommand(command)) return;
+
+      switch (command) {
         case 'clear': {
           setModelMessages([]);
           setMessages([]);
@@ -24,6 +19,7 @@ export function useCommandProcessor() {
         case 'exit':
         case 'quit': {
           controller.abort(0);
+          break;
         }
       }
     },

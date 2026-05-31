@@ -1,6 +1,6 @@
 import { glob } from 'glob';
 import { useEffect, useState } from 'react';
-import { SUPPORTED_COMMANDS } from './command-processor';
+import { SUPPORTED_COMMANDS } from '../../lib/commands';
 
 const FILE_SUGGESTION_PATTERN = /(?:\s|^)@([\w_.-]+)$/;
 const COMMAND_PATTERN = /^\/(\w*)$/;
