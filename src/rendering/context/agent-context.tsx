@@ -367,11 +367,6 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
       const requiresApproval = await tool.requiresApproval(input, channel);
       if (requiresApproval) {
         const options = await tool.approvalOptions(input, channel);
-        emitAgentMessage({
-          type: 'generic',
-          id: uuid(),
-          content: 'Tool requires input',
-        });
 
         const [chosen] = await requestUserInput({
           title: 'Approval required',
@@ -379,6 +374,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
           options: options.map(opt => ({ label: opt.text, id: opt.option })),
           allowMultiple: false,
         });
+        console.log(chosen);
         const selectionOption = await tool.onOptionSelect(
           input,
           chosen.id,

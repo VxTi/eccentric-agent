@@ -193,6 +193,7 @@ export default function InputField(): JSX.Element {
       flexDirection="column"
       flexShrink={0}
       paddingTop={1}
+      overflow="hidden"
     >
       <Suggestions maxSuggestions={maxSuggestions} />
       <Box
@@ -227,9 +228,9 @@ function InputText(): ReactNode {
 
   if (input.length === 0) {
     return (
-      <Box>
+      <Box flexDirection="row">
         <Text inverse={blinkState}>{cursorChar}</Text>
-        <Text color="gray" italic>
+        <Text color="gray" italic wrap="wrap">
           {' '}
           {INPUT_PLACEHOLDER}
         </Text>
@@ -238,10 +239,10 @@ function InputText(): ReactNode {
   }
 
   return (
-    <Box flexWrap="wrap">
-      <Text>{before}</Text>
+    <Box flexDirection="row" flexWrap="nowrap">
+      <Text wrap="hard">{before}</Text>
       <Text inverse={blinkState}>{cursorChar}</Text>
-      <Text>{after}</Text>
+      <Text wrap="hard">{after}</Text>
     </Box>
   );
 }

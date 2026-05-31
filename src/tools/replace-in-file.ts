@@ -1,3 +1,4 @@
+import chalk from 'chalk';
 import { readFile, writeFile } from 'fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
@@ -87,6 +88,11 @@ export default createTool({
     if (!success) return `Unable to replace in file`;
 
     const fileName = path.basename(filePath);
-    return `Replaced \`${find}\` with \`${replace}\` in \`${fileName}\``;
+
+    if (replace.length === 0) {
+      return `Removed from \`${fileName}\`\n--${chalk.bgRed.whiteBright(find)}`;
+    }
+
+    return `Replaced in \`${fileName}\`\n-- ${chalk.bgRed.whiteBright(find)}\n++ ${chalk.bgGreen.blackBright(replace)}`;
   },
 });

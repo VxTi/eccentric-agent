@@ -65,10 +65,12 @@ export interface IToolBase<
     input: NoInfer<TIn>,
     channel: NotifierChannel<ToolChannelParams>
   ): Promise<NoInfer<TOut>>;
+
   inputToString(
     input: TIn,
     channel: NotifierChannel<ToolChannelParams>
   ): string;
+
   outputToString(
     output: TOut,
     channel: NotifierChannel<ToolChannelParams>

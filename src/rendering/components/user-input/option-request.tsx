@@ -40,9 +40,12 @@ export function InputRequest(): ReactNode {
         prev => (prev + options.length + 1) % options.length
       );
     } else if (key.return || key.tab) {
+      const indices =
+        activeIndices.length === 0 ? [userSelectedInputIndex] : activeIndices;
+
       emitEvent(
         new UserInputResponseEvent(
-          inputRequest.options.filter((_, idx) => activeIndices.includes(idx))
+          indices.map(idx => inputRequest.options[idx])
         )
       );
 
@@ -63,7 +66,7 @@ export function InputRequest(): ReactNode {
       </Box>
       <Box marginTop={1} marginLeft={2} flexDirection="column">
         <Text italic color="gray">
-          Press space to select one{}
+          Press space to select one
         </Text>
         {options.map((option, i) => (
           <InputOption

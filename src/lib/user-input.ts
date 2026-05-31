@@ -20,8 +20,8 @@ export function requestUserInput(
       resolve(event.detail);
     };
 
-    emitEvent(new UserInputRequestEvent(props));
     subscribeEvent(EventName.USER_INPUT_RESPONSE, handler);
+    emitEvent(new UserInputRequestEvent(props));
   });
 }
 

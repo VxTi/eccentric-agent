@@ -25,7 +25,8 @@
     "prettier": "^3.3.1",
     "tsx": "^4.21.0",
     "typescript": "^5.2.2",
-    "typescript-eslint": "^8.47.0"
+    "typescript-eslint": "^8.47.0",
+    "vitest": "^4.1.7"
   },
   "dependencies": {
     "@ai-sdk/google-vertex": "^4.0.137",
