@@ -1,2 +1,2 @@
 export * from './tool-base';
-export * from './tool-registry';
+export * from './registry';

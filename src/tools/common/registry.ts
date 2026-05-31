@@ -27,7 +27,7 @@ export const agentTools = [
   UpdateTaskList,
 ] satisfies IToolBase[];
 
-export const toolRegistry = [
+export const registry = [
   SpawnAgents,
   PromptUserOptions,
   Shell,

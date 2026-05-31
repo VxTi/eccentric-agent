@@ -45,7 +45,7 @@ import {
 import {
   type IToolBase,
   type ToolChannelParams,
-  toolRegistry,
+  registry,
   ToolSelectionOption,
 } from '../../tools';
 import { formatMarkdown, previewArgs } from '../formatting';
@@ -94,7 +94,7 @@ export function AgentProvider({
 
   const notifier = useMemo(() => new Notifier(), []);
   const tools = useMemo<ToolSet>(
-    () => constructToolset(toolRegistry, notifier),
+    () => constructToolset(registry, notifier),
     [notifier]
   );
   const model = useMemo<LanguageModel>(
