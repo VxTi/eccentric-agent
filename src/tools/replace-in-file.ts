@@ -127,9 +127,6 @@ export default createTool({
     if (!success) return `Unable to replace in file`;
 
     const fileName = path.basename(filePath);
-    const additions = linesRemoved === 0 ? '' : chalk.redBright(linesRemoved);
-    const deletions =
-      linesInserted === 0 ? '' : chalk.greenBright(linesInserted);
-    return `Replaced in \`${fileName}\` ${additions} ${deletions}`;
+    return `Replaced in \`${fileName}\` ${chalk.redBright(`-${linesRemoved}`)} +${chalk.greenBright(`+${linesInserted}`)}`;
   },
 });

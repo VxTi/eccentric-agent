@@ -6,3 +6,11 @@ export function formatBytes(bytes: number): string {
 
   return `${bytes} bytes`;
 }
+
+export function formatTokenCount(amount: number): string {
+  if (amount < 1000) {
+    return `${amount}`;
+  }
+
+  return `${(amount / 1000).toFixed(amount < 10_000 ? 1 : 0)}K`;
+}

@@ -36,7 +36,7 @@ import {
 import { FileCache } from '../../lib/file-cache';
 import type { Message, UserMessage } from '../../lib/types/messages';
 import { Notifier } from '../../lib/events/notifier';
-import { geminiProvider } from '../../lib/agent/provider';
+import { geminiProvider, type ModelName } from '../../lib/agent/provider';
 import { Result } from '../../lib/result';
 import { TaskList, TaskStatus } from '../../lib/tasks';
 import {
@@ -68,6 +68,7 @@ export interface AgentContext {
   setModelMessages: Dispatch<SetStateAction<ModelMessage[]>>;
   status: AgentStatus;
   setStatus: Dispatch<SetStateAction<AgentStatus>>;
+  model: ModelName;
 }
 
 const PrimaryAgentContext = createContext<AgentContext | null>(null);
@@ -259,6 +260,7 @@ export function AgentProvider({
   return (
     <PrimaryAgentContext.Provider
       value={{
+        model: (typeof model === 'string' ? model : model.modelId) as ModelName,
         messages,
         setMessages,
         cwd,

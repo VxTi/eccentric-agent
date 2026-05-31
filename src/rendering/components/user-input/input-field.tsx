@@ -241,7 +241,7 @@ function InputText(): ReactNode {
   }
 
   return (
-    <Box flexDirection="row" flexWrap="nowrap">
+    <Box flexDirection="row" flexWrap="nowrap" maxWidth="80%">
       <Text wrap="hard">{before}</Text>
       <Text inverse={blinkState}>{cursorChar}</Text>
       <Text wrap="hard">{after}</Text>
