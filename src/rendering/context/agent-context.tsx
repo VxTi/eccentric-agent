@@ -36,7 +36,7 @@ import {
 import { FileCache } from '../../lib/file-cache';
 import type { Message, UserMessage } from '../../lib/messages';
 import { Notifier } from '../../lib/notifier';
-import { geminiProvider } from '../../lib/provider';
+import { geminiProvider } from '../../lib/agent/provider';
 import { Result } from '../../lib/result';
 import { TaskList, TaskStatus } from '../../lib/tasks';
 import { emitAgentMessage, requestUserInput } from '../../lib/user-input';
@@ -62,7 +62,7 @@ export interface AgentContext {
   fileCache: FileCache;
   messages: Message[];
   setMessages: Dispatch<SetStateAction<Message[]>>;
-
+  setModelMessages: Dispatch<SetStateAction<ModelMessage[]>>;
   status: AgentStatus;
   setStatus: Dispatch<SetStateAction<AgentStatus>>;
 }
@@ -275,6 +275,7 @@ export function AgentProvider({
         fileCache,
         status,
         setStatus,
+        setModelMessages,
       }}
     >
       {children}

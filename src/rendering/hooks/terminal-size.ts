@@ -9,15 +9,15 @@ export interface TerminalDimensions {
 export function useTerminalSize(): TerminalDimensions {
   const { stdout } = useStdout();
   const [size, setSize] = useState(() => ({
-    width: stdout.columns ?? 80,
-    height: stdout.rows ?? 24,
+    width: stdout.columns,
+    height: stdout.rows,
   }));
 
   useEffect(() => {
     const handler = (): void => {
       setSize({
-        width: stdout.columns ?? 80,
-        height: stdout.rows ?? 24,
+        width: stdout.columns,
+        height: stdout.rows,
       });
     };
     stdout.on('resize', handler);

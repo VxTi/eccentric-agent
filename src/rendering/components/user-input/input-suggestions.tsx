@@ -1,23 +1,7 @@
 import { type ReactNode, useMemo } from 'react';
 import { Box, Text } from 'ink';
-import { useUserInputField } from '../../context/user-input-field';
-
-interface SuggestionTextProps {
-  children: string;
-  selected: boolean;
-}
-
-function SuggestionText({
-  children,
-  selected,
-}: SuggestionTextProps): ReactNode {
-  return (
-    <Text color={selected ? 'redBright' : 'white'}>
-      {selected ? '▶ ' : '  '}
-      {children}
-    </Text>
-  );
-}
+import { useUserInputField } from '../../context/user-input-context';
+import { type Suggestion } from '../../hooks';
 
 interface SuggestionsProps {
   maxSuggestions: number;
@@ -26,11 +10,13 @@ interface SuggestionsProps {
 export function Suggestions({ maxSuggestions }: SuggestionsProps): ReactNode {
   const { suggestions, suggestionIndex } = useUserInputField();
   const state = useMemo(() => {
-    if (suggestions.length === 0) return undefined;
+    if (!suggestions || suggestions.values.length === 0) return undefined;
 
-    if (suggestions.length <= maxSuggestions) {
+    const { values } = suggestions;
+
+    if (values.length <= maxSuggestions) {
       return {
-        shown: suggestions,
+        shown: values,
         itemsAfter: 0,
         itemsBefore: 0,
         offsetIndex: 0,
@@ -38,7 +24,7 @@ export function Suggestions({ maxSuggestions }: SuggestionsProps): ReactNode {
     }
 
     const halfWindow = Math.floor(maxSuggestions / 2);
-    const maxOffset = suggestions.length - maxSuggestions;
+    const maxOffset = values.length - maxSuggestions;
 
     const targetOffset = suggestionIndex - halfWindow;
 
@@ -47,8 +33,8 @@ export function Suggestions({ maxSuggestions }: SuggestionsProps): ReactNode {
 
     return {
       offsetIndex,
-      shown: suggestions.slice(offsetIndex, offsetUpperBound),
-      itemsAfter: suggestions.length - offsetUpperBound,
+      shown: values.slice(offsetIndex, offsetUpperBound),
+      itemsAfter: values.length - offsetUpperBound,
     };
   }, [suggestions, maxSuggestions, suggestionIndex]);
 
@@ -58,7 +44,7 @@ export function Suggestions({ maxSuggestions }: SuggestionsProps): ReactNode {
 
   return (
     <Box flexDirection="column" paddingTop={1}>
-      {suggestions.length > maxSuggestions && (
+      {suggestions && suggestions.values.length > maxSuggestions && (
         <Text color="gray">{'  ...'}</Text>
       )}
       {shown.map((suggestion, i) => (
@@ -69,6 +55,30 @@ export function Suggestions({ maxSuggestions }: SuggestionsProps): ReactNode {
       <Text color="gray">
         {itemsAfter > 0 ? `+${itemsAfter} more` : '  ...'}
       </Text>
+    </Box>
+  );
+}
+
+interface SuggestionTextProps {
+  children: Suggestion;
+  selected: boolean;
+}
+
+function SuggestionText({
+  children,
+  selected,
+}: SuggestionTextProps): ReactNode {
+  return (
+    <Box flexShrink={0} gap={2}>
+      <Text color={selected ? 'redBright' : 'white'}>
+        {selected ? '▶ ' : '  '}
+        {children.value}
+      </Text>
+      {children.description !== undefined && (
+        <Text color="gray" italic>
+          {children.description}
+        </Text>
+      )}
     </Box>
   );
 }

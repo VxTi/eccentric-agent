@@ -53,6 +53,8 @@ export default defineConfig([
       '@typescript-eslint/no-explicit-any': 0,
       '@typescript-eslint/no-empty-object-type': 0,
       '@typescript-eslint/no-misused-promises': 0,
+      "@typescript-eslint/no-unnecessary-condition": 2,
+
       'no-duplicate-imports': 2,
 
       'import/export': 2, // No re-exporting the same name

@@ -43,17 +43,6 @@ const outputSchema = z.object({
   results: z.array(resultSchema),
 });
 
-function resolveDuckDuckGoUrl(href: string): string {
-  try {
-    const url = new URL(href, 'https://duckduckgo.com');
-    const uddg = url.searchParams.get('uddg');
-    if (uddg) return decodeURIComponent(uddg);
-    return url.toString();
-  } catch {
-    return href;
-  }
-}
-
 function getCountryName(locale: string): string | undefined {
   const countryCode = locale.split('-')[1].toUpperCase();
   return new Intl.DisplayNames(['en'], { type: 'region' }).of(countryCode);
@@ -74,7 +63,7 @@ function extractSearchResults(html: string, limit: number): SearchResult[] {
     const snippet = $(article).find('p').first().text().trim();
     results.push({
       title,
-      url: resolveDuckDuckGoUrl(href),
+      url: decodeURIComponent(href),
       snippet,
     });
   });

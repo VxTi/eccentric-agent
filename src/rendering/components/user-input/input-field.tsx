@@ -1,4 +1,10 @@
-import { type JSX, type ReactNode, useEffect, useState } from 'react';
+import {
+  type JSX,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useState,
+} from 'react';
 import { Box, Text, useInput, usePaste } from 'ink';
 import { CURSOR_BLINK_INTERVAL_MS } from '../../../lib/constants';
 import {
@@ -8,8 +14,9 @@ import {
   type UserInputRequestEvent,
 } from '../../../lib/events';
 import { useAbort, useAgent } from '../../context';
-import { useUserInputField } from '../../context/user-input-field';
-import { useTerminalSize } from '../../hooks';
+import { useCommandProcessor } from '../../hooks/command-processor';
+import { useUserInputField } from '../../context/user-input-context';
+import { SuggestionType, useTerminalSize } from '../../hooks';
 import { Suggestions } from './input-suggestions';
 import { InputRequest } from './option-request';
 
@@ -21,6 +28,8 @@ export default function InputField(): JSX.Element {
   const maxSuggestions = Math.ceil(
     Math.max(height / 2.5, MIN_SUGGESTION_COUNT)
   );
+
+  const { processCommand } = useCommandProcessor();
 
   const {
     input,
@@ -38,6 +47,37 @@ export default function InputField(): JSX.Element {
 
   const controller = useAbort();
   const agent = useAgent();
+
+  const handlePickSuggestion = useCallback(
+    (type: SuggestionType, suggestion: string) => {
+      setSuggestions(undefined);
+
+      switch (type) {
+        case SuggestionType.FILE: {
+          setInput(prev => {
+            const beforeCursor = prev.slice(0, suggestionCursorIndex);
+            return `${beforeCursor + suggestion} ${prev.slice(cursorOffset)}`;
+          });
+          setCursorOffset(suggestionCursorIndex + suggestion.length + 1);
+          break;
+        }
+        case SuggestionType.COMMAND: {
+          setCursorOffset(0);
+          setInput('');
+          processCommand(suggestion);
+          break;
+        }
+      }
+    },
+    [
+      cursorOffset,
+      processCommand,
+      setCursorOffset,
+      setInput,
+      setSuggestions,
+      suggestionCursorIndex,
+    ]
+  );
 
   useEffect(() => {
     setSuggestionIndex(0);
@@ -75,18 +115,15 @@ export default function InputField(): JSX.Element {
     if (inputRequest.options.length > 0) return;
 
     // Suggestion handling
-    if (suggestions.length > 0) {
+    if (suggestions && suggestions.values.length > 0) {
+      const { values } = suggestions;
       if (key.upArrow) {
-        setSuggestionIndex(
-          prev => (prev + suggestions.length - 1) % suggestions.length
-        );
+        setSuggestionIndex(prev => (prev + values.length - 1) % values.length);
         return;
       }
 
       if (key.downArrow) {
-        setSuggestionIndex(
-          prev => (prev + suggestions.length + 1) % suggestions.length
-        );
+        setSuggestionIndex(prev => (prev + values.length + 1) % values.length);
         return;
       }
 
@@ -96,17 +133,7 @@ export default function InputField(): JSX.Element {
       }
 
       if (key.tab || key.return) {
-        setInput(
-          prev =>
-            `${
-              prev.slice(0, suggestionCursorIndex) +
-              suggestions[suggestionIndex]
-            } ${prev.slice(cursorOffset)}`
-        );
-        setCursorOffset(
-          suggestionCursorIndex + suggestions[suggestionIndex].length + 1
-        );
-        setSuggestions([]);
+        handlePickSuggestion(suggestions.type, values[suggestionIndex].value);
         return;
       }
     }

@@ -1,13 +1,34 @@
 import { glob } from 'glob';
 import { useEffect, useState } from 'react';
+import { SUPPORTED_COMMANDS } from './command-processor';
 
 const FILE_SUGGESTION_PATTERN = /(?:\s|^)@([\w_.-]+)$/;
+const COMMAND_PATTERN = /^\/(\w*)$/;
+const MAX_SHOWN_SUGGESTIONS = 200;
+
+export const enum SuggestionType {
+  FILE = 'file',
+  COMMAND = 'command',
+}
+
+export interface Suggestion {
+  value: string;
+  // Description shown after a suggestion, when highlighted
+  description?: string;
+}
+
+export interface SuggestionSet {
+  type: SuggestionType;
+  values: Suggestion[];
+}
 
 export function useInputSuggestionProvider(
   input: string,
   cursorOffset: number
 ) {
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<SuggestionSet | undefined>(
+    undefined
+  );
   const [suggestionCursorIndex, setSuggestionCursorIndex] = useState(0);
 
   useEffect(() => {
@@ -15,27 +36,46 @@ export function useInputSuggestionProvider(
 
     const preCursorInput = input.slice(0, cursorOffset);
 
-    const fileSuggestionMatch = FILE_SUGGESTION_PATTERN.exec(preCursorInput);
-    if (fileSuggestionMatch?.[1]) {
-      const filePath = fileSuggestionMatch[1];
-      setSuggestionCursorIndex(
-        fileSuggestionMatch.index + 1 /* to exclude @ char*/
-      );
+    let matches: RegExpExecArray | null = null;
 
-      // MARK: Fails silently
+    if ((matches = FILE_SUGGESTION_PATTERN.exec(preCursorInput))?.[1]) {
+      const filePath = matches[1];
+
+      if (filePath.length === 0) return;
+
+      /* to exclude @ char*/
+      setSuggestionCursorIndex(matches.index + 1);
+
       void glob('**/*', {
         nodir: true,
         ignore: ['node_modules/**', 'dist/**', '.git/**'],
         dot: false,
         cwd: process.cwd(),
-      })
-        .then(files => filterFiles(files, filePath))
-        .then(files => setSuggestions(files));
+      }).then(files =>
+        setSuggestions({
+          type: SuggestionType.FILE,
+          values: filterSuggestions(
+            files.map(f => ({ value: f })),
+            filePath
+          ),
+        })
+      );
+
+      // MARK: Fails silently
+    } else if ((matches = COMMAND_PATTERN.exec(preCursorInput))?.[1]) {
+      const command = matches[1];
+
+      setSuggestions({
+        type: SuggestionType.COMMAND,
+        values: filterSuggestions(SUPPORTED_COMMANDS, command),
+      });
     } else {
-      setSuggestions([]);
-      setSuggestionCursorIndex(0);
+      if (suggestions?.values.length) {
+        setSuggestions(undefined);
+        setSuggestionCursorIndex(0);
+      }
     }
-  }, [cursorOffset, input]);
+  }, [cursorOffset, input, suggestions?.values.length]);
 
   return {
     suggestions,
@@ -44,12 +84,16 @@ export function useInputSuggestionProvider(
   };
 }
 
-function filterFiles(files: string[], query: string): string[] {
+function filterSuggestions(
+  suggestions: Suggestion[],
+  query: string
+): Suggestion[] {
   const q = query.toLowerCase();
-  if (!q) return files.slice(0, 200);
-  return files
-    .filter(f => f.toLowerCase().includes(q))
-    .sort((a, b) => {
+  if (!q) return suggestions.slice(0, MAX_SHOWN_SUGGESTIONS);
+
+  return suggestions
+    .filter(({ value }) => value.toLowerCase().includes(q))
+    .sort(({ value: a }, { value: b }) => {
       const ai = a.toLowerCase().indexOf(q);
       const bi = b.toLowerCase().indexOf(q);
       if (ai !== bi) return ai - bi;

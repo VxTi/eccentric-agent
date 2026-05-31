@@ -7,13 +7,13 @@ import {
   useState,
 } from 'react';
 import type { UserInputRequest } from '../../lib/events';
-import { useInputSuggestionProvider } from '../hooks';
+import { type SuggestionSet, useInputSuggestionProvider } from '../hooks';
 
 interface UserInputContextType {
   input: string;
   setInput: Dispatch<SetStateAction<string>>;
-  suggestions: string[];
-  setSuggestions: Dispatch<SetStateAction<string[]>>;
+  suggestions: SuggestionSet | undefined;
+  setSuggestions: Dispatch<SetStateAction<SuggestionSet | undefined>>;
   suggestionCursorIndex: number;
   suggestionIndex: number;
   setSuggestionIndex: Dispatch<SetStateAction<number>>;

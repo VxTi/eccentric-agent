@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { Box, measureElement, useInput, type DOMElement } from 'ink';
 import { useAgent } from '../context';
-import { useUserInputField } from '../context/user-input-field';
+import { useUserInputField } from '../context/user-input-context';
 import { ModelMessageFragment } from './model-message-fragment';
 
 const SCROLL_STEP = 1;

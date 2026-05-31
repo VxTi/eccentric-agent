@@ -8,11 +8,15 @@ import {
   type ToolSet,
 } from 'ai';
 import * as z from 'zod';
-import { agentTools, type IToolBase, type ToolChannelParams } from '../tools';
-import { type NotifierChannel } from './notifier';
+import {
+  agentTools,
+  type IToolBase,
+  type ToolChannelParams,
+} from '../../tools';
+import { type NotifierChannel } from '../notifier';
 import { geminiProvider } from './provider';
-import { Result } from './result';
-import { emitAgentMessage } from './user-input';
+import { Result } from '../result';
+import { emitAgentMessage } from '../user-input';
 import { v7 as uuid } from 'uuid';
 
 const AGENT_MAX_LOOP_ITERATIONS = 200;
