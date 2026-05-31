@@ -11,26 +11,35 @@ const inputSchema = z.object({
     .describe(
       'The path of the file to edit. May be absolute or relative to the working directory.'
     ),
-  find: z
-    .string()
+  line: z
+    .number()
+    .int()
     .min(1)
     .describe(
-      'The exact single line currently in the file that should be replaced. Must match the file' +
-        ' content verbatim (including indentation and whitespace), must be unique within the' +
-        ' file, and must NOT contain a newline character.'
+      'The 1-based line number where the replacement range starts (inclusive).'
     ),
-  replace: z
+  count: z
+    .number()
+    .int()
+    .min(1)
+    .describe(
+      'The number of consecutive lines to replace, starting at `line`. Must be >= 1.' +
+        ' `line + count - 1` must not exceed the file length.'
+    ),
+  replacement: z
     .string()
     .describe(
-      'The single line that `find` should be replaced with. Use an empty string to blank the' +
-        ' line. Must NOT contain a newline character.'
+      'The text to insert in place of the removed range. May contain multiple lines' +
+        ' separated by `\\n`, or be empty to delete the range entirely. Inserted verbatim;' +
+        ' a trailing `\\n` is treated as part of the block, not as a separator.'
     ),
 });
 
 const outputSchema = z.object({
   success: z.boolean(),
-  find: z.string(),
-  replace: z.string(),
+  bytesWritten: z.number(),
+  linesRemoved: z.number(),
+  linesInserted: z.number(),
   filePath: z.string(),
 });
 
@@ -38,61 +47,89 @@ export default createTool({
   internalName: 'replace_in_file',
   name: 'Replace in file',
   description:
-    'Applies one or more single-line replacements to a file atomically. Each replacement has' +
-    ' `find` (the exact single line currently in the file) and `replace` (the single line it' +
-    ' should become). Neither `find` nor `replace` may contain newline characters.\n\n' +
-    'Use this tool when changing one or more individual lines in a file. To add new lines' +
-    ' to a file without replacing existing content, use `insert_in_file` instead.\n\n' +
+    'Replaces a contiguous range of lines in `filePath` with `replacement`. The range' +
+    ' starts at the 1-based `line` and spans `count` lines (inclusive).\n\n' +
+    'Use this tool when changing one or more consecutive lines in a file. To add new' +
+    ' lines without removing existing content, use `insert_in_file` instead.\n\n' +
     'Rules:\n' +
-    '  • Each `find` must be a single line (no `\\n`) and must match EXACTLY ONCE in the file' +
-    '    (whitespace and indentation included). If it appears multiple times, this tool cannot' +
-    '    be used — pick a line that is unique within the file.\n' +
-    '  • `replace` must be a single line (no `\\n`). Use an empty string to blank the line' +
-    "    (the line's newline is preserved).\n" +
-    '  • All replacements are validated up front against the original file contents; if any' +
-    '    one fails, nothing is written.\n' +
-    '  • Replacements are applied in order to an in-memory copy and the result is written once' +
-    '    at the end, so the operation is atomic.\n' +
-    '  • If the file changed on disk since it was last read in this session, the operation is' +
-    '    rejected so you can re-read and retry against fresh content.',
+    '  • `line` is 1-based; `count` must be >= 1.\n' +
+    '  • `line + count - 1` must not exceed the file line count.\n' +
+    '  • `replacement` may span multiple lines separated by `\\n`, or be empty to delete' +
+    '    the range. A trailing `\\n` in `replacement` is treated as part of the block,' +
+    '    not as a separator.\n' +
+    "  • The file's original trailing-newline state is preserved.\n" +
+    '  • If the file changed on disk since it was last read in this session, the operation' +
+    '    is rejected so you can re-read and retry against fresh content.',
   inputSchema,
   outputSchema,
   mightRequireApproval: false,
 
-  async handle({ find, replace, filePath }) {
+  async handle({ filePath, line, count, replacement }) {
     const context = await acquireContextInstance();
     const absolutePath = await context.fileCache.getCachedFilePath(filePath);
 
-    const fileContent = await readFile(absolutePath, 'utf-8');
+    const original = await readFile(absolutePath, 'utf-8');
+    const lines = original.length === 0 ? [] : original.split('\n');
 
-    const replacedContent = fileContent.replaceAll(find, replace);
+    const hadTrailingNewline = original.endsWith('\n');
+    if (hadTrailingNewline) lines.pop();
 
-    await writeFile(absolutePath, replacedContent, 'utf-8');
+    if (line < 1 || line > lines.length) {
+      throw new Error(
+        `\`line\` ${line} is out of range. File has ${lines.length} line(s);` +
+          ` valid range is 1..${lines.length}.`
+      );
+    }
+
+    const endLine = line + count - 1;
+    if (endLine > lines.length) {
+      throw new Error(
+        `Range \`line\` ${line} + \`count\` ${count} exceeds file length` +
+          ` (${lines.length} line(s)).`
+      );
+    }
+
+    const replacementLines =
+      replacement.length === 0 ? [] : replacement.split('\n');
+    if (
+      replacementLines.length > 1 &&
+      replacementLines[replacementLines.length - 1] === ''
+    ) {
+      replacementLines.pop();
+    }
+
+    lines.splice(line - 1, count, ...replacementLines);
+
+    let updated = lines.join('\n');
+    if ((hadTrailingNewline || original.length === 0) && lines.length > 0)
+      updated += '\n';
+
+    await writeFile(absolutePath, updated, 'utf-8');
     await context.fileCache.update(absolutePath);
 
     return {
       success: true,
-      bytesWritten: Buffer.byteLength(replacedContent, 'utf-8'),
-      find,
-      replace,
+      bytesWritten: Buffer.byteLength(updated, 'utf-8'),
+      linesRemoved: count,
+      linesInserted: replacementLines.length,
       filePath,
     };
   },
 
-  inputToString({ filePath, find, replace }) {
+  inputToString({ filePath, line, count }) {
     const fileName = path.basename(filePath);
-    return `Replacing \`${find} with \`${replace}\` in \`${fileName}\``;
+    const range =
+      count === 1 ? `line ${line}` : `lines ${line}-${line + count - 1}`;
+    return `Replacing ${range} in \`${fileName}\``;
   },
 
-  outputToString({ success, find, replace, filePath }) {
+  outputToString({ success, linesRemoved, linesInserted, filePath }) {
     if (!success) return `Unable to replace in file`;
 
     const fileName = path.basename(filePath);
-
-    if (replace.length === 0) {
-      return `Removed from \`${fileName}\`\n--${chalk.bgRed.whiteBright(find)}`;
-    }
-
-    return `Replaced in \`${fileName}\`\n-- ${chalk.bgRed.whiteBright(find)}\n++ ${chalk.bgGreen.blackBright(replace)}`;
+    const additions = linesRemoved === 0 ? '' : chalk.redBright(linesRemoved);
+    const deletions =
+      linesInserted === 0 ? '' : chalk.greenBright(linesInserted);
+    return `Replaced in \`${fileName}\` ${additions} ${deletions}`;
   },
 });
