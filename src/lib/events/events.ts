@@ -3,30 +3,12 @@ import { type Message } from '../types/messages';
 
 export const eventTarget = new EventTarget();
 
-export function subscribeEvent<E extends Event>(
-  name: EventName,
-  handler: (event: E) => any
-) {
-  eventTarget.addEventListener(name, handler as never);
-}
-
-export function unsubscribeEvent<E extends Event>(
-  name: EventName,
-  handler: (event: E) => any
-) {
-  eventTarget.removeEventListener(name, handler as never);
-}
-
-export function emitEvent<E extends Event>(event: E): void {
-  eventTarget.dispatchEvent(event);
-}
-
 export const enum EventName {
-  REQUEST_USER_INPUT = 'request-user-input',
-  USER_INPUT_RESPONSE = 'user-input-response',
+  REQUEST_INPUT = 'request-user-input',
+  INPUT_RESPONSE = 'user-input-response',
   AGENT_MESSAGE = 'agent-message',
-  SYNC_AGENT_CONTEXT = 'sync-agent-context-context',
-  AGENT_CONTEXT_SYNC_RESULT = 'agent-context-sync-result',
+  CONTEXT_SYNC_REQUEST = 'sync-agent-context-context',
+  CONTEXT_SYNC_RESULT = 'agent-context-sync-result',
 }
 
 export interface InputOption {
@@ -42,13 +24,13 @@ export interface UserInputRequest {
 
 export class UserInputRequestEvent extends CustomEvent<UserInputRequest> {
   constructor(inputRequest: UserInputRequest) {
-    super(EventName.REQUEST_USER_INPUT, { detail: inputRequest });
+    super(EventName.REQUEST_INPUT, { detail: inputRequest });
   }
 }
 
 export class UserInputResponseEvent extends CustomEvent<InputOption[]> {
   constructor(options: InputOption[]) {
-    super(EventName.USER_INPUT_RESPONSE, { detail: options });
+    super(EventName.INPUT_RESPONSE, { detail: options });
   }
 }
 
@@ -60,12 +42,45 @@ export class AgentMessageEvent extends CustomEvent<Message> {
 
 export class SyncAgentContextEvent extends CustomEvent<never> {
   constructor() {
-    super(EventName.SYNC_AGENT_CONTEXT);
+    super(EventName.CONTEXT_SYNC_REQUEST);
   }
 }
 
 export class AgentContextSyncResult extends CustomEvent<AgentContext> {
   constructor(context: AgentContext) {
-    super(EventName.AGENT_CONTEXT_SYNC_RESULT, { detail: context });
+    super(EventName.CONTEXT_SYNC_RESULT, { detail: context });
   }
+}
+
+const EventConstructorRegistry = {
+  [EventName.REQUEST_INPUT]: UserInputRequestEvent,
+  [EventName.INPUT_RESPONSE]: UserInputResponseEvent,
+  [EventName.AGENT_MESSAGE]: AgentMessageEvent,
+  [EventName.CONTEXT_SYNC_REQUEST]: SyncAgentContextEvent,
+  [EventName.CONTEXT_SYNC_RESULT]: AgentContextSyncResult,
+} as const;
+
+type EventRegistry = typeof EventConstructorRegistry;
+
+export function subscribeEvent<E extends Event>(
+  name: EventName,
+  handler: (event: E) => any
+) {
+  eventTarget.addEventListener(name, handler as never);
+}
+
+export function unsubscribeEvent<E extends Event>(
+  name: EventName,
+  handler: (event: E) => any
+) {
+  eventTarget.removeEventListener(name, handler as never);
+}
+
+export function emitEvent<TEventName extends EventName>(
+  eventName: TEventName,
+  ...parameters: ConstructorParameters<EventRegistry[TEventName]>
+): void {
+  eventTarget.dispatchEvent(
+    new EventConstructorRegistry[eventName](parameters as never) // Sadly this can't be fixed
+  );
 }

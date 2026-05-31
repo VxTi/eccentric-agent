@@ -1,7 +1,6 @@
 import { type ReactNode, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import {
-  AgentContextSyncResult,
   emitEvent,
   EventName,
   subscribeEvent,
@@ -20,13 +19,13 @@ export function App(): ReactNode {
 
   useEffect(() => {
     const handleContextRetrieval = () => {
-      emitEvent(new AgentContextSyncResult(context));
+      emitEvent(EventName.CONTEXT_SYNC_RESULT, context);
     };
 
-    subscribeEvent(EventName.SYNC_AGENT_CONTEXT, handleContextRetrieval);
+    subscribeEvent(EventName.CONTEXT_SYNC_REQUEST, handleContextRetrieval);
 
     return () => {
-      unsubscribeEvent(EventName.SYNC_AGENT_CONTEXT, handleContextRetrieval);
+      unsubscribeEvent(EventName.CONTEXT_SYNC_REQUEST, handleContextRetrieval);
     };
   }, [context]);
 

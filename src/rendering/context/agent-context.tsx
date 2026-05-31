@@ -30,7 +30,6 @@ import {
   emitEvent,
   EventName,
   subscribeEvent,
-  SyncAgentContextEvent,
   unsubscribeEvent,
 } from '../../lib/events/events';
 import { FileCache } from '../../lib/file-cache';
@@ -431,11 +430,11 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
 export async function acquireContextInstance(): Promise<AgentContext> {
   return new Promise(resolve => {
     const handler = (event: AgentContextSyncResult) => {
-      unsubscribeEvent(EventName.AGENT_CONTEXT_SYNC_RESULT, handler);
+      unsubscribeEvent(EventName.CONTEXT_SYNC_RESULT, handler);
       resolve(event.detail);
     };
 
-    subscribeEvent(EventName.AGENT_CONTEXT_SYNC_RESULT, handler);
-    emitEvent(new SyncAgentContextEvent());
+    subscribeEvent(EventName.CONTEXT_SYNC_RESULT, handler);
+    emitEvent(EventName.CONTEXT_SYNC_REQUEST);
   });
 }

@@ -87,10 +87,10 @@ export default function InputField(): JSX.Element {
     const handleInputRequest = (event: UserInputRequestEvent) =>
       setInputRequest(event.detail);
 
-    subscribeEvent(EventName.REQUEST_USER_INPUT, handleInputRequest);
+    subscribeEvent(EventName.REQUEST_INPUT, handleInputRequest);
 
     return () => {
-      unsubscribeEvent(EventName.REQUEST_USER_INPUT, handleInputRequest);
+      unsubscribeEvent(EventName.REQUEST_INPUT, handleInputRequest);
     };
   }, [setInputRequest]);
 
