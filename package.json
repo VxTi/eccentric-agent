@@ -7,7 +7,7 @@
     "lint": "eslint --fix \"./src/**/*.{ts,tsx}\"",
     "lint:ci": "eslint --fix \"./src/**/*.{ts,tsx}\" --max-warnings 0",
     "check:types": "tsc --noEmit",
-    "start": "tsx src/main.tsx",
+    "start": "vite-node src/main.tsx",
     "build": "esbuild src/main.tsx --bundle --packages=external --minify --platform=node --format=esm --outfile=./dist/index.js"
   },
   "devDependencies": {
@@ -26,7 +26,8 @@
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.47.0",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.7",
+    "vite-node": "6.0.0"
   },
   "dependencies": {
     "@ai-sdk/google-vertex": "^4.0.140",

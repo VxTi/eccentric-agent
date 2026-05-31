@@ -384,11 +384,13 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         }
       }
 
+      const inputText = formatMarkdown(tool.inputToString(input, channel));
+
       emitAgentMessage({
         type: 'generic',
         id: toolCallId,
         loading: true,
-        content: formatMarkdown(tool.inputToString(input, channel)),
+        content: inputText,
       });
 
       let output: unknown;
@@ -412,7 +414,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         type: 'generic',
         id: toolCallId,
         loading: false,
-        content: `→ ${formatMarkdown(tool.outputToString(output, channel))}\n`,
+        content: `${inputText}\n→ ${formatMarkdown(tool.outputToString(output, channel))}`,
       });
       notifier.unsubscribe(toolCallId);
       return output;

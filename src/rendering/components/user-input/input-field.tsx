@@ -212,11 +212,7 @@ export default function InputField(): JSX.Element {
 
 function InputText(): ReactNode {
   const { input, cursorOffset } = useUserInputField();
-
   const safeCursor = Math.max(0, Math.min(cursorOffset, input.length));
-  const before = input.slice(0, safeCursor);
-  const cursorChar = input[safeCursor] ?? ' ';
-  const after = input.slice(safeCursor + 1);
 
   const [blinkState, setBlinkState] = useState<boolean>(false);
 
@@ -231,7 +227,7 @@ function InputText(): ReactNode {
   if (input.length === 0) {
     return (
       <Box flexDirection="row">
-        <Text inverse={blinkState}>{cursorChar}</Text>
+        <Text inverse={blinkState}> </Text>
         <Text color="gray" italic wrap="wrap">
           {' '}
           {INPUT_PLACEHOLDER}
@@ -240,11 +236,18 @@ function InputText(): ReactNode {
     );
   }
 
+  const characters = input.split('');
+
   return (
-    <Box flexDirection="row" flexWrap="nowrap" maxWidth="80%">
-      <Text wrap="hard">{before}</Text>
-      <Text inverse={blinkState}>{cursorChar}</Text>
-      <Text wrap="hard">{after}</Text>
+    <Box flexDirection="row" flexWrap="wrap" flexShrink={1}>
+      {characters.map((char, index) => (
+        <Text key={index} inverse={blinkState && index === safeCursor}>
+          {char}
+        </Text>
+      ))}
+      {safeCursor === input.length && blinkState && (
+        <Text inverse={true}> </Text>
+      )}
     </Box>
   );
 }

@@ -124,9 +124,10 @@ export default createTool({
   },
 
   outputToString({ success, linesRemoved, linesInserted, filePath }) {
-    if (!success) return `Unable to replace in file`;
-
     const fileName = path.basename(filePath);
-    return `Replaced in \`${fileName}\` ${chalk.redBright(`-${linesRemoved}`)} +${chalk.greenBright(`+${linesInserted}`)}`;
+
+    if (!success) return `Unable to update contents of ${filePath}`;
+
+    return `Updated \`${fileName}\` ${chalk.redBright(`-${linesRemoved}`)} ${chalk.greenBright(`+${linesInserted}`)}`;
   },
 });
