@@ -17,6 +17,7 @@ import { useAbort, useAgent } from '../../context';
 import { useCommandProcessor } from '../../hooks/command-processor';
 import { useUserInputField } from '../../context/user-input-context';
 import { SuggestionType, useTerminalSize } from '../../hooks';
+import { TokenUsageCounter } from '../token-usage-counter';
 import { Suggestions } from './input-suggestions';
 import { InputRequest } from './option-request';
 
@@ -204,6 +205,7 @@ export default function InputField(): JSX.Element {
       >
         <InputText />
       </Box>
+      <TokenUsageCounter />
     </Box>
   );
 }

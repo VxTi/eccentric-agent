@@ -24,6 +24,7 @@ import {
 } from 'react';
 import { v7 as uuid } from 'uuid';
 import { DEFAULT_SYSTEM_PROMPT } from '../../lib/constants';
+import { emitConsumeTokenEvent } from '../../lib/events/emission';
 import {
   type AgentContextSyncResult,
   type AgentMessageEvent,
@@ -142,16 +143,17 @@ export function AgentProvider({
   );
 
   /**
-   * Handling incoming messages from non-react world
+   * Handling incoming messages from non-react world, and token consumption
    */
   useEffect(() => {
-    const handler = (event: AgentMessageEvent) => {
+    const handleIncomingMessage = (event: AgentMessageEvent) => {
       setMessage(event.detail);
     };
-    subscribeEvent(EventName.AGENT_MESSAGE, handler);
+
+    subscribeEvent(EventName.AGENT_MESSAGE, handleIncomingMessage);
 
     return () => {
-      unsubscribeEvent(EventName.AGENT_MESSAGE, handler);
+      unsubscribeEvent(EventName.AGENT_MESSAGE, handleIncomingMessage);
     };
   }, [setMessage]);
 
@@ -181,6 +183,12 @@ export function AgentProvider({
           ...updatedMessages,
         ],
         tools,
+        onStepFinish: step => {
+          emitConsumeTokenEvent(
+            step.usage.inputTokens ?? 0,
+            step.usage.outputTokens ?? 0
+          );
+        },
         providerOptions: {
           google: {
             thinkingConfig: {
@@ -219,23 +227,6 @@ export function AgentProvider({
         setStatus({ text: chalk.red('Fatal error'), loading: false });
         return;
       }
-
-      /*
-      TODO: Properly implement
-
-      let taskIterations = 0;
-      while (
-        taskList.hasIncompleteTasks() &&
-        taskIterations < MAX_TASK_CONTINUATION_ITERATIONS
-      ) {
-        taskIterations += 1;
-        await processRequest(
-          'The task list still has incomplete tasks. Continue working on the' +
-            ' next pending or in-progress task and update the task list as you' +
-            ' make progress. Do not wait for further user input.',
-          true
-        );
-      }*/
 
       const firstQueuedMessage = messageQueue.shift();
       if (firstQueuedMessage) {

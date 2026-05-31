@@ -9,6 +9,7 @@ export const enum EventName {
   AGENT_MESSAGE = 'agent-message',
   CONTEXT_SYNC_REQUEST = 'sync-agent-context-context',
   CONTEXT_SYNC_RESULT = 'agent-context-sync-result',
+  CONSUME_TOKENS = 'consume-tokens',
 }
 
 export interface InputOption {
@@ -52,13 +53,23 @@ export class AgentContextSyncResult extends CustomEvent<AgentContext> {
   }
 }
 
+export class ConsumeTokenEvent extends CustomEvent<{
+  input: number;
+  output: number;
+}> {
+  constructor(input: number, output: number) {
+    super(EventName.CONSUME_TOKENS, { detail: { input, output } });
+  }
+}
+
 const EventConstructorRegistry = {
   [EventName.REQUEST_INPUT]: UserInputRequestEvent,
   [EventName.INPUT_RESPONSE]: UserInputResponseEvent,
   [EventName.AGENT_MESSAGE]: AgentMessageEvent,
   [EventName.CONTEXT_SYNC_REQUEST]: SyncAgentContextEvent,
   [EventName.CONTEXT_SYNC_RESULT]: AgentContextSyncResult,
-} as const;
+  [EventName.CONSUME_TOKENS]: ConsumeTokenEvent,
+} as const satisfies Record<EventName, any>;
 
 type EventRegistry = {
   [EventName.REQUEST_INPUT]: UserInputRequestEvent;
@@ -66,6 +77,7 @@ type EventRegistry = {
   [EventName.AGENT_MESSAGE]: AgentMessageEvent;
   [EventName.CONTEXT_SYNC_REQUEST]: SyncAgentContextEvent;
   [EventName.CONTEXT_SYNC_RESULT]: AgentContextSyncResult;
+  [EventName.CONSUME_TOKENS]: ConsumeTokenEvent;
 };
 
 export function subscribeEvent<TEventName extends EventName>(

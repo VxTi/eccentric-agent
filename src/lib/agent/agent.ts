@@ -13,6 +13,7 @@ import {
   type IToolBase,
   type ToolChannelParams,
 } from '../../tools';
+import { emitConsumeTokenEvent } from '../events/emission';
 import { type NotifierChannel } from '../events/notifier';
 import { geminiProvider } from './provider';
 import { Result } from '../result';
@@ -80,6 +81,12 @@ ${message.content}`,
           this.channel.notify({
             content: `An error occurred in agent task - ${String(error)}`,
           });
+        },
+        onStepFinish: step => {
+          emitConsumeTokenEvent(
+            step.usage.inputTokens ?? 0,
+            step.usage.outputTokens ?? 0
+          );
         },
         providerOptions: {
           google: {
