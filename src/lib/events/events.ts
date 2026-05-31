@@ -60,27 +60,37 @@ const EventConstructorRegistry = {
   [EventName.CONTEXT_SYNC_RESULT]: AgentContextSyncResult,
 } as const;
 
-type EventRegistry = typeof EventConstructorRegistry;
+type EventRegistry = {
+  [EventName.REQUEST_INPUT]: UserInputRequestEvent;
+  [EventName.INPUT_RESPONSE]: UserInputResponseEvent;
+  [EventName.AGENT_MESSAGE]: AgentMessageEvent;
+  [EventName.CONTEXT_SYNC_REQUEST]: SyncAgentContextEvent;
+  [EventName.CONTEXT_SYNC_RESULT]: AgentContextSyncResult;
+};
 
-export function subscribeEvent<E extends Event>(
-  name: EventName,
-  handler: (event: E) => any
-) {
+export function subscribeEvent<TEventName extends EventName>(
+  name: TEventName,
+  handler: (event: EventRegistry[TEventName]) => any
+): void {
   eventTarget.addEventListener(name, handler as never);
 }
 
-export function unsubscribeEvent<E extends Event>(
-  name: EventName,
-  handler: (event: E) => any
-) {
+export function unsubscribeEvent<TEventName extends EventName>(
+  name: TEventName,
+  handler: (event: EventRegistry[TEventName]) => any
+): void {
   eventTarget.removeEventListener(name, handler as never);
 }
 
 export function emitEvent<TEventName extends EventName>(
   eventName: TEventName,
-  ...parameters: ConstructorParameters<EventRegistry[TEventName]>
+  ...parameters: ConstructorParameters<
+    (typeof EventConstructorRegistry)[TEventName]
+  >
 ): void {
   eventTarget.dispatchEvent(
-    new EventConstructorRegistry[eventName](parameters as never) // Sadly this can't be fixed
+    // eslint-disable-next-line
+    // @ts-ignore
+    new EventConstructorRegistry[eventName](...parameters)
   );
 }
