@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { formatBytes } from '../lib/text-formatting';
 import { createTool } from './common';
 import { mkdir, writeFile, access } from 'fs/promises';
 import { dirname } from 'path';
@@ -40,15 +41,6 @@ async function safeExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes >= 1 << 30) return `${bytes / (1 << 30)}GB`;
-
-  if (bytes >= 1 << 20) return `${bytes / (1 << 20)}MB`;
-  if (bytes >= 1 << 10) return `${bytes / (1 << 20)}KB`;
-
-  return `${bytes}bytes`;
 }
 
 export default createTool({

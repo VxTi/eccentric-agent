@@ -1,79 +1,83 @@
-# Eccentric Agent CLI
+# Eccentric Agent CLI: Your Intelligent Command-Line Assistant
 
-`eccentric-agent` is a powerful and versatile AI agent framework designed to streamline the development and deployment of AI-powered applications. Leveraging various AI SDKs (Google Vertex AI, OpenAI, Ollama), it provides a robust foundation for building intelligent systems with rich command-line interfaces.
+`eccentric-agent` is a smart assistant that lives in your computer's command-line. Think of it as a helpful digital
+colleague that can understand your requests and use various artificial intelligence (AI) tools to get things done. It's
+designed to make complex tasks simpler and faster, right from your keyboard.
 
-## What the project does: Clear project title and description
+## What can Eccentric Agent do for you?
 
-## Why the project is useful: Key features and benefits
+This project helps bridge the gap between powerful AI technologies and everyday tasks. It's particularly useful for:
 
-*   **Multi-AI Provider Support:** Seamlessly integrate with Google Vertex AI, OpenAI, and Ollama for diverse AI capabilities.
-*   **Rich CLI Experience:** Built with React and Ink, offering an interactive and engaging command-line user interface.
-*   **Web Scraping Capabilities:** Utilize `cheerio` for efficient parsing and manipulation of web content.
-*   **Modular and Extensible:** Designed for easy expansion and customization to fit various project needs.
-*   **TypeScript-first:** Fully typed codebase for enhanced developer experience and maintainability.
+* **Tapping into Multiple AI Brains:** Instead of being limited to one AI, `eccentric-agent` can work with different
+  popular AI services like Google Vertex AI, OpenAI, and Ollama. This means it can choose the best AI for your specific
+  task, giving you more accurate and diverse results.
+* **Easy-to-Use Interface:** Even though it's a command-line tool, we've made it interactive and user-friendly. You
+  won't just be typing commands; you'll have a helpful back-and-forth conversation with the agent, making it easy to
+  guide and get feedback.
+* **Smart Web Research:** Need to find information online? `eccentric-agent` can intelligently browse and extract
+  information from websites, saving you time and effort. It's like having a research assistant that can quickly pull out
+  the key details you need.
+* **Flexible and Customizable:** Everyone has different needs. This agent is built to be easily adapted and expanded. If
+  you have a unique task or want to connect it to other tools, it's designed to be flexible enough to grow with you.
 
-## How users can get started: Installation/setup instructions with usage examples
+## How to Get Started (for the curious)
 
-To get started with `eccentric-agent`, follow these steps:
+While `eccentric-agent` is designed to be user-friendly, setting it up does involve some basic computer steps. If you're
+comfortable with following instructions, you can get it running.
 
-### Prerequisites
+### What you'll need:
 
-*   Node.js (version 18 or higher)
-*   pnpm (performant package manager)
+* **Node.js:** A program that helps run JavaScript applications. (Version 18 or newer is best)
+* **pnpm:** A tool to quickly install and manage the agent's necessary components.
 
-### Installation
+### Installation Steps:
 
-1.  **Clone the repository:**
+1. **Get the Agent's Code:** Open your computer's terminal (like Command Prompt on Windows or Terminal on Mac) and type:
 
-    ```bash
-    git clone https://github.com/your-username/eccentric-agent.git
-    cd eccentric-agent
-    ```
+   ```bash
+   git clone https://github.com/your-username/eccentric-agent.git
+   cd eccentric-agent
+   ```
 
-2.  **Install dependencies using pnpm:**
+   This downloads the agent's "brain" to your computer.
 
-    ```bash
-    pnpm install
-    ```
+2. **Install its Tools:**
 
-### Configuration
+   ```bash
+   pnpm install
+   ```
 
-This project uses `dotenv` for environment variable management. Create a `.env` file in the root directory of the project and add your API keys and other configurations:
+   This command tells `pnpm` to gather all the necessary software and tools the agent needs to operate.
+
+### Setting Up Your AI Connections:
+
+`eccentric-agent` needs to know how to talk to the AI services. You'll create a simple file called `.env` in the agent's
+folder and add your special "API keys" for the AI services you want to use. Think of these as unique passwords that let
+the agent access the AI's capabilities.
 
 ```
 GOOGLE_VERTEX_PROJECT="your project"
 GOOGLE_VERTEX_LOCATION="location of project, e.g., europe-west4"
 GEMINI_API_KEY="the API key"
+OPENAI_API_KEY="your OpenAI API key"
 ```
 
-### Usage
+### Using the Agent:
 
-To run the agent, use the `start` script:
+Once set up, you can start `eccentric-agent` by typing:
 
 ```bash
 pnpm start
 ```
 
-### Building the Project
+Then, you can begin interacting with it right in your command-line!
 
-To build the project for production, use the `build` script:
+## Want to Contribute?
 
-```bash
-pnpm build
-```
-
-This will generate a bundled JavaScript file in the `dist` directory.
-
-## Who maintains and contributes: Maintainer information and contribution guidelines
-
-### Maintainers
-
-*   [VxTi] - Initial development and primary maintenance.
-
-### Contributing
-
-We welcome contributions to `eccentric-agent`! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to submit pull requests, report bugs, and suggest new features.
+If you're a developer and interested in making `eccentric-agent` even better, we welcome your contributions! Please see
+our [CONTRIBUTING.md](CONTRIBUTING.md) guide for how to help out.
 
 ## License
 
-This project is licensed under the [Your License Here] - see the [LICENSE](LICENSE) file for details.
+This project operates under the MIT License, which means it's open for anyone to use, modify, and distribute. You can
+find the full details in the [LICENSE](LICENSE) file.

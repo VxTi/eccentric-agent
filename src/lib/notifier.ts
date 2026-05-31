@@ -31,6 +31,9 @@ export class Notifier {
     channelId: string,
     notifier: NotifierFn<T>
   ): NotifierChannel<T> {
+    if (this.channels.has(channelId)) {
+      throw new Error(`Channel '${channelId}' is already subscribed to`);
+    }
     const channel = new NotifierChannel(channelId, notifier);
     this.channels.set(channelId, channel);
     return channel;
@@ -38,7 +41,7 @@ export class Notifier {
 
   public unsubscribe(channelId: string): void {
     if (!this.channels.has(channelId)) {
-      throw new Error(`Channel ${channelId} does not exist`);
+      throw new Error(`Channel '${channelId}' does not exist`);
     }
 
     this.channels.delete(channelId);
