@@ -13,10 +13,10 @@ import {
   type IToolBase,
   type ToolChannelParams,
 } from '../../tools';
-import { type NotifierChannel } from '../notifier';
+import { type NotifierChannel } from '../events/notifier';
 import { geminiProvider } from './provider';
 import { Result } from '../result';
-import { emitAgentMessage } from '../user-input';
+import { emitAgentMessage } from '../events/user-input';
 import { v7 as uuid } from 'uuid';
 
 const AGENT_MAX_LOOP_ITERATIONS = 200;

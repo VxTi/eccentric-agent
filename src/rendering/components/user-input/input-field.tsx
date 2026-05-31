@@ -12,7 +12,7 @@ import {
   subscribeEvent,
   unsubscribeEvent,
   type UserInputRequestEvent,
-} from '../../../lib/events';
+} from '../../../lib/events/events';
 import { useAbort, useAgent } from '../../context';
 import { useCommandProcessor } from '../../hooks/command-processor';
 import { useUserInputField } from '../../context/user-input-context';

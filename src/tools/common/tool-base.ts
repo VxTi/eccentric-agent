@@ -1,6 +1,6 @@
 import type * as z from 'zod';
 import { type Message } from '../../lib/types/messages';
-import { type NotifierChannel } from '../../lib/notifier';
+import { type NotifierChannel } from '../../lib/events/notifier';
 import {
   type ApprovalOption,
   type MakeOptional,

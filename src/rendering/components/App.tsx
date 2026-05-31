@@ -6,7 +6,7 @@ import {
   EventName,
   subscribeEvent,
   unsubscribeEvent,
-} from '../../lib/events';
+} from '../../lib/events/events';
 import { useAgent } from '../context';
 import { useTerminalSize } from '../hooks';
 import { MessageList } from './MessageList';

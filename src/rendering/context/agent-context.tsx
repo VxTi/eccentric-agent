@@ -32,14 +32,17 @@ import {
   subscribeEvent,
   SyncAgentContextEvent,
   unsubscribeEvent,
-} from '../../lib/events';
+} from '../../lib/events/events';
 import { FileCache } from '../../lib/file-cache';
 import type { Message, UserMessage } from '../../lib/types/messages';
-import { Notifier } from '../../lib/notifier';
+import { Notifier } from '../../lib/events/notifier';
 import { geminiProvider } from '../../lib/agent/provider';
 import { Result } from '../../lib/result';
 import { TaskList, TaskStatus } from '../../lib/tasks';
-import { emitAgentMessage, requestUserInput } from '../../lib/user-input';
+import {
+  emitAgentMessage,
+  requestUserInput,
+} from '../../lib/events/user-input';
 import {
   type IToolBase,
   type ToolChannelParams,

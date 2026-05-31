@@ -6,7 +6,7 @@ import {
   useContext,
   useState,
 } from 'react';
-import type { UserInputRequest } from '../../lib/events';
+import type { UserInputRequest } from '../../lib/events/events';
 import { type SuggestionSet, useInputSuggestionProvider } from '../hooks';
 
 interface UserInputContextType {

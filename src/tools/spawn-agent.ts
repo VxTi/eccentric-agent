@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { Agent } from '../lib/agent/agent';
-import { type NotifierChannel } from '../lib/notifier';
+import { type NotifierChannel } from '../lib/events/notifier';
 import { createTool, type ToolChannelParams } from './common';
 
 const agentSpecSchema = z.object({
