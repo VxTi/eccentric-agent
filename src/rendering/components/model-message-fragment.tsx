@@ -5,7 +5,7 @@ import {
   type GenericMessage,
   type Message,
   type UserMessage,
-} from '../../lib/messages';
+} from '../../lib/types/messages';
 import { MarkdownLines, MarkdownView } from './MarkdownView';
 
 export function ModelMessageFragment({ message }: { message: Message }) {

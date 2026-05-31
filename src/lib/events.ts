@@ -1,5 +1,5 @@
 import { type AgentContext } from '../rendering/context';
-import { type Message } from './messages';
+import { type Message } from './types/messages';
 
 export const eventTarget = new EventTarget();
 

@@ -1,11 +1,11 @@
 import type * as z from 'zod';
-import { type Message } from '../../lib/messages';
+import { type Message } from '../../lib/types/messages';
 import { type NotifierChannel } from '../../lib/notifier';
 import {
   type ApprovalOption,
   type MakeOptional,
   type MaybePromise,
-} from '../../types';
+} from '../../lib/types/types';
 
 export const DEFAULT_APPROVAL_OPTIONS: ApprovalOption[] = [
   { option: 'approve', text: 'Approve' },

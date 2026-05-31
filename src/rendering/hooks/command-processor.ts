@@ -4,7 +4,7 @@ import { useAgent } from '../context';
 
 export const SUPPORTED_COMMANDS = [
   { value: 'clear', description: 'Clears the context window' },
-  { value: ''}
+  { value: '' },
 ] as const satisfies Suggestion[];
 
 export function useCommandProcessor() {

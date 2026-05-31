@@ -9,7 +9,7 @@ import {
   UserInputRequestEvent,
   type UserInputResponseEvent,
 } from './events';
-import { type Message } from './messages';
+import { type Message } from './types/messages';
 
 export function requestUserInput(
   props: UserInputRequest

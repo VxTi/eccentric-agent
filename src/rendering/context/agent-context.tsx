@@ -34,7 +34,7 @@ import {
   unsubscribeEvent,
 } from '../../lib/events';
 import { FileCache } from '../../lib/file-cache';
-import type { Message, UserMessage } from '../../lib/messages';
+import type { Message, UserMessage } from '../../lib/types/messages';
 import { Notifier } from '../../lib/notifier';
 import { geminiProvider } from '../../lib/agent/provider';
 import { Result } from '../../lib/result';
