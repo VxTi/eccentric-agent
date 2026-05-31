@@ -57,7 +57,7 @@ export function MessageList(): JSX.Element {
         flexDirection="column"
         flexShrink={0}
         overflowY="hidden"
-        top={-(overflow - clampedOffset)}
+        marginTop={-(overflow - clampedOffset)}
       >
         <ModelMessageFragment
           message={{
