@@ -36,7 +36,7 @@ export function useInputSuggestionProvider(
 
     const preCursorInput = input.slice(0, cursorOffset);
 
-    let matches: RegExpExecArray | null = null;
+    let matches: RegExpExecArray | null;
 
     if ((matches = FILE_SUGGESTION_PATTERN.exec(preCursorInput))?.[1]) {
       const filePath = matches[1];

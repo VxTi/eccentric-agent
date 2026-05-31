@@ -13,9 +13,16 @@ export function MarkdownView({ content }: MarkdownViewProps): JSX.Element {
 export function MarkdownLines({ text }: { text: string }): JSX.Element {
   const lines = text.split('\n');
   return (
-    <Box flexDirection="column" flexShrink={0}>
+    <Box
+      flexDirection="column"
+      flexShrink={0}
+      maxWidth="100%"
+      overflowX="hidden"
+    >
       {lines.map((line, i) => (
-        <Text key={i}>{line.length === 0 ? ' ' : line}</Text>
+        <Text wrap="truncate-end" key={i}>
+          {line.length === 0 ? ' ' : line}
+        </Text>
       ))}
     </Box>
   );

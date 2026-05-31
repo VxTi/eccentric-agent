@@ -6,7 +6,7 @@ import {
   type Message,
   type UserMessage,
 } from '../../lib/types/messages';
-import { MarkdownLines, MarkdownView } from './MarkdownView';
+import { MarkdownView } from './MarkdownView';
 
 export function ModelMessageFragment({ message }: { message: Message }) {
   return (
@@ -62,7 +62,7 @@ function Generic({ message }: { message: GenericMessage }) {
       ) : (
         <LoadingSpinner loading={message.loading} />
       )}
-      <MarkdownLines text={message.content} />
+      <MarkdownView content={message.content} />
     </Box>
   );
 }

@@ -16,7 +16,7 @@ import {
 } from '../../lib/text-formatting';
 import { useAgent } from '../context';
 
-export function TokenUsageCounter(): ReactNode {
+export function ModelStatsDisplay(): ReactNode {
   const [{ input, output }, setCount] = useState({ input: 0, output: 0 });
   const { model } = useAgent();
 

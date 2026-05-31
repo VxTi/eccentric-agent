@@ -414,7 +414,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         type: 'generic',
         id: toolCallId,
         loading: false,
-        content: `${inputText}\n→ ${formatMarkdown(tool.outputToString(output, channel))}`,
+        content: `→ ${formatMarkdown(tool.outputToString(output, channel))}`,
       });
       notifier.unsubscribe(toolCallId);
       return output;
