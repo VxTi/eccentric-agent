@@ -52,13 +52,18 @@ export class AgentContextSyncResult extends CustomEvent<AgentContext> {
     super(EventName.CONTEXT_SYNC_RESULT, { detail: context });
   }
 }
-
-export class ConsumeTokenEvent extends CustomEvent<{
+export const enum TokenSource {
+  PRIMARY = 'primary',
+  SUB_TASK = 'sub-task',
+}
+export interface TokenConsumeProps {
   input: number;
   output: number;
-}> {
-  constructor(input: number, output: number) {
-    super(EventName.CONSUME_TOKENS, { detail: { input, output } });
+  source: TokenSource;
+}
+export class ConsumeTokenEvent extends CustomEvent<TokenConsumeProps> {
+  constructor(detail: TokenConsumeProps) {
+    super(EventName.CONSUME_TOKENS, { detail });
   }
 }
 

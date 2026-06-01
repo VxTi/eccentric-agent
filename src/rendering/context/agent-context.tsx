@@ -23,6 +23,7 @@ import {
   useState,
 } from 'react';
 import { v7 as uuid } from 'uuid';
+import { geminiProvider, type ModelName } from '../../lib/agent/provider';
 import { DEFAULT_SYSTEM_PROMPT } from '../../lib/constants';
 import { emitConsumeTokenEvent } from '../../lib/events/emission';
 import {
@@ -31,22 +32,22 @@ import {
   emitEvent,
   EventName,
   subscribeEvent,
+  TokenSource,
   unsubscribeEvent,
 } from '../../lib/events/events';
-import { FileCache } from '../../lib/file-cache';
-import type { Message, UserMessage } from '../../lib/types/messages';
 import { Notifier } from '../../lib/events/notifier';
-import { geminiProvider, type ModelName } from '../../lib/agent/provider';
-import { Result } from '../../lib/result';
-import { TaskList, TaskStatus } from '../../lib/tasks';
 import {
   emitAgentMessage,
   requestUserInput,
 } from '../../lib/events/user-input';
+import { FileCache } from '../../lib/file-cache';
+import { Result } from '../../lib/result';
+import { TaskList, TaskStatus } from '../../lib/tasks';
+import type { Message, UserMessage } from '../../lib/types/messages';
 import {
   type IToolBase,
-  type ToolChannelParams,
   registry,
+  type ToolChannelParams,
   ToolSelectionOption,
 } from '../../tools';
 import { formatMarkdown, previewArgs } from '../formatting';
@@ -185,10 +186,11 @@ export function AgentProvider({
         ],
         tools,
         onStepFinish: step => {
-          emitConsumeTokenEvent(
-            step.usage.inputTokens ?? 0,
-            step.usage.outputTokens ?? 0
-          );
+          emitConsumeTokenEvent({
+            input: step.usage.inputTokens ?? 0,
+            output: step.usage.outputTokens ?? 0,
+            source: TokenSource.PRIMARY,
+          });
         },
         providerOptions: {
           google: {

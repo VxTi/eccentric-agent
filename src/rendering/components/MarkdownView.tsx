@@ -20,7 +20,7 @@ export function MarkdownLines({ text }: { text: string }): JSX.Element {
       overflowX="hidden"
     >
       {lines.map((line, i) => (
-        <Text wrap="truncate-end" key={i}>
+        <Text wrap="wrap" key={i}>
           {line.length === 0 ? ' ' : line}
         </Text>
       ))}

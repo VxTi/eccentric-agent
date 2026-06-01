@@ -8,6 +8,8 @@ import {
   type ConsumeTokenEvent,
   EventName,
   subscribeEvent,
+  type TokenConsumeProps,
+  TokenSource,
   unsubscribeEvent,
 } from '../../lib/events/events';
 import {
@@ -17,14 +19,25 @@ import {
 import { useAgent } from '../context';
 
 export function ModelStatsDisplay(): ReactNode {
-  const [{ input, output }, setCount] = useState({ input: 0, output: 0 });
+  const [{ input, output }, setCount] = useState<
+    Omit<TokenConsumeProps, 'source'>
+  >({
+    input: 0,
+    output: 0,
+  });
+  const [{ input: extIn, output: extOut }, setExtCount] = useState<
+    Omit<TokenConsumeProps, 'source'>
+  >({ input: 0, output: 0 });
   const { model } = useAgent();
 
   useEffect(() => {
     const handleTokenConsumption = ({
-      detail: { input, output },
+      detail: { input, output, source },
     }: ConsumeTokenEvent) => {
-      setCount(prev => ({
+      const updateState =
+        source === TokenSource.SUB_TASK ? setExtCount : setCount;
+
+      updateState(prev => ({
         input: prev.input + input,
         output: prev.output + output,
       }));
@@ -42,21 +55,21 @@ export function ModelStatsDisplay(): ReactNode {
   const contextWindowUsedPercentage =
     100 * ((input + output) / metadata.contextWindow);
   const cost =
-    (input / 1_000_000) * metadata.inputTokenPricing +
-    (output / 1_000_000) * metadata.outputTokenPricing;
+    ((input + extIn) / 1_000_000) * metadata.inputTokenPricing +
+    ((output + extOut) / 1_000_000) * metadata.outputTokenPricing;
 
   return (
     <Box flexDirection="row" flexShrink={0} gap={1} width="100%">
       <Text color="gray">
-        ↑ {formatTokenCount(input)} - ↓ {formatTokenCount(output)}
+        ↑ {formatTokenCount(input)} • ↓ {formatTokenCount(output)}
       </Text>
       <Spacer />
       <Box gap={1}>
         <Box paddingRight={1} gap={2}>
           <Text underline>{model}</Text>
-          <Text>${cost.toFixed(1)}</Text>
+          <Text>${cost.toFixed(cost < 100 ? 2 : 1)}</Text>
         </Box>
-        <Box width={8}>
+        <Box>
           <Text>{formatPercentageSymbol(contextWindowUsedPercentage)} </Text>
           <Text>{contextWindowUsedPercentage.toFixed(1)}% </Text>
         </Box>

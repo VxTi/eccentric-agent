@@ -26,12 +26,13 @@
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.47.0",
-    "vitest": "^4.1.7",
-    "vite-node": "6.0.0"
+    "vite-node": "6.0.0",
+    "vitest": "^4.1.7"
   },
   "dependencies": {
     "@ai-sdk/google-vertex": "^4.0.140",
     "@ai-sdk/openai": "^3.0.60",
+    "@tavily/core": "^0.7.3",
     "@vitejs/plugin-react": "^6.0.2",
     "ai": "^6.0.175",
     "boxen": "^8.0.1",

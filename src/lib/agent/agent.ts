@@ -14,11 +14,10 @@ import {
   type ToolChannelParams,
 } from '../../tools';
 import { emitConsumeTokenEvent } from '../events/emission';
+import { TokenSource } from '../events/events';
 import { type NotifierChannel } from '../events/notifier';
-import { geminiProvider } from './provider';
 import { Result } from '../result';
-import { emitAgentMessage } from '../events/user-input';
-import { v7 as uuid } from 'uuid';
+import { geminiProvider } from './provider';
 
 const AGENT_MAX_LOOP_ITERATIONS = 200;
 
@@ -31,7 +30,6 @@ export class Agent<T = string> {
 
   private goalAccomplished = false;
   private result: string | undefined;
-  private readonly taskId: string;
 
   constructor(
     private readonly goal: string,
@@ -39,7 +37,6 @@ export class Agent<T = string> {
     private readonly signal: AbortSignal,
     private readonly channel: NotifierChannel<ToolChannelParams>
   ) {
-    this.taskId = uuid();
     this.toolset = this.constructToolset();
     this.model = geminiProvider('gemini-2.5-flash');
     this.messages = [
@@ -62,11 +59,6 @@ ${message.content}`,
 
   private async process(): Promise<T> {
     let iterations = 0;
-    emitAgentMessage({
-      type: 'generic',
-      id: this.taskId,
-      content: `Running agent task ${this.goal}`,
-    });
     while (iterations++ < AGENT_MAX_LOOP_ITERATIONS) {
       if (this.goalAccomplished) {
         return this.result as T;
@@ -83,10 +75,11 @@ ${message.content}`,
           });
         },
         onStepFinish: step => {
-          emitConsumeTokenEvent(
-            step.usage.inputTokens ?? 0,
-            step.usage.outputTokens ?? 0
-          );
+          emitConsumeTokenEvent({
+            input: step.usage.inputTokens ?? 0,
+            output: step.usage.outputTokens ?? 0,
+            source: TokenSource.SUB_TASK,
+          });
         },
         providerOptions: {
           google: {
@@ -113,6 +106,7 @@ ${message.content}`,
         this.channel.notify({
           content: `An error occurred in agent task - ${String(e)}`,
         });
+        await new Promise(res => setTimeout(res, 1000));
       }
     }
 

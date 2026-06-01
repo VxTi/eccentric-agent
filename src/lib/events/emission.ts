@@ -1,5 +1,5 @@
-import { emitEvent, EventName } from './events';
+import { emitEvent, EventName, type TokenConsumeProps } from './events';
 
-export function emitConsumeTokenEvent(input: number, output: number): void {
-  emitEvent(EventName.CONSUME_TOKENS, input, output);
+export function emitConsumeTokenEvent(props: TokenConsumeProps): void {
+  emitEvent(EventName.CONSUME_TOKENS, props);
 }
