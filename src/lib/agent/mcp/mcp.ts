@@ -159,7 +159,7 @@ export class MCP extends EventEmitter {
     return mcp;
   }
 
-  public async callTool(name: string, args: object): Promise<object> {
+  public async callTool(name: string, args: object): Promise<unknown> {
     const data = await this.makeRequest({
       method: McpMethod.CALL_TOOL,
       decoder: toolCallResponseSchema,

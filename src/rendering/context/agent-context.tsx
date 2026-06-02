@@ -22,7 +22,7 @@ import {
   useState,
 } from 'react';
 import { v7 as uuid } from 'uuid';
-import { type MCP } from '../../lib/agent/mcp/mcp';
+import { loadMcpConfig, type MCP } from '../../lib/agent/mcp/mcp';
 import { geminiProvider, type ModelName } from '../../lib/agent/provider';
 import { DEFAULT_SYSTEM_PROMPT } from '../../lib/constants';
 import { emitConsumeTokenEvent } from '../../lib/events/emission';
@@ -77,10 +77,8 @@ const PrimaryAgentContext = createContext<AgentContext | null>(null);
 
 export function AgentProvider({
   children,
-  mcpServers,
 }: {
   children: ReactNode;
-  mcpServers: MCP[];
 }): ReactNode {
   const [messageQueue, setMessageQueue] = useState<string[]>([]);
   const [cwd, setCwd] = useState<string>(process.cwd());
@@ -111,6 +109,14 @@ export function AgentProvider({
     DEFAULT_SYSTEM_PROMPT
   );
 
+  const [mcpServers, setMcpServers] = useState<MCP[]>([]);
+
+  useEffect(() => {
+    void loadMcpConfig(signal)
+      .catch(() => [])
+      .then(setMcpServers);
+  }, [signal]);
+
   /**
    * System prompt construction
    */
@@ -130,21 +136,19 @@ export function AgentProvider({
    */
   const setMessage = useCallback(
     (newMessage: Message) => {
-      const existingMessage = messages.findIndex(
-        existingMessage => existingMessage.id === newMessage.id
-      );
+      setMessages(prev => {
+        const existingMessage = messages.findIndex(
+          existingMessage => existingMessage.id === newMessage.id
+        );
 
-      // If it doesn't exist already ,append it to the existing one
-      if (existingMessage < 0) {
-        setMessages(prev => [...prev, newMessage]);
-        return;
-      }
-
-      setMessages(prev =>
-        prev.map(prevMessage =>
+        // If it doesn't exist already ,append it to the existing one
+        if (existingMessage < 0) {
+          return [...prev, newMessage];
+        }
+        return prev.map(prevMessage =>
           prevMessage.id === newMessage.id ? newMessage : prevMessage
-        )
-      );
+        );
+      });
     },
     [messages]
   );

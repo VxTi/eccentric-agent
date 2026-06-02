@@ -5,7 +5,6 @@ import chalk from 'chalk';
 import isNumber from 'lodash/isNumber';
 import { stdin, stdout } from 'node:process';
 import { render } from 'ink';
-import { loadMcpConfig } from './lib/agent/mcp/mcp';
 import {
   AgentProvider,
   ApplicationCancellationProvider,
@@ -42,15 +41,10 @@ async function main(): Promise<void> {
     )
   );
 
-  const mcpRegistry = await loadMcpConfig(controller.signal).catch(e => {
-    console.error(e);
-    process.exit(1);
-  });
-
   const { waitUntilExit } = render(
     <ApplicationCancellationProvider controller={controller}>
       <UserInputProvider>
-        <AgentProvider mcpServers={mcpRegistry}>
+        <AgentProvider>
           <App />
         </AgentProvider>
       </UserInputProvider>

@@ -38,9 +38,7 @@ const listMcpToolsOutputSchema = z.object({
 
 const callMcpToolOutputSchema = z.object({
   action: z.literal(ToolAction.CALL_TOOL),
-  result: z
-    .record(z.string(), z.unknown())
-    .describe('The result of the MCP tool call.'),
+  result: z.unknown().describe('The result of the MCP tool call.'),
 });
 
 const outputSchema = z.object({
@@ -65,7 +63,7 @@ async function callTool(
     throw new Error(`MCP server ${mcp.name} does not have tool ${name}`);
   }
 
-  const result: object = await mcp.callTool(name, args);
+  const result: unknown = await mcp.callTool(name, args);
   return {
     action: ToolAction.CALL_TOOL,
     result,
@@ -102,7 +100,7 @@ export default createTool({
       case ToolAction.CALL_TOOL: {
         const { toolName, args } = request;
         return {
-          value: callTool(mcp, toolName, args),
+          value: await callTool(mcp, toolName, args),
         };
       }
     }
