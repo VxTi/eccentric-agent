@@ -14,6 +14,7 @@ import SpawnAgents from '../spawn-agent';
 import UpdateTaskList from '../tasks/update-task-list';
 import WebFetch from '../web-fetch';
 import WebSearch from '../web-search';
+import MCP from '../mcp';
 
 export const agentTools = [
   FindFile,
@@ -25,6 +26,7 @@ export const agentTools = [
   GetUserLocation,
   CreateTaskList,
   UpdateTaskList,
+  MCP,
 ] satisfies IToolBase[];
 
 export const registry = [

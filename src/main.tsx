@@ -32,10 +32,6 @@ async function main(): Promise<void> {
   if (!stdin.isTTY) {
     throw new Error('stdin not a TTY. CLI need interactive terminal.\n');
   }
-  const mcpRegistry = await loadMcpConfig(controller.signal).catch((e) => {
-    console.error(e)
-    process.exit(1)
-  })
 
   stdout.write(ANSI_ALT_SCREEN_ENTER);
   stdout.write(ANSI_MOUSE_ENABLE);
@@ -45,6 +41,11 @@ async function main(): Promise<void> {
       isNumber(controller.signal.reason) ? controller.signal.reason : 0
     )
   );
+
+  const mcpRegistry = await loadMcpConfig(controller.signal).catch(e => {
+    console.error(e);
+    process.exit(1);
+  });
 
   const { waitUntilExit } = render(
     <ApplicationCancellationProvider controller={controller}>
@@ -58,7 +59,7 @@ async function main(): Promise<void> {
       stdout,
       stdin,
       exitOnCtrlC: true,
-      patchConsole: false,
+      patchConsole: true,
       maxFps: 120,
       incrementalRendering: true,
       concurrent: true,

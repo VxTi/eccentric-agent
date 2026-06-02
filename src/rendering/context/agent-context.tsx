@@ -22,7 +22,7 @@ import {
   useState,
 } from 'react';
 import { v7 as uuid } from 'uuid';
-import { type MCP } from '../../lib/agent/mcp/types';
+import { type MCP } from '../../lib/agent/mcp/mcp';
 import { geminiProvider, type ModelName } from '../../lib/agent/provider';
 import { DEFAULT_SYSTEM_PROMPT } from '../../lib/constants';
 import { emitConsumeTokenEvent } from '../../lib/events/emission';
@@ -100,7 +100,7 @@ export function AgentProvider({
       taskList: new TaskList(),
       notifier: new Notifier(),
       fileCache: new FileCache(),
-      model: geminiProvider('gemini-3.5-flash'),
+      model: geminiProvider('gemini-2.5-flash'),
     };
   }, []);
   const tools = useMemo<ToolSet>(
@@ -116,34 +116,35 @@ export function AgentProvider({
    */
   useEffect(() => {
     let cancelled = false;
-    void constructSystemPrompt(taskList, cwd).then(prompt => {
+    void constructSystemPrompt(taskList, mcpServers, cwd).then(prompt => {
       if (!cancelled) setSystemPrompt(prompt);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [taskList, cwd]);
+  }, [taskList, cwd, mcpServers]);
 
   /**
    * Message addition / updates
    */
   const setMessage = useCallback(
-    (message: Message) => {
-      const existingMessage = messages.findIndex(msg => msg.id === message.id);
+    (newMessage: Message) => {
+      const existingMessage = messages.findIndex(
+        existingMessage => existingMessage.id === newMessage.id
+      );
 
       // If it doesn't exist already ,append it to the existing one
       if (existingMessage < 0) {
-        setMessages(prev => [...prev, message]);
+        setMessages(prev => [...prev, newMessage]);
         return;
       }
 
-      setMessages(prev => {
-        const copy = [...prev];
-
-        copy[existingMessage] = message;
-        return copy;
-      });
+      setMessages(prev =>
+        prev.map(prevMessage =>
+          prevMessage.id === newMessage.id ? newMessage : prevMessage
+        )
+      );
     },
     [messages]
   );
@@ -295,12 +296,18 @@ export function useAgent(): AgentContext {
 
 async function constructSystemPrompt(
   taskList: TaskList,
+  mcps: MCP[],
   cwd: string
 ): Promise<string> {
   const systemPrompt = await loadSystemPrompt(cwd);
 
+  const mcpServerNames = mcps.map(mcp => `- ${mcp.name}`).join('\n');
   const taskFragment = constructTaskListSystemPromptFragment(taskList);
-  return compact([systemPrompt, taskFragment]).join('\n');
+  return compact([
+    systemPrompt,
+    `The following MCP servers are available:\n${mcpServerNames}`,
+    taskFragment,
+  ]).join('\n');
 }
 
 function constructTaskListSystemPromptFragment(
@@ -377,7 +384,6 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
           options: options.map(opt => ({ label: opt.text, id: opt.option })),
           allowMultiple: false,
         });
-        console.log(chosen);
         const selectionOption = await tool.onOptionSelect(
           input,
           chosen.id,

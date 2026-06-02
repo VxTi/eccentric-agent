@@ -7,8 +7,6 @@ import {
 } from './models';
 import type { z } from 'zod';
 
-declare interface MCP {}
-
 export declare namespace mcp {
   type McpConfig = z.infer<typeof mcpServerConfigSchema>;
 
@@ -24,6 +22,4 @@ export declare namespace mcp {
     data: object,
     protocolVersion?: string
   ) => Promise<unknown>;
-
-  type Registry = Record<string, MCP>;
 }

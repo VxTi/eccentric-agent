@@ -65,7 +65,7 @@ export const primitiveSchema = z.object({
 
 export const toolSchema = z.object({
   ...primitiveSchema.shape,
-  inputSchema: z.any(),
+  inputSchema: z.unknown(),
 });
 export const listToolsResponseSchema = jsonRpcResponseSchema(
   z.object({

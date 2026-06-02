@@ -72,7 +72,6 @@ export async function loadMcpConfig(signal: AbortSignal): Promise<MCP[]> {
 
     const content = await fs.promises.readFile(path, 'utf8');
     const json: unknown = JSON.parse(content);
-    console.log(path, json);
     const parsed = mcpConfigSchema.parse(json);
 
     return Promise.all(
@@ -89,7 +88,7 @@ export class MCP extends EventEmitter {
   private metadata: mcp.ServerInfo | undefined;
   private process: ChildProcess;
   private messageBuffer: string = '';
-
+  private cachedTools: mcp.Tool[];
   private processActive: boolean;
 
   private constructor(
@@ -98,25 +97,30 @@ export class MCP extends EventEmitter {
     signal: AbortSignal
   ) {
     super();
-    console.log('Spawning process with path ', process.env.PATH);
+    this.cachedTools = [];
     this.processActive = true;
     this.process = spawn(config.command, config.args, {
       shell: true,
+      detached: true,
       signal,
+      stdio: ['pipe', 'pipe', 'pipe'],
       env: {
         PATH: process.env.PATH,
+        TERM: 'dumb',
+        NO_COLOR: '1',
+        CI: '1',
         ...(config.env ?? {}),
       },
     });
-
+    this.process.unref();
     this.process.stdout?.on('data', (data: Buffer) => {
       this.messageBuffer += data.toString();
       this.parseAndEmitMessages();
     });
 
-    this.process.stderr?.on('data', (data: Buffer) => {
+    /*this.process.stderr?.on('data', (data: Buffer) => {
       console.error(`-> (${this.name}): ${data.toString()}`);
-    });
+    });*/
 
     this.process.on('close', () => (this.processActive = false));
   }
@@ -129,7 +133,6 @@ export class MCP extends EventEmitter {
 
       if (message) {
         try {
-          console.error('Payload:', message);
           const parsedMessage: unknown = JSON.parse(message);
           this.emit(INCOMING_MESSAGE_EVENT_ID, parsedMessage);
         } catch (e) {
@@ -150,6 +153,8 @@ export class MCP extends EventEmitter {
   ): Promise<MCP> {
     const mcp = new MCP(name, config, signal);
     await mcp.initializeClient();
+    await mcp.notifyServer();
+    await mcp.listToolsInternal();
 
     return mcp;
   }
@@ -168,20 +173,23 @@ export class MCP extends EventEmitter {
     return data.result.content;
   }
 
-  public async listTools(): Promise<mcp.Tool[]> {
+  private async listToolsInternal(): Promise<void> {
     const { result } = await this.makeRequest({
       method: McpMethod.LIST_TOOLS,
       decoder: listToolsResponseSchema,
-      protocolVersion: this.serverMetadata.protocolVersion,
     });
-    return result.tools;
+    this.cachedTools = result.tools;
+  }
+
+  public get listTools(): mcp.Tool[] {
+    return this.cachedTools;
   }
 
   private async notifyServer(): Promise<void> {
     await this.makeRequest({
       decoder: z.any(),
       method: McpMethod.NOTIFY_INITIALIZED,
-      protocolVersion: this.serverMetadata.protocolVersion,
+      listen: false,
     });
   }
 
@@ -199,23 +207,27 @@ export class MCP extends EventEmitter {
     });
 
     this.metadata = response.result;
-    await this.notifyServer();
   }
 
   private async makeRequest<T extends object, R>(props: {
     method: McpMethod;
     decoder: z.ZodType<R>;
     params?: T;
-    protocolVersion?: string;
+    listen?: boolean;
   }): Promise<R> {
-    const { method, params, decoder } = props;
-    console.error(`Outgoing -> ${method}`, params);
+    const { method, params, decoder, listen } = props;
     const id = messageIdRegistry[method];
+
+    if (listen === false) {
+      const payload = { jsonrpc: '2.0', id, method, params };
+      this.process.stdin?.write(`${JSON.stringify(payload)}\n`);
+      return undefined as R;
+    }
+
     return await new Promise(resolve => {
       this.once(INCOMING_MESSAGE_EVENT_ID, (msg: JSONRPCSchema) => {
         if (msg.id !== id) return;
 
-        console.error(`Handling incoming message - ${method}`, msg);
         const data = decoder.parse(msg);
 
         resolve(data);

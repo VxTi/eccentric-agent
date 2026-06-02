@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "atlassian-rovo-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote@latest",
+        "https://mcp.atlassian.com/v1/mcp/authv2"
+      ],
+      "autoApprove": [
+        "getJiraIssue",
+        "getJiraProjectIssueTypesMetadata",
+        "getIssueLinkTypes",
+        "getJiraIssueTypeMetaWithFields",
+        "getTransitionsForJiraIssue"
+      ]
+    }
+  }
+}
