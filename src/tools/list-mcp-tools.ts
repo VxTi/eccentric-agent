@@ -38,7 +38,7 @@ export default createTool({
 
     return {
       mcpServer,
-      tools: mcp.listTools,
+      tools: await mcp.listTools(),
     };
   },
 

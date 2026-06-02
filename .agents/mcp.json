@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "atlassian-rovo-mcp": {
+    "atlassian-jira": {
       "command": "npx",
       "args": [
         "-y",

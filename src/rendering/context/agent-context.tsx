@@ -117,9 +117,20 @@ export function AgentProvider({
   const [mcpServers, setMcpServers] = useState<MCP[]>([]);
 
   useEffect(() => {
+    setStatus({
+      text: 'Loading MCP servers',
+      loading: true,
+    });
     void loadMcpConfig(signal)
-      .catch(() => [])
-      .then(setMcpServers);
+      .catch((): MCP[] => {
+        setStatus({
+          text: chalk.red('Failed to load MCP config'),
+          loading: false,
+        });
+        return [];
+      })
+      .then(setMcpServers)
+      .then(() => setStatus({ text: '', loading: false }));
   }, [signal]);
 
   /**

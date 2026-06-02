@@ -25,13 +25,13 @@ export function MessageList(): JSX.Element {
   useEffect(() => {
     if (viewportRef.current) {
       const { height } = measureElement(viewportRef.current);
-      if (height !== viewportHeight) setViewportHeight(height);
+      setViewportHeight(prev => (prev === height ? prev : height));
     }
     if (contentRef.current) {
       const { height } = measureElement(contentRef.current);
-      if (height !== contentHeight) setContentHeight(height);
+      setContentHeight(prev => (prev === height ? prev : height));
     }
-  }, [messages, contentHeight, inputRequest, viewportHeight]);
+  }, [messages, inputRequest]);
 
   const overflow = Math.max(0, contentHeight - viewportHeight);
   const clampedOffset = Math.min(Math.max(0, scrollOffset), overflow);
@@ -56,8 +56,9 @@ export function MessageList(): JSX.Element {
       flexDirection="column"
       flexGrow={1}
       flexShrink={1}
-      overflowY="hidden"
-      height={viewportHeight}
+      minHeight={0}
+      height={viewportHeight || undefined}
+      overflow="hidden"
     >
       <Box
         ref={contentRef}

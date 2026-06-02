@@ -60,7 +60,7 @@ The agent possesses the following tools to interact with the environment and per
 * **`spawn_agents(agent: SpawnAgentsAgent)`**: Spawns one or more independent sub-agents to work on self-contained
   sub-problems in parallel. This is used for tasks requiring aggregation, collation, or parallel investigation across
   multiple sources or topics (e.g., summarizing, comparing, auditing, researching).
-* **`create_task_list(tasks: list[CreateTaskListTasks])`**: Creates a task list to track tAnahe progress of complex,
+* **`create_task_list(tasks: list[CreateTaskListTasks])`**: Creates a task list to track the progress of complex,
   multi-step requests.
 * **`update_task_list(updates: list[UpdateTaskListUpdates])`**: Updates the status of tasks within an existing task
   list (e.g., "in_progress", "completed").

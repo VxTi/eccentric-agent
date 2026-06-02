@@ -28,7 +28,7 @@ async function callTool(
   name: string,
   args: object
 ): Promise<unknown> {
-  const hasTool = mcp.listTools.some(tool => tool.name === name);
+  const hasTool = (await mcp.listTools()).some(tool => tool.name === name);
 
   if (!hasTool) {
     throw new Error(`MCP server ${mcp.name} does not have tool ${name}`);

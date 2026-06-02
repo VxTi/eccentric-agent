@@ -74,7 +74,7 @@ export async function loadMcpConfig(signal: AbortSignal): Promise<MCP[]> {
     const json: unknown = JSON.parse(content);
     const parsed = mcpConfigSchema.parse(json);
 
-    return Promise.all(
+    return await Promise.all(
       Object.entries(parsed.mcpServers).map(
         async ([name, config]) => await MCP.createClient(name, config, signal)
       )
@@ -156,7 +156,6 @@ export class MCP extends EventEmitter {
     const mcp = new MCP(name, config, signal);
     await mcp.initializeClient();
     await mcp.notifyServer();
-    await mcp.listToolsInternal();
 
     return mcp;
   }
@@ -175,15 +174,16 @@ export class MCP extends EventEmitter {
     return data.result.content;
   }
 
-  private async listToolsInternal(): Promise<void> {
+  public async listTools(): Promise<mcp.Tool[]> {
+    if (this.cachedTools.length > 0) {
+      return this.cachedTools;
+    }
     const { result } = await this.makeRequest({
       method: McpMethod.LIST_TOOLS,
       decoder: listToolsResponseSchema,
     });
     this.cachedTools = result.tools;
-  }
 
-  public get listTools(): mcp.Tool[] {
     return this.cachedTools;
   }
 
