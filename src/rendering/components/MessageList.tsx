@@ -56,8 +56,8 @@ export function MessageList(): JSX.Element {
       flexDirection="column"
       flexGrow={1}
       flexShrink={1}
-      minHeight={0}
       overflowY="hidden"
+      height={viewportHeight}
     >
       <Box
         ref={contentRef}
@@ -66,9 +66,12 @@ export function MessageList(): JSX.Element {
         marginTop={-(overflow - clampedOffset)}
       >
         {messages.map((message, idx) => (
-          <Box key={idx} flexShrink={0} flexDirection="column">
-            <ModelMessageFragment message={message} />
-          </Box>
+          <ModelMessageFragment
+            key={idx}
+            message={message}
+            viewportHeight={viewportHeight}
+            scrollOffset={scrollOffset}
+          />
         ))}
       </Box>
     </Box>

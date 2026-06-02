@@ -5,6 +5,7 @@ export const SUPPORTED_COMMANDS = [
   { value: 'exit' },
   { value: 'quit' },
   { value: 'halt', description: 'Halts the agent of its activity' },
+  { value: 'system-prompt', description: 'Prints the current system prompt' },
 ] as const satisfies Suggestion[];
 export type Command = (typeof SUPPORTED_COMMANDS)[number]['value'];
 

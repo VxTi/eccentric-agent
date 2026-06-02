@@ -9,6 +9,7 @@ import {
 import chalk from 'chalk';
 import compact from 'lodash/compact';
 import first from 'lodash/first';
+import { readFileSync } from 'node:fs';
 import { glob } from 'node:fs/promises';
 import {
   createContext,
@@ -24,7 +25,10 @@ import {
 import { v7 as uuid } from 'uuid';
 import { loadMcpConfig, type MCP } from '../../lib/agent/mcp/mcp';
 import { geminiProvider, type ModelName } from '../../lib/agent/provider';
-import { DEFAULT_SYSTEM_PROMPT } from '../../lib/constants';
+import {
+  CONSTANT_SYSTEM_PROMPT,
+  DEFAULT_SYSTEM_PROMPT,
+} from '../../lib/constants';
 import { emitConsumeTokenEvent } from '../../lib/events/emission';
 import {
   type AgentContextSyncResult,
@@ -71,6 +75,7 @@ export interface AgentContext {
   setStatus: Dispatch<SetStateAction<AgentStatus>>;
   model: ModelName;
   mcpServers: MCP[];
+  systemPrompt: string;
 }
 
 const PrimaryAgentContext = createContext<AgentContext | null>(null);
@@ -134,24 +139,15 @@ export function AgentProvider({
   /**
    * Message addition / updates
    */
-  const setMessage = useCallback(
-    (newMessage: Message) => {
-      setMessages(prev => {
-        const existingMessage = messages.findIndex(
-          existingMessage => existingMessage.id === newMessage.id
-        );
-
-        // If it doesn't exist already ,append it to the existing one
-        if (existingMessage < 0) {
-          return [...prev, newMessage];
-        }
-        return prev.map(prevMessage =>
-          prevMessage.id === newMessage.id ? newMessage : prevMessage
-        );
-      });
-    },
-    [messages]
-  );
+  const setMessage = useCallback((newMessage: Message) => {
+    setMessages(prev => {
+      const i = prev.findIndex(m => m.id === newMessage.id);
+      if (i < 0) return [...prev, newMessage];
+      const next = prev.slice();
+      next[i] = newMessage;
+      return next;
+    });
+  }, []);
 
   /**
    * Handling incoming messages from non-react world, and token consumption
@@ -271,6 +267,7 @@ export function AgentProvider({
   return (
     <PrimaryAgentContext.Provider
       value={{
+        systemPrompt,
         model: (typeof model === 'string' ? model : model.modelId) as ModelName,
         messages,
         setMessages,
@@ -309,6 +306,7 @@ async function constructSystemPrompt(
   const taskFragment = constructTaskListSystemPromptFragment(taskList);
   return compact([
     systemPrompt,
+    CONSTANT_SYSTEM_PROMPT,
     `The following MCP servers are available:\n${mcpServerNames}`,
     taskFragment,
   ]).join('\n');
@@ -349,7 +347,10 @@ async function loadSystemPrompt(cwd: string): Promise<string> {
   const agentFile = await Array.fromAsync(
     glob(`**/{${supportedFileNames.join(',')}}.md`, { cwd })
   );
-  return first(agentFile) ?? DEFAULT_SYSTEM_PROMPT;
+  const firstFile = first(agentFile);
+  if (!firstFile) return DEFAULT_SYSTEM_PROMPT;
+
+  return readFileSync(firstFile, 'utf-8');
 }
 
 function constructToolset(tools: IToolBase[], notifier: Notifier): ToolSet {

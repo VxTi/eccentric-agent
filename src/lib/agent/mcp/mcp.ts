@@ -136,7 +136,9 @@ export class MCP extends EventEmitter {
           const parsedMessage: unknown = JSON.parse(message);
           this.emit(INCOMING_MESSAGE_EVENT_ID, parsedMessage);
         } catch (e) {
-          console.error(`Failed to parse MCP message: ${message}`, e);
+          console.error(
+            `Failed to parse MCP message: ${message}: ${JSON.stringify(e)}`
+          );
         }
       }
     }

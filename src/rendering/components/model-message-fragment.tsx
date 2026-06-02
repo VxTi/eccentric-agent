@@ -8,7 +8,17 @@ import {
 } from '../../lib/types/messages';
 import { MarkdownView } from './MarkdownView';
 
-export function ModelMessageFragment({ message }: { message: Message }) {
+interface Props<T extends Message = Message> {
+  viewportHeight: number;
+  scrollOffset: number;
+  message: T;
+}
+
+export function ModelMessageFragment({
+  message,
+  viewportHeight,
+  scrollOffset,
+}: Props) {
   return (
     <Box
       width="80%"
@@ -17,44 +27,48 @@ export function ModelMessageFragment({ message }: { message: Message }) {
       flexShrink={0}
       marginBottom={1}
     >
-      <ModelMessageText message={message} />
+      <ModelMessageText
+        message={message}
+        viewportHeight={viewportHeight}
+        scrollOffset={scrollOffset}
+      />
     </Box>
   );
 }
 
-function ModelMessageText({ message }: { message: Message }) {
-  switch (message.type) {
+function ModelMessageText(props: Props) {
+  switch (props.message.type) {
     case 'user':
-      return <User message={message} />;
+      return <User {...props} message={props.message} />;
     case 'assistant':
-      return <Assistant message={message} />;
+      return <Assistant {...props} message={props.message} />;
     case 'generic':
-      return <Generic message={message} />;
+      return <Generic {...props} message={props.message} />;
   }
 }
 
-function User({ message }: { message: UserMessage }) {
+function User({ message, ...props }: Props<UserMessage>) {
   return (
     <Box flexDirection="row" flexShrink={0} flexWrap="wrap">
       <Text>Me</Text>
       <Text color="gray"> ▶ </Text>
-      <MarkdownView content={message.content} />
+      <MarkdownView content={message.content} {...props} />
     </Box>
   );
 }
 
-function Assistant({ message }: { message: AssistantMessage }) {
+function Assistant({ message, ...props }: Props<AssistantMessage>) {
   return (
     <Box flexDirection="row" flexShrink={0} flexWrap="wrap">
       <Text color="blue">◆ </Text>
-      <MarkdownView content={message.content} />
+      <MarkdownView content={message.content} {...props} />
     </Box>
   );
 }
 
-function Generic({ message }: { message: GenericMessage }) {
+function Generic({ message, ...props }: Props<GenericMessage>) {
   return (
-    <Box maxWidth="80%" flexShrink={0} flexDirection="row" flexWrap="wrap">
+    <Box maxWidth="80%" flexShrink={0} flexDirection="row">
       {message.failure ? (
         <Text color="red" bold>
           ✖{' '}
@@ -62,7 +76,7 @@ function Generic({ message }: { message: GenericMessage }) {
       ) : (
         <LoadingSpinner loading={message.loading} />
       )}
-      <MarkdownView content={message.content} />
+      <MarkdownView content={message.content} {...props} />
     </Box>
   );
 }
