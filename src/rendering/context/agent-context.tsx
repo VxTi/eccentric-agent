@@ -1,5 +1,4 @@
 import {
-  type LanguageModel,
   type ModelMessage,
   stepCountIs,
   streamText,
@@ -23,6 +22,8 @@ import {
   useState,
 } from 'react';
 import { v7 as uuid } from 'uuid';
+import { loadMcpConfig } from '../../lib/agent/mcp/mcp';
+import { type MCP } from '../../lib/agent/mcp/types';
 import { geminiProvider, type ModelName } from '../../lib/agent/provider';
 import { DEFAULT_SYSTEM_PROMPT } from '../../lib/constants';
 import { emitConsumeTokenEvent } from '../../lib/events/emission';
@@ -92,18 +93,19 @@ export function AgentProvider({
 
   const signal = useSignal();
 
-  const fileCache = useMemo(() => new FileCache(cwd), [cwd]);
-  const taskList = useMemo(() => new TaskList(), []);
-
-  const notifier = useMemo(() => new Notifier(), []);
+  const { taskList, notifier, model, fileCache } = useMemo(() => {
+    return {
+      taskList: new TaskList(),
+      notifier: new Notifier(),
+      model: geminiProvider('gemini-2.5-flash'),
+      fileCache: new FileCache(),
+    };
+  }, []);
   const tools = useMemo<ToolSet>(
     () => constructToolset(registry, notifier),
     [notifier]
   );
-  const model = useMemo<LanguageModel>(
-    () => geminiProvider('gemini-2.5-flash'),
-    []
-  );
+  const [mcpConfig, setMcpConfig] = useState<MCP[]>([]);
   const [systemPrompt, setSystemPrompt] = useState<string>(
     DEFAULT_SYSTEM_PROMPT
   );
@@ -116,10 +118,15 @@ export function AgentProvider({
     void constructSystemPrompt(taskList, cwd).then(prompt => {
       if (!cancelled) setSystemPrompt(prompt);
     });
+
+    void loadMcpConfig(signal).then(cfg => {
+      if (!cancelled) setMcpConfig(cfg);
+    });
+
     return () => {
       cancelled = true;
     };
-  }, [taskList, cwd]);
+  }, [taskList, cwd, signal]);
 
   /**
    * Message addition / updates
@@ -343,8 +350,9 @@ function constructToolset(tools: IToolBase[], notifier: Notifier): ToolSet {
 }
 
 function constructTool(tool: IToolBase, notifier: Notifier): Tool {
-  const { description, inputSchema, outputSchema } = tool;
+  const { description, inputSchema, outputSchema, name } = tool;
   return createTool({
+    title: name,
     description,
     inputSchema,
     outputSchema,

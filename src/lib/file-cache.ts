@@ -5,8 +5,8 @@ export class FileCache {
   private readonly cwd: string;
   private readonly cache: Map<string, number>;
 
-  constructor(cwd: string) {
-    this.cwd = cwd;
+  constructor() {
+    this.cwd = process.cwd();
     this.cache = new Map<string, number>();
   }
 
