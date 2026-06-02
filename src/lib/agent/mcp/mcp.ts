@@ -51,14 +51,18 @@ export function getLocalClaudeConfig(): string {
 
 export async function loadMcpConfig(signal: AbortSignal): Promise<MCP[]> {
   const home = os.homedir();
+  const cwd = process.cwd();
 
   const localPaths: string[] = [
-    getLocalClaudeConfig(),
+    // getLocalClaudeConfig(),
+    path.resolve(cwd, '.agents/mcp.json'),
+    path.resolve(cwd, '.kiro/mcp.json'),
+    path.resolve(home, '.kiro/mcp.json'),
 
-    path.resolve(process.cwd(), '.claude.json'),
-    path.resolve(home, '.claude.json'),
+    // path.resolve(cwd, '.claude.json'),
+    // path.resolve(home, '.claude.json'),
 
-    path.resolve(process.cwd(), '.cursor/mcp.json'),
+    path.resolve(cwd, '.cursor/mcp.json'),
     path.resolve(home, '.cursor/mcp.json'),
   ];
   for (const path of localPaths) {
@@ -67,7 +71,9 @@ export async function loadMcpConfig(signal: AbortSignal): Promise<MCP[]> {
     }
 
     const content = await fs.promises.readFile(path, 'utf8');
-    const parsed = mcpConfigSchema.parse(content);
+    const json: unknown = JSON.parse(content);
+    console.log(path, json);
+    const parsed = mcpConfigSchema.parse(json);
 
     return Promise.all(
       Object.entries(parsed.mcpServers).map(

@@ -22,7 +22,6 @@ import {
   useState,
 } from 'react';
 import { v7 as uuid } from 'uuid';
-import { loadMcpConfig } from '../../lib/agent/mcp/mcp';
 import { type MCP } from '../../lib/agent/mcp/types';
 import { geminiProvider, type ModelName } from '../../lib/agent/provider';
 import { DEFAULT_SYSTEM_PROMPT } from '../../lib/constants';
@@ -71,14 +70,17 @@ export interface AgentContext {
   status: AgentStatus;
   setStatus: Dispatch<SetStateAction<AgentStatus>>;
   model: ModelName;
+  mcpServers: MCP[];
 }
 
 const PrimaryAgentContext = createContext<AgentContext | null>(null);
 
 export function AgentProvider({
   children,
+  mcpServers,
 }: {
   children: ReactNode;
+  mcpServers: MCP[];
 }): ReactNode {
   const [messageQueue, setMessageQueue] = useState<string[]>([]);
   const [cwd, setCwd] = useState<string>(process.cwd());
@@ -97,15 +99,14 @@ export function AgentProvider({
     return {
       taskList: new TaskList(),
       notifier: new Notifier(),
-      model: geminiProvider('gemini-2.5-flash'),
       fileCache: new FileCache(),
+      model: geminiProvider('gemini-3.5-flash'),
     };
   }, []);
   const tools = useMemo<ToolSet>(
     () => constructToolset(registry, notifier),
     [notifier]
   );
-  const [mcpConfig, setMcpConfig] = useState<MCP[]>([]);
   const [systemPrompt, setSystemPrompt] = useState<string>(
     DEFAULT_SYSTEM_PROMPT
   );
@@ -119,14 +120,10 @@ export function AgentProvider({
       if (!cancelled) setSystemPrompt(prompt);
     });
 
-    void loadMcpConfig(signal).then(cfg => {
-      if (!cancelled) setMcpConfig(cfg);
-    });
-
     return () => {
       cancelled = true;
     };
-  }, [taskList, cwd, signal]);
+  }, [taskList, cwd]);
 
   /**
    * Message addition / updates
@@ -272,6 +269,7 @@ export function AgentProvider({
         model: (typeof model === 'string' ? model : model.modelId) as ModelName,
         messages,
         setMessages,
+        mcpServers,
         cwd,
         setCwd,
         submitMessage,

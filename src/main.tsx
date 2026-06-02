@@ -5,6 +5,7 @@ import chalk from 'chalk';
 import isNumber from 'lodash/isNumber';
 import { stdin, stdout } from 'node:process';
 import { render } from 'ink';
+import { loadMcpConfig } from './lib/agent/mcp/mcp';
 import {
   AgentProvider,
   ApplicationCancellationProvider,
@@ -31,6 +32,10 @@ async function main(): Promise<void> {
   if (!stdin.isTTY) {
     throw new Error('stdin not a TTY. CLI need interactive terminal.\n');
   }
+  const mcpRegistry = await loadMcpConfig(controller.signal).catch((e) => {
+    console.error(e)
+    process.exit(1)
+  })
 
   stdout.write(ANSI_ALT_SCREEN_ENTER);
   stdout.write(ANSI_MOUSE_ENABLE);
@@ -44,7 +49,7 @@ async function main(): Promise<void> {
   const { waitUntilExit } = render(
     <ApplicationCancellationProvider controller={controller}>
       <UserInputProvider>
-        <AgentProvider>
+        <AgentProvider mcpServers={mcpRegistry}>
           <App />
         </AgentProvider>
       </UserInputProvider>
