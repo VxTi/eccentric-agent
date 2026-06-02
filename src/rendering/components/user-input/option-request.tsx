@@ -23,7 +23,9 @@ export function InputRequest(): ReactNode {
 
         // If multiselect is disabled and we already have a selection
         // (and it's not the current one), exit
-        if (indices.length > 0 && !allowMultiple) return indices;
+        if (indices.length > 0 && !allowMultiple) {
+          return [userSelectedInputIndex];
+        }
 
         // Otherwise append
         return [...indices, userSelectedInputIndex];
@@ -54,14 +56,24 @@ export function InputRequest(): ReactNode {
   });
 
   return (
-    <Box width="80%" alignSelf="center" flexDirection="column" flexShrink={0}>
+    <Box
+      minWidth={60}
+      width="50%"
+      alignSelf="center"
+      flexDirection="column"
+      flexShrink={0}
+      paddingBottom={2}
+      borderStyle="round"
+      borderColor="gray"
+      borderDimColor
+    >
       <Box flexDirection="column" alignItems="center">
         {title?.length && (
-          <Text bold color="white">
+          <Text bold color="whiteBright">
             {title}
           </Text>
         )}
-        {description?.length && <Text color="gray">{description}</Text>}
+        {description?.length && <Text color="white">{description}</Text>}
       </Box>
       <Box marginTop={1} marginLeft={2} flexDirection="column">
         <Text italic color="gray">
@@ -92,9 +104,11 @@ function InputOption({
   return (
     <Box>
       <Text color={selected ? 'redBright' : 'white'}>
-        {selected ? '◉' : '◯'}
+        {selected ? '◉' : '◯'}{' '}
       </Text>
-      <Text color={highlighted ? 'red' : 'white'}> {label}</Text>
+      <Text color={highlighted ? 'red' : 'white'} italic={highlighted}>
+        {label}
+      </Text>
     </Box>
   );
 }
