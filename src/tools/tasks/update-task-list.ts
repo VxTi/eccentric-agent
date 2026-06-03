@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { acquireContextInstance } from '../../rendering/context';
+import { acquireContextInstance } from '../../lib/events/context-acquisition';
 import { type Task, TaskStatus } from '../../lib/tasks';
 import { createTool } from '../common';
 

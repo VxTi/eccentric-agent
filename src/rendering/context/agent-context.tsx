@@ -32,9 +32,7 @@ import {
 } from '../../lib/constants';
 import { emitConsumeTokenEvent } from '../../lib/events/emission';
 import {
-  type AgentContextSyncResult,
   type AgentMessageEvent,
-  emitEvent,
   EventName,
   subscribeEvent,
   TokenSource,
@@ -460,14 +458,3 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
   });
 }
 
-export async function acquireContextInstance(): Promise<AgentContext> {
-  return new Promise(resolve => {
-    const handler = (event: AgentContextSyncResult) => {
-      unsubscribeEvent(EventName.CONTEXT_SYNC_RESULT, handler);
-      resolve(event.detail);
-    };
-
-    subscribeEvent(EventName.CONTEXT_SYNC_RESULT, handler);
-    emitEvent(EventName.CONTEXT_SYNC_REQUEST);
-  });
-}

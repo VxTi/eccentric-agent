@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { readFile, writeFile } from 'fs/promises';
-import { acquireContextInstance } from '../rendering/context';
+import { acquireContextInstance } from '../lib/events/context-acquisition';
 import { createTool } from './common';
 
 const inputSchema = z.object({
@@ -103,7 +103,8 @@ export default createTool({
     }
 
     let updated = lines.join('\n');
-    if (hadTrailingNewline || content.endsWith('\n') || original.length === 0) updated += '\n';
+    if (hadTrailingNewline || content.endsWith('\n') || original.length === 0)
+      updated += '\n';
 
     await writeFile(absolutePath, updated, 'utf-8');
     await context.fileCache.update(absolutePath);

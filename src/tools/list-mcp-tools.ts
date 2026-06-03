@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { toolSchema } from '../lib/agent/mcp/models';
-import { acquireContextInstance } from '../rendering/context';
+import { acquireContextInstance } from '../lib/events/context-acquisition';
 import { createTool } from './common';
 
 const inputSchema = z.object({

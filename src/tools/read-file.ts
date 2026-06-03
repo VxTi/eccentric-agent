@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as z from 'zod';
-import { acquireContextInstance } from '../rendering/context';
+import { acquireContextInstance } from '../lib/events/context-acquisition';
 import { createTool } from './common';
 
 const inputSchema = z.object({
