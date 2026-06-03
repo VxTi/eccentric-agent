@@ -2,7 +2,6 @@ import { config } from 'dotenv';
 config({ quiet: true });
 
 import chalk from 'chalk';
-import isNumber from 'lodash/isNumber';
 import { stdin, stdout } from 'node:process';
 import { render } from 'ink';
 import {
@@ -35,11 +34,7 @@ async function main(): Promise<void> {
   stdout.write(ANSI_ALT_SCREEN_ENTER);
   stdout.write(ANSI_MOUSE_ENABLE);
 
-  controller.signal.addEventListener('abort', () =>
-    handleExit(
-      isNumber(controller.signal.reason) ? controller.signal.reason : 0
-    )
-  );
+  controller.signal.addEventListener('abort', () => handleExit());
 
   const { waitUntilExit } = render(
     <ApplicationCancellationProvider controller={controller}>
@@ -67,15 +62,19 @@ process.on('SIGINT', controller.abort.bind(controller));
 process.on('SIGTERM', controller.abort.bind(controller));
 
 main()
-  .then(() => handleExit(0))
+  .then(() => {
+    restoreScreen();
+    process.exit(0);
+  })
   .catch(err => {
+    restoreScreen();
     if (err instanceof Error && err.name === 'ExitPromptError') {
       stdout.write(chalk.yellow('Goodbye.'));
     } else {
-      stdout.write(`Failure: \n${chalk.red(String(err))}\n`);
+      console.trace(`Failure: \n${chalk.red(String(err))}\n`);
     }
 
-    handleExit(1);
+    process.exit(1);
   });
 
 function handleExit(statusCode = 0): void {

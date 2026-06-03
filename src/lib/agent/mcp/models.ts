@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
 export const mcpServerConfigSchema = z.object({
-  command: z.string(),
-  args: z.array(z.string()),
+  command: z.optional(z.string()),
+  httpUrl: z.optional(z.string()),
+  args: z.optional(z.array(z.string())),
   autoApprove: z.optional(z.array(z.string())),
   env: z.optional(z.record(z.string(), z.string())),
   oauth: z.optional(

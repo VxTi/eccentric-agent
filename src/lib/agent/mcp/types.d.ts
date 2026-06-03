@@ -17,9 +17,4 @@ export declare namespace mcp {
   type Tool = z.infer<typeof toolSchema>;
 
   type ServerInfo = z.infer<typeof initializationResponseSchema>['result'];
-
-  type CommunicationProtocol = (
-    data: object,
-    protocolVersion?: string
-  ) => Promise<unknown>;
 }

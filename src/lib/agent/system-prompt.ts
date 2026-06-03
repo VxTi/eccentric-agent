@@ -2,7 +2,6 @@ import compact from 'lodash/compact';
 import first from 'lodash/first';
 import { readFileSync } from 'node:fs';
 import { glob } from 'node:fs/promises';
-import ListMcpTools from './tools/mcp/list-mcp-tools';
 import { CONSTANT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT } from '../constants';
 import { type TaskList, TaskStatus } from '../tasks';
 import type { MCP } from './mcp/mcp';
@@ -26,7 +25,7 @@ export async function constructSystemPrompt(
   return compact([
     systemPrompt,
     CONSTANT_SYSTEM_PROMPT,
-    `The following MCP servers are available:\n${mcpServerNames}\nMake sure to call the ${ListMcpTools.internalName} tool if you need to know the input schema`,
+    `The following MCP servers are available:\n${mcpServerNames}\nMake sure to call the 'list_mcp_tools' tool if you need to know the input schema`,
     taskFragment,
   ]).join('\n');
 }

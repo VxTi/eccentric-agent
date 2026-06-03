@@ -22,6 +22,8 @@ export class NotifierChannel<T extends any[]> {
   }
 }
 
+export type MessageNotifier = NotifierChannel<[string]>;
+
 export class Notifier {
   constructor(
     private readonly channels: Map<string, NotifierChannel<any>> = new Map()

@@ -1,3 +1,4 @@
+import { Client } from '@modelcontextprotocol/client';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -55,6 +56,7 @@ export async function loadMcpConfig(signal: AbortSignal): Promise<MCP[]> {
 }
 
 export class MCP extends EventEmitter {
+  private mcpClient: Client;
   private server: MCPServer | undefined;
 
   constructor(
@@ -63,6 +65,7 @@ export class MCP extends EventEmitter {
     private readonly signal: AbortSignal
   ) {
     super();
+    this.mcpClient = new Client({ name: 'eccentric-agent', version: '1.0.0' });
   }
 
   private async initialize(): Promise<void> {
@@ -85,7 +88,7 @@ export class MCP extends EventEmitter {
       await this.initialize();
     }
 
-    return this.server!.listTools();
+    return this.server?.listTools() ?? [];
   }
 
   public async getServerMetadata(): Promise<mcp.ServerInfo> {
@@ -93,9 +96,9 @@ export class MCP extends EventEmitter {
       await this.initialize();
     }
 
-    if (!this.server!.metadata) {
+    if (!this.server?.metadata) {
       throw new Error('Unable to retrieve server metadata');
     }
-    return this.server!.metadata;
+    return this.server.metadata;
   }
 }
