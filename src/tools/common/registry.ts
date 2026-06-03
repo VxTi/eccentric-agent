@@ -13,9 +13,9 @@ import Shell from '../shell';
 import SpawnAgents from '../spawn-agent';
 import UpdateTaskList from '../tasks/update-task-list';
 import WebFetch from '../web-fetch';
-import WebSearch from '../web-search';
-import ListMcpTools from '../list-mcp-tools';
-import CallMcpTool from '../call-mcp-tool';
+import WebSearch    from '../web-search';
+import ListMcpTools from '../mcp/list-mcp-tools';
+import CallMcpTool  from '../mcp/call-mcp-tool';
 
 export const agentTools = [
   FindFile,

@@ -12,7 +12,7 @@ export const enum ToolSelectionOption {
   DENY = 'deny',
 }
 
-export const DEFAULT_APPROVAL_OPTIONS: ApprovalOption<ToolSelectionOption>[] = [
+export const DEFAULT_APPROVAL_OPTIONS: ApprovalOption[] = [
   { option: ToolSelectionOption.ALLOW, text: 'Approve' },
   { option: ToolSelectionOption.DENY, text: 'Deny' },
 ];
@@ -22,7 +22,7 @@ export type ToolChannelParams = [Omit<Message, 'id' | 'type'>];
 export interface IToolBase<
   TIn = unknown,
   TOut = unknown,
-  TApprovalOption extends string = ToolSelectionOption,
+  TApprovalOption extends string = string,
 > {
   readonly internalName: string;
   readonly name: string;
@@ -41,7 +41,7 @@ export interface IToolBase<
   approvalOptions(
     input: TIn,
     channel: NotifierChannel<ToolChannelParams>
-  ): MaybePromise<ApprovalOption[]>;
+  ): MaybePromise<ApprovalOption<TApprovalOption>[]>;
 
   /**
    * @returns `false` if not provided upon tool creation
@@ -88,13 +88,15 @@ type ToolProps<
 export function createTool<
   TIn = unknown,
   TOut = unknown,
-  TApprovalOption extends string = ToolSelectionOption,
+  TApprovalOption extends string = string,
 >(
   props: ToolProps<TIn, TOut, TApprovalOption>
 ): IToolBase<TIn, TOut, TApprovalOption> {
   return {
     ...props,
-    approvalOptions: props.approvalOptions ?? (() => DEFAULT_APPROVAL_OPTIONS),
+    approvalOptions:
+      props.approvalOptions ??
+      (() => DEFAULT_APPROVAL_OPTIONS as ApprovalOption<TApprovalOption>[]),
     requiresApproval: props.requiresApproval ?? (() => false),
     onOptionSelect: props.onOptionSelect ?? (() => ToolSelectionOption.ALLOW),
   };

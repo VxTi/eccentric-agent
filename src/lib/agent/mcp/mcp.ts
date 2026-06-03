@@ -1,3 +1,4 @@
+import first from 'lodash/first';
 import { type ChildProcess, spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
@@ -249,9 +250,13 @@ export class MCP extends EventEmitter {
   }
 }
 
-export async function getMCPServer(name: string): Promise<MCP | undefined> {
+export async function getMCPServer(name: string): Promise<MCP> {
   const context = await acquireContextInstance();
 
-  const [mcp] = context.mcpServers.filter(server => server.name === name);
+  const mcp = first(context.mcpServers.filter(server => server.name === name));
+
+  if (!mcp) {
+    throw new Error(`MCP "${name}" was not found`);
+  }
   return mcp;
 }

@@ -5,6 +5,14 @@ export const mcpServerConfigSchema = z.object({
   args: z.array(z.string()),
   autoApprove: z.optional(z.array(z.string())),
   env: z.optional(z.record(z.string(), z.string())),
+  oauth: z.optional(
+    z.object({
+      enabled: z.boolean(),
+      clientId: z.string(),
+      clientSecret: z.string(),
+      scopes: z.array(z.string()),
+    })
+  ),
 });
 
 export const mcpConfigSchema = z.object({
