@@ -1,40 +1,10 @@
-import first from 'lodash/first';
-import { type ChildProcess, spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import path from 'node:path';
-import { z } from 'zod';
-import { acquireContextInstance } from '../../events/context-acquisition';
-import {
-  initializationResponseSchema,
-  type JSONRPCSchema,
-  listToolsResponseSchema,
-  mcpConfigSchema,
-  toolCallResponseSchema,
-} from './models';
+import { mcpConfigSchema } from './models';
+import { MCPServer } from './server';
 import { type mcp } from './types';
-
-const enum McpMethod {
-  INITIALIZE = 'initialize',
-  NOTIFY_INITIALIZED = 'notifications/initialized',
-  LIST_TOOLS = 'tools/list',
-  CALL_TOOL = 'tools/call',
-}
-
-const PROTOCOL_VERSION = '2025-06-18';
-const CLIENT_INFO = {
-  name: 'eccentric-agent',
-  version: '1.0.0',
-};
-
-const messageIdRegistry: Partial<Record<McpMethod, number>> = {
-  [McpMethod.INITIALIZE]: 1,
-  [McpMethod.LIST_TOOLS]: 2,
-  [McpMethod.CALL_TOOL]: 3,
-};
-
-const INCOMING_MESSAGE_EVENT_ID = 'incomingMessage';
 
 export function getLocalClaudeConfig(): string {
   const home = os.homedir();
@@ -76,10 +46,8 @@ export async function loadMcpConfig(signal: AbortSignal): Promise<MCP[]> {
     const json: unknown = JSON.parse(content);
     const parsed = mcpConfigSchema.parse(json);
 
-    return await Promise.all(
-      Object.entries(parsed.mcpServers).map(
-        async ([name, config]) => await MCP.createClient(name, config, signal)
-      )
+    return Object.entries(parsed.mcpServers).map(
+      ([name, config]) => new MCP(name, config, signal)
     );
   }
 
@@ -87,176 +55,47 @@ export async function loadMcpConfig(signal: AbortSignal): Promise<MCP[]> {
 }
 
 export class MCP extends EventEmitter {
-  private metadata: mcp.ServerInfo | undefined;
-  private process: ChildProcess;
-  private messageBuffer: string = '';
-  private cachedTools: mcp.Tool[];
-  private processActive: boolean;
+  private server: MCPServer | undefined;
 
-  private constructor(
+  constructor(
     public readonly name: string,
-    public readonly config: mcp.McpConfig,
-    signal: AbortSignal
+    public readonly config: mcp.Config,
+    private readonly signal: AbortSignal
   ) {
     super();
-    this.cachedTools = [];
-    this.processActive = true;
-    this.process = spawn(config.command, config.args, {
-      shell: true,
-      detached: true,
-      signal,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: {
-        PATH: process.env.PATH,
-        TERM: 'dumb',
-        NO_COLOR: '1',
-        CI: '1',
-        ...(config.env ?? {}),
-      },
-    });
-    this.process.unref();
-    this.process.stdout?.on('data', (data: Buffer) => {
-      this.messageBuffer += data.toString();
-      this.parseAndEmitMessages();
-    });
-
-    /*this.process.stderr?.on('data', (data: Buffer) => {
-      console.error(`-> (${this.name}): ${data.toString()}`);
-    });*/
-
-    this.process.on('close', () => (this.processActive = false));
   }
 
-  private parseAndEmitMessages() {
-    let newlineIndex;
-    while ((newlineIndex = this.messageBuffer.indexOf('\n')) !== -1) {
-      const message = this.messageBuffer.substring(0, newlineIndex).trim();
-      this.messageBuffer = this.messageBuffer.substring(newlineIndex + 1);
-
-      if (message) {
-        try {
-          const parsedMessage: unknown = JSON.parse(message);
-          this.emit(INCOMING_MESSAGE_EVENT_ID, parsedMessage);
-        } catch (e) {
-          console.error(
-            `Failed to parse MCP message: ${message}: ${JSON.stringify(e)}`
-          );
-        }
-      }
-    }
+  private async initialize(): Promise<void> {
+    this.server = await MCPServer.create(this.config, this.signal);
   }
 
-  public get active() {
-    return this.processActive;
-  }
-
-  static async createClient(
-    name: string,
-    config: mcp.McpConfig,
-    signal: AbortSignal
-  ): Promise<MCP> {
-    const mcp = new MCP(name, config, signal);
-    await mcp.initializeClient();
-    await mcp.notifyServer();
-
-    return mcp;
+  public get active(): boolean {
+    return !!this.server;
   }
 
   public async callTool(name: string, args: object): Promise<unknown> {
-    const data = await this.makeRequest({
-      method: McpMethod.CALL_TOOL,
-      decoder: toolCallResponseSchema,
-      params: { name, arguments: args },
-    });
-
-    if (data.result.isError || !data.result.content) {
-      throw new Error(`Failed to invoke tool`);
+    if (!this.active) {
+      await this.initialize();
     }
-
-    return data.result.content;
+    return this.server!.callTool(name, args);
   }
 
   public async listTools(): Promise<mcp.Tool[]> {
-    if (this.cachedTools.length > 0) {
-      return this.cachedTools;
-    }
-    const { result } = await this.makeRequest({
-      method: McpMethod.LIST_TOOLS,
-      decoder: listToolsResponseSchema,
-    });
-    this.cachedTools = result.tools;
-
-    return this.cachedTools;
-  }
-
-  private async notifyServer(): Promise<void> {
-    await this.makeRequest({
-      decoder: z.any(),
-      method: McpMethod.NOTIFY_INITIALIZED,
-      listen: false,
-    });
-  }
-
-  private async initializeClient(): Promise<void> {
-    const response = await this.makeRequest({
-      method: McpMethod.INITIALIZE,
-      decoder: initializationResponseSchema,
-      params: {
-        protocolVersion: PROTOCOL_VERSION,
-        capabilities: {
-          elicitation: {},
-        },
-        clientInfo: CLIENT_INFO,
-      },
-    });
-
-    this.metadata = response.result;
-  }
-
-  private async makeRequest<T extends object, R>(props: {
-    method: McpMethod;
-    decoder: z.ZodType<R>;
-    params?: T;
-    listen?: boolean;
-  }): Promise<R> {
-    const { method, params, decoder, listen } = props;
-    const id = messageIdRegistry[method];
-
-    if (listen === false) {
-      const payload = { jsonrpc: '2.0', id, method, params };
-      this.process.stdin?.write(`${JSON.stringify(payload)}\n`);
-      return undefined as R;
+    if (!this.active) {
+      await this.initialize();
     }
 
-    return await new Promise(resolve => {
-      this.once(INCOMING_MESSAGE_EVENT_ID, (msg: JSONRPCSchema) => {
-        if (msg.id !== id) return;
-
-        const data = decoder.parse(msg);
-
-        resolve(data);
-      });
-      const payload = { jsonrpc: '2.0', id, method, params };
-      this.process.stdin?.write(`${JSON.stringify(payload)}\n`);
-    });
+    return this.server!.listTools();
   }
 
-  public get serverMetadata(): mcp.ServerInfo {
-    if (!this.metadata) {
-      throw new Error('MCP Server metadata not initialized');
+  public async getServerMetadata(): Promise<mcp.ServerInfo> {
+    if (!this.server?.metadata) {
+      await this.initialize();
     }
 
-    return this.metadata;
+    if (!this.server!.metadata) {
+      throw new Error('Unable to retrieve server metadata');
+    }
+    return this.server!.metadata;
   }
-}
-
-export async function getMCPServer(name: string): Promise<MCP> {
-  const context = await acquireContextInstance();
-
-  const mcp = first(context.mcpServers.filter(server => server.name === name));
-
-  if (!mcp) {
-    throw new Error(`MCP "${name}" was not found`);
-  }
-  return mcp;
 }

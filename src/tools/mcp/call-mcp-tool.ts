@@ -1,5 +1,6 @@
 import * as z from 'zod';
-import { getMCPServer, type MCP } from '../../lib/agent/mcp/mcp';
+import { type MCP } from '../../lib/agent/mcp/mcp';
+import { getMCPServer } from '../../lib/agent/mcp/server';
 import { createTool, ToolSelectionOption } from '../common';
 
 const inputSchema = z.object({

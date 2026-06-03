@@ -8,7 +8,7 @@ import {
 import type { z } from 'zod';
 
 export declare namespace mcp {
-  type McpConfig = z.infer<typeof mcpServerConfigSchema>;
+  type Config = z.infer<typeof mcpServerConfigSchema>;
 
   type Prompt = z.infer<typeof promptSchema>;
 
