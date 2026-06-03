@@ -59,6 +59,7 @@ export const enum TokenSource {
 export interface TokenConsumeProps {
   input: number;
   output: number;
+  reset?: boolean;
   source: TokenSource;
 }
 export class ConsumeTokenEvent extends CustomEvent<TokenConsumeProps> {

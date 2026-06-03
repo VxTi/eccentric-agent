@@ -34,7 +34,7 @@ const outputSchema = z.object({
 
 const MAX_SHOWN_OUTPUT_LINES = 5;
 
-const ALLOWED_COMMAND_PATTERNS: RegExp[] = [
+export const ALLOWED_COMMAND_PATTERNS: RegExp[] = [
   /^ls(\s|$)/,
   /^pwd(\s|$)/,
   /^echo(\s|$)/,
@@ -43,7 +43,7 @@ const ALLOWED_COMMAND_PATTERNS: RegExp[] = [
   /^tail\s+[^|;&`$()<>]+$/,
   /^wc\s+[^|;&`$()<>]+$/,
   /^grep\s+[^|;&`$()<>]+$/,
-  /^find\s+[^|;&`$()<>]+$/,
+  /(^find$)|(^find\s+(?!.*-exec\s)([^|;&`$()<>])+?$)/,
   /^which\s+\S+$/,
   /^node\s+--version$/,
   /^npm\s+(list|ls|view|outdated|run\s+\S+)(\s|$)/,
@@ -58,7 +58,7 @@ const enum Option {
   TRUST = 'trust',
 }
 
-function isAllowed(command: string): boolean {
+export function isAllowedCommand(command: string): boolean {
   const trimmed = command.trim();
   return ALLOWED_COMMAND_PATTERNS.some(pattern => pattern.test(trimmed));
 }
@@ -111,7 +111,7 @@ export default createTool({
   },
 
   requiresApproval({ command }) {
-    return isAllowed(command);
+    return !isAllowedCommand(command);
   },
 
   onOptionSelect({ command }, option: Option) {
@@ -140,9 +140,13 @@ export default createTool({
     const { exitCode, stderr, stdout } = output;
 
     if (exitCode === 0) {
-      return `Command finished:\n ${renderFencedBlock(
+      const lines = stdout.split('\n');
+
+      return `Command finished:${renderFencedBlock(
         'plaintext',
-        stdout.split('\n').slice(0, MAX_SHOWN_OUTPUT_LINES).join('\n')
+        lines
+          .slice(0, Math.min(lines.length, MAX_SHOWN_OUTPUT_LINES))
+          .join('\n')
       )}`;
     }
 

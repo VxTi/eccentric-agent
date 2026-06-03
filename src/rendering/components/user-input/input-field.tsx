@@ -17,7 +17,7 @@ import { useAbort, useAgent } from '../../context';
 import { useCommandProcessor } from '../../hooks/command-processor';
 import { useUserInputField } from '../../context/user-input-context';
 import { SuggestionType, useTerminalSize } from '../../hooks';
-import { ModelStatsDisplay } from '../ModelStatsDisplay';
+import { InformationBar } from '../information-bar';
 import { Suggestions } from './input-suggestions';
 import { InputRequest } from './option-request';
 
@@ -205,7 +205,7 @@ export default function InputField(): JSX.Element {
       >
         <InputText />
       </Box>
-      <ModelStatsDisplay />
+      <InformationBar />
     </Box>
   );
 }

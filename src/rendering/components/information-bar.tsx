@@ -18,7 +18,7 @@ import {
 } from '../../lib/text-formatting';
 import { useAgent } from '../context';
 
-export function ModelStatsDisplay(): ReactNode {
+export function InformationBar(): ReactNode {
   const [{ input, output }, setCount] = useState<
     Omit<TokenConsumeProps, 'source'>
   >({
@@ -32,8 +32,13 @@ export function ModelStatsDisplay(): ReactNode {
 
   useEffect(() => {
     const handleTokenConsumption = ({
-      detail: { input, output, source },
+      detail: { input, output, source, reset },
     }: ConsumeTokenEvent) => {
+      if (reset) {
+        setExtCount({ input: 0, output: 0 });
+        setCount({ input: 0, output: 0 });
+        return;
+      }
       const updateState =
         source === TokenSource.SUB_TASK ? setExtCount : setCount;
 

@@ -25,6 +25,7 @@ import {
 import { v7 as uuid } from 'uuid';
 import { loadMcpConfig, type MCP } from '../../lib/agent/mcp/mcp';
 import { geminiProvider, type ModelName } from '../../lib/agent/provider';
+import { getRandomMessage } from '../../lib/agent/rotating-messages';
 import {
   CONSTANT_SYSTEM_PROMPT,
   DEFAULT_SYSTEM_PROMPT,
@@ -177,7 +178,13 @@ export function AgentProvider({
 
   const processRequest = useCallback(
     async (prompt: string, quiet: boolean) => {
-      setStatus({ text: 'Processing...', loading: true });
+      setStatus({ text: getRandomMessage(), loading: true });
+      const interval = setInterval(() => {
+        setStatus({
+          text: getRandomMessage(),
+          loading: true,
+        });
+      }, 3000);
 
       const updatedMessages: ModelMessage[] = [
         ...modelMessages,
@@ -226,6 +233,7 @@ export function AgentProvider({
         const response = await result.response;
 
         setStatus({ text: '', loading: false });
+        clearInterval(interval);
         setModelMessages(prev => [
           ...prev,
           ...response.messages,

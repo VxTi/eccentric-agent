@@ -89,7 +89,7 @@ function filterSuggestions(
   query: string
 ): Suggestion[] {
   const q = query.toLowerCase();
-  if (!q) return suggestions.slice(0, MAX_SHOWN_SUGGESTIONS);
+  if (!q.length) return suggestions.slice(0, MAX_SHOWN_SUGGESTIONS);
 
   return suggestions
     .filter(({ value }) => value.toLowerCase().includes(q))
