@@ -54,7 +54,6 @@ export default createTool({
     ' file, prefer `insert_in_file` instead.',
   inputSchema,
   outputSchema,
-  mightRequireApproval: false,
 
   async handle({ overwrite, createDirectories, filePath, content }) {
     const override = overwrite ?? false;

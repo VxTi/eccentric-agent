@@ -57,7 +57,6 @@ export default createTool({
     ' already contain the information being searched for.',
   inputSchema,
   outputSchema,
-  mightRequireApproval: false,
 
   async handle({ filePath, caseSensitive, isRegex, maxResults, pattern }) {
     const content = await readFile(filePath, 'utf-8');

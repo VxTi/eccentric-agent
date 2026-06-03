@@ -75,7 +75,6 @@ export default createTool({
     ' genuinely needed, it MUST go through this tool — no exceptions.',
   inputSchema,
   outputSchema,
-  mightRequireApproval: false,
 
   async handle({ options, question, selectMultiple }) {
     const ids = new Set<string>();

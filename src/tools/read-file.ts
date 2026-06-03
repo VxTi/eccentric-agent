@@ -49,7 +49,6 @@ export default createTool({
     ' present in the current context; prefer existing context over repeated reads.',
   inputSchema,
   outputSchema,
-  mightRequireApproval: false,
 
   async handle({ filePath, fromLine, lineCount }) {
     const context = await acquireContextInstance();

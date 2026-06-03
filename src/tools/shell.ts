@@ -75,7 +75,6 @@ export default createTool({
     ' before each invocation.',
   inputSchema,
   outputSchema,
-  mightRequireApproval: true,
 
   async handle({ command, timeoutMs, cwd }, channel) {
     try {

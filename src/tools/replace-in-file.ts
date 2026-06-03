@@ -62,7 +62,6 @@ export default createTool({
     '    is rejected so you can re-read and retry against fresh content.',
   inputSchema,
   outputSchema,
-  mightRequireApproval: false,
 
   async handle({ filePath, line, count, replacement }) {
     const context = await acquireContextInstance();

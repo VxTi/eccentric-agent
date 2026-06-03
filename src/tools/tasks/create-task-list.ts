@@ -49,7 +49,6 @@ export default createTool({
     ' one.',
   inputSchema,
   outputSchema,
-  mightRequireApproval: false,
 
   async handle(input) {
     const context = await acquireContextInstance();

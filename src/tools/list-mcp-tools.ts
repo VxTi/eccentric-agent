@@ -23,7 +23,6 @@ export default createTool({
     'List the tools available on a given MCP (Model Context Protocol) server.',
   inputSchema,
   outputSchema,
-  mightRequireApproval: false,
 
   async handle({ mcpServer }) {
     const context = await acquireContextInstance();

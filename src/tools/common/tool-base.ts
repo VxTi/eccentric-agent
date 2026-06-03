@@ -7,22 +7,22 @@ import {
   type MaybePromise,
 } from '../../lib/types/types';
 
-export const DEFAULT_APPROVAL_OPTIONS: ApprovalOption[] = [
-  { option: 'approve', text: 'Approve' },
-  { option: 'deny', text: 'Deny' },
-];
-
 export const enum ToolSelectionOption {
   ALLOW = 'allow',
   DENY = 'deny',
 }
+
+export const DEFAULT_APPROVAL_OPTIONS: ApprovalOption<ToolSelectionOption>[] = [
+  { option: ToolSelectionOption.ALLOW, text: 'Approve' },
+  { option: ToolSelectionOption.DENY, text: 'Deny' },
+];
 
 export type ToolChannelParams = [Omit<Message, 'id' | 'type'>];
 
 export interface IToolBase<
   TIn = unknown,
   TOut = unknown,
-  TApprovalOption extends string = string,
+  TApprovalOption extends string = ToolSelectionOption,
 > {
   readonly internalName: string;
   readonly name: string;
@@ -31,10 +31,9 @@ export interface IToolBase<
   readonly outputSchema: z.ZodType<TOut>;
 
   /**
-   * Whether the tool might require approval.
-   * @default true
+   * Whether the tool should be executed quietly
    */
-  readonly mightRequireApproval?: boolean;
+  readonly quiet?: boolean;
 
   /**
    * @returns {@link DEFAULT_APPROVAL_OPTIONS} if not provided upon tool creation
@@ -89,7 +88,7 @@ type ToolProps<
 export function createTool<
   TIn = unknown,
   TOut = unknown,
-  TApprovalOption extends string = string,
+  TApprovalOption extends string = ToolSelectionOption,
 >(
   props: ToolProps<TIn, TOut, TApprovalOption>
 ): IToolBase<TIn, TOut, TApprovalOption> {

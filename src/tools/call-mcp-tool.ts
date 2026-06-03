@@ -1,6 +1,5 @@
 import * as z from 'zod';
-import { type MCP } from '../lib/agent/mcp/mcp';
-import { acquireContextInstance } from '../lib/events/context-acquisition';
+import { getMCPServer, type MCP } from '../lib/agent/mcp/mcp';
 import { createTool } from './common';
 
 const inputSchema = z.object({
@@ -43,15 +42,10 @@ export default createTool({
   description: 'Invoke a tool on a given MCP (Model Context Protocol) server.',
   inputSchema,
   outputSchema,
-  mightRequireApproval: false,
 
   async handle({ mcpServer, toolName, arguments: args }) {
-    const context = await acquireContextInstance();
-    const [mcp] = context.mcpServers.filter(
-      server => server.name === mcpServer
-    );
+    const mcp = await getMCPServer(mcpServer);
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!mcp) {
       throw new Error(`MCP "${mcpServer}" was not found`);
     }
@@ -62,6 +56,16 @@ export default createTool({
       toolName,
       result,
     };
+  },
+
+  async requiresApproval({ mcpServer, toolName }) {
+    const mcp = await getMCPServer(mcpServer);
+    if (!mcp) {
+      throw new Error(`MCP server '${mcpServer}' not found`);
+    }
+    if (!mcp.config.autoApprove?.length) return false;
+
+    return mcp.config.autoApprove.includes(toolName);
   },
 
   inputToString({ toolName, mcpServer }) {

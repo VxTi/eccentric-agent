@@ -59,7 +59,6 @@ export default createTool({
     ' over narrow ones — it is better to return a few extra matches than to return nothing.',
   inputSchema,
   outputSchema,
-  mightRequireApproval: false,
 
   async handle({ filePattern, directoryPath, maxResults }) {
     const cwd = path.resolve(process.cwd(), directoryPath);

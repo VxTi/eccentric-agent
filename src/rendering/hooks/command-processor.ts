@@ -1,8 +1,7 @@
 import { useCallback } from 'react';
 import { isCommand } from '../../lib/commands';
-import { emitAgentMessage } from '../../lib/events/user-input';
+import { emitMessage } from '../../lib/events/user-input';
 import { useAbort, useAgent } from '../context';
-import { v7 as uuid } from 'uuid';
 
 export function useCommandProcessor() {
   const { setMessages, setModelMessages, systemPrompt } = useAgent();
@@ -24,9 +23,8 @@ export function useCommandProcessor() {
           break;
         }
         case 'system-prompt':
-          emitAgentMessage({
+          emitMessage({
             type: 'assistant',
-            id: uuid(),
             content: `Here is the system prompt:
 
 ${systemPrompt}`,

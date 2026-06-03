@@ -81,7 +81,6 @@ export default createTool({
     ' trivial single-step work that does not involve aggregating data from multiple sources.',
   inputSchema,
   outputSchema,
-  mightRequireApproval: false,
 
   async handle({ agent: { goal, name } }, channel) {
     return await runSubAgent(name, goal, channel);

@@ -39,10 +39,7 @@ import {
   unsubscribeEvent,
 } from '../../lib/events/events';
 import { Notifier } from '../../lib/events/notifier';
-import {
-  emitAgentMessage,
-  requestUserInput,
-} from '../../lib/events/user-input';
+import { emitMessage, requestUserInput } from '../../lib/events/user-input';
 import { FileCache } from '../../lib/file-cache';
 import { Result } from '../../lib/result';
 import { TaskList, TaskStatus } from '../../lib/tasks';
@@ -117,7 +114,7 @@ export function AgentProvider({
 
   useEffect(() => {
     setStatus({
-      text: 'Loading MCP servers',
+      text: chalk.blue('Loading MCP servers'),
       loading: true,
     });
     void loadMcpConfig(signal)
@@ -389,7 +386,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
       const channel = notifier.subscribe(
         toolCallId,
         (...[message]: ToolChannelParams) =>
-          emitAgentMessage({
+          emitMessage({
             ...message,
             type: 'generic',
             id: toolCallId,
@@ -402,7 +399,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
 
         const [chosen] = await requestUserInput({
           title: 'Approval required',
-          description: `Tool "${tool.name}" requires approval\n ↳ ${previewArgs(input)}`,
+          description: `Tool "${tool.name}" requires approval\n ${previewArgs(input)}`,
           options: options.map(opt => ({ label: opt.text, id: opt.option })),
           allowMultiple: false,
         });
@@ -422,7 +419,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
 
       const inputText = formatMarkdown(tool.inputToString(input, channel));
 
-      emitAgentMessage({
+      emitMessage({
         type: 'generic',
         id: toolCallId,
         loading: true,
@@ -436,7 +433,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         const errMsg = err instanceof Error ? err.message : 'unknown';
         const message = `Tool "${tool.name}" failed: ${errMsg}`;
 
-        emitAgentMessage({
+        emitMessage({
           type: 'generic',
           id: toolCallId,
           failure: true,
@@ -446,7 +443,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         return Result.Error(message);
       }
 
-      emitAgentMessage({
+      emitMessage({
         type: 'generic',
         id: toolCallId,
         loading: false,
@@ -457,4 +454,3 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
     },
   });
 }
-

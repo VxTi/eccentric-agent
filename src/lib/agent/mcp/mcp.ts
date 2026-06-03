@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
+import { acquireContextInstance } from '../../events/context-acquisition';
 import {
   initializationResponseSchema,
   type JSONRPCSchema,
@@ -93,7 +94,7 @@ export class MCP extends EventEmitter {
 
   private constructor(
     public readonly name: string,
-    config: mcp.McpConfig,
+    public readonly config: mcp.McpConfig,
     signal: AbortSignal
   ) {
     super();
@@ -246,4 +247,11 @@ export class MCP extends EventEmitter {
 
     return this.metadata;
   }
+}
+
+export async function getMCPServer(name: string): Promise<MCP | undefined> {
+  const context = await acquireContextInstance();
+
+  const [mcp] = context.mcpServers.filter(server => server.name === name);
+  return mcp;
 }

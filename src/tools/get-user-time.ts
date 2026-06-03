@@ -18,7 +18,6 @@ export default createTool({
     ' or to reason about deadlines relative to "now". Takes no arguments.',
   inputSchema,
   outputSchema,
-  mightRequireApproval: false,
 
   async handle() {
     const now = new Date();

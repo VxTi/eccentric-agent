@@ -48,7 +48,6 @@ export default createTool({
     ' has been created yet or if an `id` does not match any existing task.',
   inputSchema,
   outputSchema,
-  mightRequireApproval: false,
 
   async handle(input) {
     const context = await acquireContextInstance();

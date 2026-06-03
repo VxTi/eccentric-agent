@@ -63,7 +63,6 @@ export default createTool({
     ' content-based edits, read the file first and use a replace-style tool.',
   inputSchema,
   outputSchema,
-  mightRequireApproval: true,
 
   async handle({ filePath, content, inclusive, lineNumber }) {
     const context = await acquireContextInstance();

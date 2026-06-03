@@ -61,8 +61,6 @@ export default createTool({
     " reference like 'nearby'. Takes no arguments.",
   inputSchema,
   outputSchema,
-  // TODO: Reconsider
-  mightRequireApproval: false,
 
   async handle() {
     const { status, body } = await httpsGetJson(GEO_ENDPOINT);
