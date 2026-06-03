@@ -1,5 +1,7 @@
 import { useCallback } from 'react';
 import { isCommand } from '../../lib/commands';
+import { emitConsumeTokenEvent } from '../../lib/events/emission';
+import { TokenSource } from '../../lib/events/events';
 import { emitMessage } from '../../lib/events/user-input';
 import { useAbort, useAgent } from '../context';
 
@@ -15,6 +17,12 @@ export function useCommandProcessor() {
         case 'clear': {
           setModelMessages([]);
           setMessages([]);
+          emitConsumeTokenEvent({
+            input: 0,
+            output: 0,
+            reset: true,
+            source: TokenSource.PRIMARY,
+          });
           break;
         }
         case 'exit':

@@ -1,5 +1,5 @@
 import type * as z from 'zod';
-import { type Message } from '../../lib/types/messages';
+import { type GenericMessage } from '../../lib/types/messages';
 import { type NotifierChannel } from '../../lib/events/notifier';
 import {
   type ApprovalOption,
@@ -17,7 +17,7 @@ export const DEFAULT_APPROVAL_OPTIONS: ApprovalOption[] = [
   { option: ToolSelectionOption.DENY, text: 'Deny' },
 ];
 
-export type ToolChannelParams = [Omit<Message, 'id' | 'type'>];
+export type ToolChannelParams = [Omit<GenericMessage, 'id' | 'type'>];
 
 export interface IToolBase<
   TIn = unknown,

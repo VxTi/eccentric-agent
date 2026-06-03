@@ -60,7 +60,6 @@ export default createTool({
     ' requires up-to-date or external information.',
   inputSchema,
   outputSchema,
-  mightRequireApproval: false,
 
   async handle({ query, maxResults, timeRange, country }) {
     const client = getTavilyClient();

@@ -86,7 +86,6 @@ export default createTool({
     ' page content is not already available in the current context.',
   inputSchema,
   outputSchema,
-  mightRequireApproval: false,
 
   async handle(input) {
     const { urls, maxBytes } = input;

@@ -410,6 +410,12 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         );
 
         if (selectionOption !== ToolSelectionOption.ALLOW) {
+          channel.notify({
+            content: chalk.red(
+              `User denied tool execution for ${chalk.underline(tool.name)}`
+            ),
+            loading: false,
+          });
           notifier.unsubscribe(toolCallId);
           return Result.Error(
             `User denied permission to run tool "${tool.internalName}".`
@@ -419,12 +425,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
 
       const inputText = formatMarkdown(tool.inputToString(input, channel));
 
-      emitMessage({
-        type: 'generic',
-        id: toolCallId,
-        loading: true,
-        content: inputText,
-      });
+      channel.notify({ loading: true, content: inputText });
 
       let output: unknown;
       try {
@@ -433,9 +434,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         const errMsg = err instanceof Error ? err.message : 'unknown';
         const message = `Tool "${tool.name}" failed: ${errMsg}`;
 
-        emitMessage({
-          type: 'generic',
-          id: toolCallId,
+        channel.notify({
           failure: true,
           content: chalk.red(`${message}\n`),
         });
@@ -443,9 +442,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         return Result.Error(message);
       }
 
-      emitMessage({
-        type: 'generic',
-        id: toolCallId,
+      channel.notify({
         loading: false,
         content: `→ ${formatMarkdown(tool.outputToString(output, channel))}`,
       });

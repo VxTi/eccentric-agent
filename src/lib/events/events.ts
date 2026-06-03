@@ -23,15 +23,21 @@ export interface UserInputRequest {
   allowMultiple?: boolean;
 }
 
-export class UserInputRequestEvent extends CustomEvent<UserInputRequest> {
-  constructor(inputRequest: UserInputRequest) {
-    super(EventName.REQUEST_INPUT, { detail: inputRequest });
+export class UserInputRequestEvent extends CustomEvent<{
+  request: UserInputRequest;
+  channelId: string;
+}> {
+  constructor(request: UserInputRequest, channelId: string) {
+    super(EventName.REQUEST_INPUT, { detail: { request, channelId } });
   }
 }
 
-export class UserInputResponseEvent extends CustomEvent<InputOption[]> {
-  constructor(options: InputOption[]) {
-    super(EventName.INPUT_RESPONSE, { detail: options });
+export class UserInputResponseEvent extends CustomEvent<{
+  options: InputOption[];
+  channelId: string;
+}> {
+  constructor(options: InputOption[], channelId: string) {
+    super(EventName.INPUT_RESPONSE, { detail: { options, channelId } });
   }
 }
 

@@ -18,14 +18,18 @@ import { v7 as uuid } from 'uuid';
 export function requestUserInput(
   props: UserInputRequest
 ): Promise<InputOption[]> {
+  const channelId = uuid();
   return new Promise(resolve => {
     const handler = (event: UserInputResponseEvent) => {
+      // Ensure we don't accept an approval event of another channel
+      if (event.detail.channelId !== channelId) return;
+
       unsubscribeEvent(EventName.INPUT_RESPONSE, handler);
-      resolve(event.detail);
+      resolve(event.detail.options);
     };
 
     subscribeEvent(EventName.INPUT_RESPONSE, handler);
-    emitEvent(EventName.REQUEST_INPUT, props);
+    emitEvent(EventName.REQUEST_INPUT, props, channelId);
   });
 }
 

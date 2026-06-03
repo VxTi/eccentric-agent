@@ -84,6 +84,6 @@ export default createTool({
   },
 
   outputToString({ filePath, created, bytesWritten }) {
-    return `${created ? 'Created' : 'Wrote to'} file '${filePath}' (${formatBytes(bytesWritten)})`;
+    return `${created ? 'Created' : 'Wrote to'} file \`${filePath}\` (\`${formatBytes(bytesWritten)}\`)`;
   },
 });
