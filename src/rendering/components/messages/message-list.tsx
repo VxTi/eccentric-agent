@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { Box, measureElement, useInput, type DOMElement } from 'ink';
-import { useAgent } from '../context';
-import { useUserInputField } from '../context/user-input-context';
-import { ModelMessageFragment } from './model-message-fragment';
+import { useAgent } from '../../context';
+import { useUserInputField } from '../../context/user-input-context';
+import { ModelMessage } from './model-message';
 
 const SCROLL_STEP = 1;
 
@@ -67,7 +67,7 @@ export function MessageList(): JSX.Element {
         marginTop={-(overflow - clampedOffset)}
       >
         {messages.map((message, idx) => (
-          <ModelMessageFragment
+          <ModelMessage
             key={idx}
             message={message}
             viewportHeight={viewportHeight}

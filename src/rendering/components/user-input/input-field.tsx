@@ -13,6 +13,7 @@ import {
   unsubscribeEvent,
   type UserInputRequestEvent,
 } from '../../../lib/events/events';
+import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
 import { useAbort, useAgent } from '../../context';
 import { useCommandProcessor } from '../../hooks/command-processor';
 import { useUserInputField } from '../../context/user-input-context';
@@ -183,7 +184,10 @@ export default function InputField(): JSX.Element {
     }
   });
 
-  if (inputRequest.options.length > 0) {
+  if (
+    inputRequest.options.length > 0 &&
+    inputRequest.channelId !== CHANNEL_ID_NONE
+  ) {
     return <InputRequest />;
   }
 

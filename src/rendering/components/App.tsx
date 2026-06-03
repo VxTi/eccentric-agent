@@ -8,7 +8,7 @@ import {
 } from '../../lib/events/events';
 import { useAgent } from '../context';
 import { useTerminalSize } from '../hooks';
-import { MessageList } from './MessageList';
+import { MessageList } from './messages/message-list';
 import { StatusLine } from './StatusLine';
 import InputField from './user-input/input-field';
 

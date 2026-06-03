@@ -21,14 +21,12 @@ export interface UserInputRequest {
   description?: string;
   options: InputOption[];
   allowMultiple?: boolean;
+  channelId: string;
 }
 
-export class UserInputRequestEvent extends CustomEvent<{
-  request: UserInputRequest;
-  channelId: string;
-}> {
-  constructor(request: UserInputRequest, channelId: string) {
-    super(EventName.REQUEST_INPUT, { detail: { request, channelId } });
+export class UserInputRequestEvent extends CustomEvent<UserInputRequest> {
+  constructor(request: UserInputRequest) {
+    super(EventName.REQUEST_INPUT, { detail: request });
   }
 }
 

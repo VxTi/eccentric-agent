@@ -9,7 +9,7 @@ import {
 } from 'ai';
 import * as z from 'zod';
 import { agentTools, type IToolBase, type ToolChannelParams } from './tools';
-import { emitConsumeTokenEvent } from '../events/emission';
+import { emitConsumeTokenEvent } from '../events/token-usage';
 import { TokenSource } from '../events/events';
 import { type NotifierChannel } from '../events/notifier';
 import { Result } from '../result';

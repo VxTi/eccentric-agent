@@ -1,8 +1,9 @@
 import { tool as createTool, type Tool, type ToolSet } from 'ai';
 import chalk from 'chalk';
 import { v7 as uuid } from 'uuid';
+import { emitMessage } from '../../events/messaging';
 import { type Notifier } from '../../events/notifier';
-import { emitMessage, requestUserInput } from '../../events/user-input';
+import { requestUserInput } from '../../events/user-input';
 import { Result } from '../../result';
 import { formatMarkdown, previewArgs } from '../../../rendering/formatting';
 import {

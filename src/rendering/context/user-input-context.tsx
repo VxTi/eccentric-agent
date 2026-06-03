@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react';
 import type { UserInputRequest } from '../../lib/events/events';
+import { CHANNEL_ID_NONE } from '../../lib/events/user-input';
 import { type SuggestionSet, useInputSuggestionProvider } from '../hooks';
 
 interface UserInputContextType {
@@ -42,6 +43,7 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
   const { suggestions, suggestionCursorIndex, setSuggestions } =
     useInputSuggestionProvider(input, cursorOffset);
   const [inputRequest, setInputRequest] = useState<UserInputRequest>({
+    channelId: CHANNEL_ID_NONE,
     options: [],
   });
 

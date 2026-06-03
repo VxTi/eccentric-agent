@@ -17,7 +17,7 @@ import { geminiProvider, type ModelName } from '../../lib/agent/provider';
 import { getRandomMessage } from '../../lib/agent/rotating-messages';
 import { constructSystemPrompt } from '../../lib/agent/system-prompt';
 import { DEFAULT_SYSTEM_PROMPT } from '../../lib/constants';
-import { emitConsumeTokenEvent } from '../../lib/events/emission';
+import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
 import {
   type AgentMessageEvent,
   EventName,

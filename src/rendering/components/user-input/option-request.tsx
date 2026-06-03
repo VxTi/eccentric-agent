@@ -1,6 +1,7 @@
 import { Box, Text, useInput } from 'ink';
 import { type ReactNode, useState } from 'react';
 import { emitEvent, EventName } from '../../../lib/events/events';
+import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
 import { useUserInputField } from '../../context/user-input-context';
 
 export function InputRequest(): ReactNode {
@@ -47,10 +48,11 @@ export function InputRequest(): ReactNode {
 
       emitEvent(
         EventName.INPUT_RESPONSE,
-        indices.map(idx => inputRequest.options[idx])
+        indices.map(idx => inputRequest.options[idx]),
+        inputRequest.channelId
       );
 
-      setInputRequest({ options: [] });
+      setInputRequest({ channelId: CHANNEL_ID_NONE, options: [] });
       setUserSelectedInputIndex(-1);
     }
   });

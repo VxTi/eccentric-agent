@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import { isCommand } from '../../lib/commands';
-import { emitConsumeTokenEvent } from '../../lib/events/emission';
+import { emitMessage } from '../../lib/events/messaging';
+import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
 import { TokenSource } from '../../lib/events/events';
-import { emitMessage } from '../../lib/events/user-input';
 import { useAbort, useAgent } from '../context';
 
 export function useCommandProcessor() {
