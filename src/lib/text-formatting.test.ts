@@ -36,7 +36,7 @@ describe('formatTokenCount', () => {
     'should format token counts correctly',
     ({ count, formatted }: { count: number; formatted: string }) => {
       expect(formatTokenCount(count)).toEqual(formatted);
-    },
+    }
   );
 });
 

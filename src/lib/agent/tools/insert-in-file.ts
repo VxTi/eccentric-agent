@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { readFile, writeFile } from 'fs/promises';
-import { acquireContextInstance } from '../lib/events/context-acquisition';
+import { acquireContextInstance } from '../../events/context-acquisition';
 import { createTool } from './common';
 
 const inputSchema = z.object({

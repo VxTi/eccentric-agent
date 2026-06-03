@@ -1,6 +1,6 @@
 import * as z from 'zod';
-import { toolSchema } from '../../lib/agent/mcp/models';
-import { acquireContextInstance } from '../../lib/events/context-acquisition';
+import { toolSchema } from '../../mcp/models';
+import { getMCPServer } from '../../mcp/server';
 import { createTool } from '../common';
 
 const inputSchema = z.object({
@@ -8,6 +8,12 @@ const inputSchema = z.object({
     .string()
     .describe(
       'The name of the MCP server to list the tools in. This server is initially provided'
+    ),
+  toolName: z
+    .string()
+    .optional()
+    .describe(
+      'Optional name of the tool to filter by. This is useful if you need to know the input schema of the tool you wish to invoke'
     ),
 });
 
@@ -24,20 +30,20 @@ export default createTool({
   inputSchema,
   outputSchema,
 
-  async handle({ mcpServer }) {
-    const context = await acquireContextInstance();
-    const [mcp] = context.mcpServers.filter(
-      server => server.name === mcpServer
-    );
+  async handle({ mcpServer, toolName }) {
+    const mcp = await getMCPServer(mcpServer);
+    const tools = await mcp.listTools();
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (!mcp) {
-      throw new Error(`MCP "${mcpServer}" was not found`);
+    if (toolName) {
+      return {
+        mcpServer,
+        tools: tools.filter(t => t.name === toolName),
+      };
     }
 
     return {
       mcpServer,
-      tools: await mcp.listTools(),
+      tools,
     };
   },
 

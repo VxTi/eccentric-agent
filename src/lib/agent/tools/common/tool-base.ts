@@ -1,11 +1,11 @@
 import type * as z from 'zod';
-import { type GenericMessage } from '../../lib/types/messages';
-import { type NotifierChannel } from '../../lib/events/notifier';
+import { type GenericMessage } from '../../../types/messages';
+import { type NotifierChannel } from '../../../events/notifier';
 import {
   type ApprovalOption,
   type MakeOptional,
   type MaybePromise,
-} from '../../lib/types/types';
+} from '../../../types/types';
 
 export const enum ToolSelectionOption {
   ALLOW = 'allow',

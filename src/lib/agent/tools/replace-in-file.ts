@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import { readFile, writeFile } from 'fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
-import { acquireContextInstance } from '../lib/events/context-acquisition';
+import { acquireContextInstance } from '../../events/context-acquisition';
 import { createTool } from './common';
 
 const inputSchema = z.object({

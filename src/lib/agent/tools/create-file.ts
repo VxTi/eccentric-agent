@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { formatBytes } from '../lib/text-formatting';
+import { formatBytes } from '../../text-formatting';
 import { createTool } from './common';
 import { mkdir, writeFile, access } from 'fs/promises';
 import { dirname } from 'path';

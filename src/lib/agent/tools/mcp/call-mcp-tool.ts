@@ -1,6 +1,6 @@
 import * as z from 'zod';
-import { type MCP } from '../../lib/agent/mcp/mcp';
-import { getMCPServer } from '../../lib/agent/mcp/server';
+import { type MCP } from '../../mcp/mcp';
+import { getMCPServer } from '../../mcp/server';
 import { createTool, ToolSelectionOption } from '../common';
 
 const inputSchema = z.object({
@@ -34,7 +34,8 @@ async function callTool(
   name: string,
   args: object
 ): Promise<unknown> {
-  const hasTool = (await mcp.listTools()).some(tool => tool.name === name);
+  const tools = await mcp.listTools();
+  const hasTool = tools.some(tool => tool.name === name);
 
   if (!hasTool) {
     throw new Error(`MCP server ${mcp.name} does not have tool ${name}`);
@@ -66,7 +67,8 @@ function trustTool(props: { mcpServer: string; toolName: string }): void {
 export default createTool({
   internalName: 'call_mcp_tool',
   name: 'Call MCP tool',
-  description: 'Invoke a tool on a given MCP (Model Context Protocol) server.',
+  description:
+    "Invoke a tool on a given MCP (Model Context Protocol) server. If you're not certain the tool exists, call the 'list_mcp_tools' tool first.",
   inputSchema,
   outputSchema,
 

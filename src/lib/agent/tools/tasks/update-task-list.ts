@@ -1,6 +1,6 @@
 import * as z from 'zod';
-import { acquireContextInstance } from '../../lib/events/context-acquisition';
-import { type Task, TaskStatus } from '../../lib/tasks';
+import { acquireContextInstance } from '../../../events/context-acquisition';
+import { type Task, TaskStatus } from '../../../tasks';
 import { createTool } from '../common';
 
 const statusNameMapping: Record<TaskStatus, string> = {

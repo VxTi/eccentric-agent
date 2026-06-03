@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { renderFencedBlock } from '../rendering/formatting';
+import { renderFencedBlock } from '../../../rendering/formatting';
 import { createTool, ToolSelectionOption } from './common';
 import { exec } from 'child_process';
 

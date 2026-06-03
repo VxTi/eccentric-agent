@@ -8,11 +8,7 @@ import {
   type ToolSet,
 } from 'ai';
 import * as z from 'zod';
-import {
-  agentTools,
-  type IToolBase,
-  type ToolChannelParams,
-} from '../../tools';
+import { agentTools, type IToolBase, type ToolChannelParams } from './tools';
 import { emitConsumeTokenEvent } from '../events/emission';
 import { TokenSource } from '../events/events';
 import { type NotifierChannel } from '../events/notifier';

@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { getTavilyClient } from '../lib/tavily';
+import { getTavilyClient } from '../../tavily';
 import { createTool } from './common';
 
 const inputSchema = z.object({

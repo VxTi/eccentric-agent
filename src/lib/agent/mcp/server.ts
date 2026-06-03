@@ -43,10 +43,14 @@ export class MCPServer extends EventEmitter {
   constructor(config: mcp.Config, signal: AbortSignal) {
     super();
     this.processActive = true;
+    const controller = new AbortController();
+
+    signal.addEventListener('abort', () => controller.abort());
+
     this.process = spawn(config.command, config.args, {
       shell: true,
       detached: true,
-      signal,
+      signal: controller.signal,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: {
         PATH: process.env.PATH,
@@ -72,6 +76,8 @@ export class MCPServer extends EventEmitter {
     const server = new MCPServer(config, signal);
     await server.initializeClient();
     await server.notifyServer();
+
+    await server.listTools();
 
     return server;
   }

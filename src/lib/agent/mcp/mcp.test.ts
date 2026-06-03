@@ -28,7 +28,7 @@ describe('MCP server', () => {
 
   it('should create mcp server', async () => {
     const controller = new AbortController();
-    const server = await MCP.createClient(
+    const server = new MCP(
       'atlassian-rovo-mcp',
       {
         command: 'npx',
