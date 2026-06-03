@@ -3,9 +3,9 @@ import {
   StdioClientTransport,
   StreamableHTTPClientTransport,
   UnauthorizedError,
-  auth,
   type Transport,
 } from '@modelcontextprotocol/client';
+import { debug } from '../../events/messaging';
 import { LocalFileOAuthProvider } from './oauth-provider';
 import first from 'lodash/first';
 import { EventEmitter } from 'node:events';
@@ -27,34 +27,14 @@ export type McpTool = PromiseResult<
 
 const protocolVersion: string = '2025-11-25';
 
-export function getLocalClaudeConfig(): string {
-  const home = os.homedir();
-  switch (os.platform()) {
-    case 'win32':
-      return path.resolve(home, 'Claude/claude_desktop_config.json');
-    case 'darwin':
-      return path.resolve(
-        home,
-        'Library/Application Support/claude_desktop_config.json'
-      );
-    default:
-      return path.resolve(home, '.config/Claude/claude_desktop_config.json');
-  }
-}
-
 export async function loadMcpConfig(signal: AbortSignal): Promise<MCP[]> {
   const home = os.homedir();
   const cwd = process.cwd();
 
   const localPaths: string[] = [
-    // getLocalClaudeConfig(),
     path.resolve(cwd, '.agents/mcp.json'),
     path.resolve(cwd, '.kiro/mcp.json'),
     path.resolve(home, '.kiro/mcp.json'),
-
-    // path.resolve(cwd, '.claude.json'),
-    // path.resolve(home, '.claude.json'),
-
     path.resolve(cwd, '.cursor/mcp.json'),
     path.resolve(home, '.cursor/mcp.json'),
   ];
@@ -82,9 +62,38 @@ export class MCP extends EventEmitter {
     public readonly config: mcp.Config,
     public readonly name: string,
     public readonly client: Client,
-    public readonly transport: Transport
+    public readonly transport: Transport,
+    public readonly authProvider?: LocalFileOAuthProvider
   ) {
     super();
+  }
+
+  /**
+   * Wraps a request to the MCP server with OAuth retry-on-401 logic.
+   *
+   * Google's MCP servers respond 200 to the initial handshake even when
+   * unauthenticated and only reject the actual JSON-RPC calls — meaning the
+   * 401 happens here, not during `client.connect`. When it does, the SDK
+   * triggers `redirectToAuthorization` (opens the browser, captures the code
+   * in our provider) and then throws `UnauthorizedError`. We catch it,
+   * complete the token exchange via `transport.finishAuth`, and retry once.
+   */
+  async withAuth<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (err) {
+      if (
+        !(err instanceof UnauthorizedError) ||
+        !this.authProvider ||
+        !(this.transport instanceof StreamableHTTPClientTransport)
+      ) {
+        throw err;
+      }
+
+      const code = await this.authProvider.waitForAuthorizationCode();
+      await this.transport.finishAuth(code);
+      return await operation();
+    }
   }
 
   static async create(
@@ -92,21 +101,29 @@ export class MCP extends EventEmitter {
     config: mcp.Config,
     signal: AbortSignal
   ): Promise<MCP> {
-    const { transport, client } = await this.makeTransport(name, config, signal);
+    const { transport, client, authProvider } = await this.makeTransport(
+      name,
+      config,
+      signal
+    );
 
     signal.addEventListener('abort', async () => {
       await transport.close();
       await client.close();
     });
 
-    return new MCP(config, name, client, transport);
+    return new MCP(config, name, client, transport, authProvider);
   }
 
   private static async makeTransport(
     name: string,
     config: mcp.Config,
     signal: AbortSignal
-  ): Promise<{ client: Client; transport: Transport }> {
+  ): Promise<{
+    client: Client;
+    transport: Transport;
+    authProvider?: LocalFileOAuthProvider;
+  }> {
     if ('command' in config) {
       const transport = new StdioClientTransport({
         command: config.command,
@@ -143,23 +160,49 @@ export class MCP extends EventEmitter {
         throw err;
       }
 
-      // Existing tokens missing or invalid — drive the authorization-code flow.
-      // `auth()` calls provider.redirectToAuthorization, which opens the browser
-      // and starts a local listener. We then wait for the code and exchange it.
-      await auth(authProvider, { serverUrl: url });
+      // The transport's 401 handler has already invoked
+      // `authProvider.redirectToAuthorization` (via `adaptOAuthProvider` →
+      // `handleOAuthUnauthorized` → `auth()`), so the browser is open and our
+      // local listener is running. We only need to wait for the code, exchange
+      // it for tokens, and reconnect.
+      debug(`[MCP ${name}] waiting for OAuth callback...`);
       const code = await authProvider.waitForAuthorizationCode();
-      await transport.finishAuth(code);
+      debug(`[MCP ${name}] received OAuth code, exchanging for tokens...`);
+      try {
+        await transport.finishAuth(code);
+      } catch (exchangeErr) {
+        debug(
+          `[MCP ${name}] token exchange failed:`,
+          exchangeErr instanceof Error
+            ? (exchangeErr.stack ?? exchangeErr.message)
+            : exchangeErr
+        );
+        throw exchangeErr;
+      }
+      debug(`[MCP ${name}] tokens saved, reconnecting...`);
 
-      // Reconnect with a fresh transport (the old one was aborted by the 401).
+      // The original Client was closed when the initial handshake threw
+      // (Client.connect catches the initialize error and calls close()), and
+      // the transport's stream was aborted by the 401. Re-create both so the
+      // retry starts from a clean state and picks up the freshly-saved tokens.
       const retryTransport = new StreamableHTTPClientTransport(url, {
         protocolVersion,
         authProvider,
       });
-      await client.connect(retryTransport, { signal });
-      return { client, transport: retryTransport };
+      const retryClient = new Client({
+        name: 'eccentric-agent',
+        version: '1.0.0',
+      });
+      await retryClient.connect(retryTransport, { signal });
+      debug(`[MCP ${name}] authenticated and connected.`);
+      return {
+        client: retryClient,
+        transport: retryTransport,
+        authProvider,
+      };
     }
 
-    return { client, transport };
+    return { client, transport, authProvider };
   }
 }
 

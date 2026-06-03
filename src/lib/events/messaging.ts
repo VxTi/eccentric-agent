@@ -18,3 +18,12 @@ export function emitMessage(
 ): void {
   emitEvent(EventName.AGENT_MESSAGE, { ...message, id: message.id ?? uuid() });
 }
+
+export function debug(message: string, ...args: any[]): void {
+  if (process.env.NODE_ENV !== 'production') {
+    emitMessage({
+      type: 'generic',
+      content: `${message} ${args.map(a => JSON.stringify(a)).join(', ')}`,
+    });
+  }
+}

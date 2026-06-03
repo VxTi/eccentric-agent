@@ -1,5 +1,5 @@
-import { getLocalClaudeConfig, MCP } from './mcp';
-import { describe, it, vi, expect } from 'vitest';
+import { MCP } from './mcp';
+import { describe, it, vi } from 'vitest';
 
 const { platformMock, homeMock } = vi.hoisted(() => ({
   platformMock: vi.fn(),
@@ -11,21 +11,6 @@ vi.mock('node:os', () => ({
 }));
 
 describe('MCP server', () => {
-  it.each`
-    platform    | expected
-    ${'win32'}  | ${'/Claude/claude_desktop_config.json'}
-    ${'darwin'} | ${'/Library/Application Support/claude_desktop_config.json'}
-    ${'linux'}  | ${'/.config/Claude/claude_desktop_config.json'}
-  `(
-    'uses the correct claude desktop config for platform',
-    ({ platform, expected }) => {
-      platformMock.mockReturnValueOnce(platform);
-      homeMock.mockReturnValueOnce('/');
-
-      expect(getLocalClaudeConfig()).toEqual(expected);
-    }
-  );
-
   it('should create mcp server', async () => {
     const controller = new AbortController();
     const server = await MCP.create(

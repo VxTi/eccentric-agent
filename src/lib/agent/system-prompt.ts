@@ -16,7 +16,7 @@ export async function constructSystemPrompt(
   const mcpServerNames = (
     await Promise.all(
       mcps.map(async mcp => {
-        const { tools } = await mcp.client.listTools();
+        const { tools } = await mcp.withAuth(() => mcp.client.listTools());
         return `- ${mcp.name}\n   With tools:\n${tools.map(t => `   - ${t.name}`).join('\n')}`;
       })
     )
@@ -25,7 +25,7 @@ export async function constructSystemPrompt(
   return compact([
     systemPrompt,
     CONSTANT_SYSTEM_PROMPT,
-    `The following MCP servers are available:\n${mcpServerNames}\nMake sure to call the 'list_mcp_tools' tool if you need to know the input schema`,
+    `The following MCP servers are available:\n${mcpServerNames}\nUse 'list_mcp_tools' to discover tools (no 'toolName' → name+description list; with a specific 'toolName' → that tool's full input/output schema). Always fetch the schema for a specific tool before invoking it via 'call_mcp_tool'.`,
     taskFragment,
   ]).join('\n');
 }

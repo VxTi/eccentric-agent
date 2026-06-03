@@ -10,7 +10,14 @@ interface Props {
 
 export function UserChatMessage({ message, ...props }: Props) {
   return (
-    <Box flexDirection="row" flexShrink={0} flexWrap="wrap">
+    <Box
+      flexDirection="row"
+      flexShrink={0}
+      padding={1}
+      backgroundColor="black"
+      borderLeftBackgroundColor="gray"
+      flexWrap="wrap"
+    >
       <Text>Me</Text>
       <Text color="gray"> ▶ </Text>
       <MarkdownView content={message.content} {...props} />

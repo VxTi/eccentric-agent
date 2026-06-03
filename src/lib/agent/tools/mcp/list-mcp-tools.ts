@@ -13,27 +13,32 @@ const inputSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Optional name of the tool to filter by. This is useful if you need to know the input schema of the tool you wish to invoke'
+      'Optional name of a specific tool. When set, the full input/output schemas for that tool are returned. When omitted, only tool names and descriptions are returned.'
     ),
+});
+
+const summaryToolSchema = z.object({
+  name: z.string(),
+  description: z.optional(z.string()),
+});
+
+const detailedToolSchema = z.object({
+  name: z.string(),
+  description: z.optional(z.string()),
+  inputSchema: z.string(),
+  outputSchema: z.optional(z.string()),
 });
 
 const outputSchema = z.object({
   mcpServer: z.string(),
-  tools: z.array(
-    z.object({
-      name: z.string(),
-      description: z.optional(z.string()),
-      inputSchema: z.any(),
-      outputSchema: z.optional(z.any()),
-    })
-  ),
+  tools: z.array(z.union([detailedToolSchema, summaryToolSchema])),
 });
 
 export default createTool({
   internalName: 'list_mcp_tools',
   name: 'List MCP tools',
   description:
-    'List the tools available on a given MCP (Model Context Protocol) server.',
+    "List tools available on a given MCP (Model Context Protocol) server. Call without 'toolName' to get a compact list of tool names and descriptions. Call again with a specific 'toolName' to retrieve that tool's full input/output schemas (as JSON-encoded strings) before invoking it via 'call_mcp_tool'.",
   inputSchema,
   outputSchema,
 
@@ -43,29 +48,46 @@ export default createTool({
 
     let cursor: string | undefined;
     do {
-      const { tools, nextCursor } = await mcp.client.listTools({ cursor });
+      const { tools, nextCursor } = await mcp.withAuth(() =>
+        mcp.client.listTools({ cursor })
+      );
       tools.forEach(t => allTools.set(t.name, t));
       cursor = nextCursor;
     } while (cursor);
 
     if (toolName) {
+      const tool = allTools.get(toolName);
       return {
         mcpServer,
-        tools: compact([allTools.get(toolName)]),
+        tools: compact([
+          tool && {
+            name: tool.name,
+            description: tool.description,
+            inputSchema: JSON.stringify(tool.inputSchema),
+            outputSchema: tool.outputSchema
+              ? JSON.stringify(tool.outputSchema)
+              : undefined,
+          },
+        ]),
       };
     }
 
     return {
       mcpServer,
-      tools: Array.from(allTools.values()),
+      tools: Array.from(allTools.values()).map(tool => ({
+        name: tool.name,
+        description: tool.description,
+      })),
     };
   },
 
-  inputToString({ mcpServer }) {
-    return `Listing available MCP tools on "${mcpServer}".`;
+  inputToString({ mcpServer, toolName }) {
+    return toolName
+      ? `Fetching schema for MCP tool "${toolName}" on "${mcpServer}".`
+      : `Listing available MCP tools on "${mcpServer}".`;
   },
 
   outputToString({ mcpServer, tools }) {
-    return `Found \`${tools.length}\` tools in \`${mcpServer}\``;
+    return `Found \`${tools.length}\` tool${tools.length === 1 ? '' : 's'} in \`${mcpServer}\``;
   },
 });

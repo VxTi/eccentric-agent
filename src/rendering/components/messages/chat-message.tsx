@@ -2,7 +2,7 @@ import { Box } from 'ink';
 import { type Message } from '../../../lib/types/messages';
 import { AssistantChatMessage } from './assistant-message';
 import { GenericChatMessage } from './generic-message';
-import { UserChatMessage } from './user-message';
+import { UserChatMessage } from './user-chat-message';
 
 interface Props {
   viewportHeight: number;
@@ -10,7 +10,7 @@ interface Props {
   message: Message;
 }
 
-export function ModelMessage({ message, viewportHeight, scrollOffset }: Props) {
+export function ChatMessage({ message, viewportHeight, scrollOffset }: Props) {
   return (
     <Box
       width="80%"

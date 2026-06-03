@@ -47,7 +47,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
 
         const [chosen] = await requestUserInput({
           title: 'Approval required',
-          description: `Tool "${tool.name}" requires approval\n ${previewArgs(input)}`,
+          description: `Tool \`${tool.name}\` requires approval\n ${previewArgs(input)}`,
           options: options.map(opt => ({ label: opt.text, id: opt.option })),
           allowMultiple: false,
         });
@@ -80,7 +80,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         output = await tool.handle(input, channel);
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'unknown';
-        const message = `Tool "${tool.name}" failed: ${errMsg}`;
+        const message = `\`${tool.name}\` failed: ${errMsg}`;
 
         channel.notify({
           failure: true,

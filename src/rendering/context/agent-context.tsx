@@ -215,13 +215,9 @@ export function AgentProvider({
         }
         const response = await result.response;
 
-        setStatus({ text: '', loading: false });
         clearInterval(interval);
-        setModelMessages(prev => [
-          ...prev,
-          ...response.messages,
-          { role: 'assistant', content: buffer },
-        ]);
+        setStatus({ text: '', loading: false });
+        setModelMessages(prev => [...prev, ...response.messages]);
         setMessage({
           type: 'assistant',
           id: messageId,

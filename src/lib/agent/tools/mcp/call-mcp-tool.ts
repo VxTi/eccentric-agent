@@ -19,7 +19,11 @@ const inputSchema = z.object({
 const outputSchema = z.object({
   mcpServer: z.string(),
   toolName: z.string(),
-  result: z.unknown().describe('The result of the MCP tool call.'),
+  result: z
+    .string()
+    .describe(
+      'The JSON-encoded result of the MCP tool call. Parse it as JSON to read the structured content.'
+    ),
 });
 
 const enum ApprovalOption {
@@ -59,15 +63,17 @@ export default createTool({
   async handle({ mcpServer, toolName, arguments: args }) {
     const mcp = await getMCPServer(mcpServer);
 
-    const result = await mcp.client.callTool({
-      name: toolName,
-      arguments: args,
-    });
+    const result = await mcp.withAuth(() =>
+      mcp.client.callTool({
+        name: toolName,
+        arguments: args,
+      })
+    );
 
     return {
       mcpServer,
       toolName,
-      result,
+      result: JSON.stringify(result),
     };
   },
 
@@ -114,10 +120,10 @@ export default createTool({
   },
 
   inputToString({ toolName, mcpServer }) {
-    return `Calling MCP tool "${toolName}" on "${mcpServer}".`;
+    return `Using MCP tool \`${toolName}\` from \`${mcpServer}\``;
   },
 
   outputToString({ toolName, mcpServer }) {
-    return `MCP tool call \`${toolName}\` in \`${mcpServer}\` finished`;
+    return `Used MCP tool \`${toolName}\` from \`${mcpServer}\``;
   },
 });
