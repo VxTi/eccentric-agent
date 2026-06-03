@@ -19,3 +19,5 @@ export type MakeOptional<In extends object, Fields extends keyof In> = Omit<
   Fields
 > &
   Partial<Pick<In, Fields>>;
+
+export type PromiseResult<T> = T extends Promise<infer F> ? F : never;

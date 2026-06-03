@@ -1,6 +1,5 @@
 import * as z from 'zod';
-import { type MCP } from '../../mcp/mcp';
-import { getMCPServer } from '../../mcp/server';
+import { getMCPServer } from '../../mcp/mcp';
 import { createTool, ToolSelectionOption } from '../common';
 
 const inputSchema = z.object({
@@ -27,21 +26,6 @@ const enum ApprovalOption {
   APPROVE = 'approve',
   DENY = 'deny',
   TRUST = 'trust',
-}
-
-async function callTool(
-  mcp: MCP,
-  name: string,
-  args: object
-): Promise<unknown> {
-  const tools = await mcp.listTools();
-  const hasTool = tools.some(tool => tool.name === name);
-
-  if (!hasTool) {
-    throw new Error(`MCP server ${mcp.name} does not have tool ${name}`);
-  }
-
-  return await mcp.callTool(name, args);
 }
 
 // Might want to enrich this with properties, e.g., 'trust this specific invocation'
@@ -75,7 +59,11 @@ export default createTool({
   async handle({ mcpServer, toolName, arguments: args }) {
     const mcp = await getMCPServer(mcpServer);
 
-    const result = await callTool(mcp, toolName, args);
+    const result = await mcp.client.callTool({
+      name: toolName,
+      arguments: args,
+    });
+
     return {
       mcpServer,
       toolName,

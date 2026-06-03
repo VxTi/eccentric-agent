@@ -173,7 +173,7 @@ export function AgentProvider({
           { type: 'user', id: uuid(), content: prompt } satisfies UserMessage,
         ]);
       }
-
+      const messageId = uuid();
       const result = streamText({
         allowSystemInMessages: true,
         abortSignal: signal,
@@ -198,9 +198,17 @@ export function AgentProvider({
           },
         },
         stopWhen: stepCountIs(20),
+        onError: ({ error }) => {
+          setMessage({
+            id: messageId,
+            type: 'assistant',
+            content: String(error),
+          });
+        },
       });
 
       let buffer = '';
+
       try {
         for await (const chunk of result.textStream) {
           buffer += chunk;
@@ -216,7 +224,7 @@ export function AgentProvider({
         ]);
         setMessage({
           type: 'assistant',
-          id: uuid(),
+          id: messageId,
           content: buffer,
         });
       } catch (err) {
