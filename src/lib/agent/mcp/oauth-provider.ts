@@ -49,7 +49,7 @@ export class LocalFileOAuthProvider implements OAuthClientProvider {
   constructor(
     private readonly serverName: string,
     private readonly clientId: string,
-    private readonly clientSecret: string,
+    private readonly clientSecret: string | undefined,
     private readonly scopes: readonly string[]
   ) {}
 

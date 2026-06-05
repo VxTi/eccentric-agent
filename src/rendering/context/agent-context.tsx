@@ -90,15 +90,17 @@ export function AgentProvider({
       loading: true,
     });
     void loadMcpConfig(appSignal)
-      .catch((): MCP[] => {
+      .then(setMcpServers)
+      .then(() => setStatus({ text: '', loading: false }))
+      .catch((error): MCP[] => {
+        const errMsg = error instanceof Error ? error.message : String(error);
         setStatus({
-          text: chalk.red('Failed to load MCP config'),
+          text: chalk.red(`Failed to load MCP config - ${errMsg}`),
           loading: false,
         });
+        setTimeout(() => setStatus({ text: '', loading: false }), 5000);
         return [];
-      })
-      .then(setMcpServers)
-      .then(() => setStatus({ text: '', loading: false }));
+      });
   }, []);
 
   /**

@@ -61,10 +61,10 @@ export interface IToolBase<
   ): MaybePromise<ToolSelectionOption>;
 
   handle(
-    input: NoInfer<TIn>,
+    input: TIn,
     channel: NotifierChannel<ToolChannelParams>,
     signal: AbortSignal
-  ): Promise<NoInfer<TOut>>;
+  ): Promise<TOut>;
 
   inputToString(
     input: TIn,

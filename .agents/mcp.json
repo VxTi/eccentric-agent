@@ -16,10 +16,15 @@
       ]
     },
     "notion": {
-      "httpUrl": "https://mcp.notion.com/mcp",
-      "disabled": true,
+      "command": "npx",
+      "args": ["-y", "mcp-remote@latest", "https://mcp.notion.com/mcp"]
+    },
+    "slack": {
+      "httpUrl": "https://mcp.slack.com/mcp",
       "oauth": {
-        "enabled": true
+        "enabled": true,
+        "clientId": "$SLACK_CLIENT_ID",
+        "clientSecret": "$SLACK_CLIENT_SECRET"
       }
     },
     "gmail": {

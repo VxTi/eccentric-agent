@@ -12,7 +12,6 @@ import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import path from 'node:path';
-import { requiredEnv } from '../../env';
 import { acquireContextInstance } from '../../events/context-acquisition';
 import type { PromiseResult } from '../../types/types';
 import { mcpConfigSchema } from './models';
@@ -45,9 +44,13 @@ export async function loadMcpConfig(signal: AbortSignal): Promise<MCP[]> {
 
     const content = await fs.promises.readFile(path, 'utf8');
     const json: unknown = JSON.parse(content);
-    const parsed = mcpConfigSchema.parse(json);
+    const parsed = mcpConfigSchema.safeParse(json);
 
-    const configs = Object.entries(parsed.mcpServers).filter(
+    if (!parsed.success) {
+      return Promise.reject(parsed.error);
+    }
+
+    const configs = Object.entries(parsed.data.mcpServers).filter(
       ([, cfg]) => !cfg.disabled
     );
 
@@ -146,15 +149,7 @@ export class MCP extends EventEmitter {
       return { client, transport };
     }
 
-    const authProvider = config.oauth?.enabled
-      ? new LocalFileOAuthProvider(
-          name,
-          requiredEnv('GOOGLE_OAUTH_CLIENT_ID'),
-          requiredEnv('GOOGLE_OAUTH_CLIENT_SECRET'),
-          config.oauth.scopes ?? []
-        )
-      : undefined;
-
+    const authProvider = resolveOAuthConfig(name, config);
     const url = new URL(config.httpUrl);
     const transport = new StreamableHTTPClientTransport(url, {
       protocolVersion,
@@ -212,6 +207,22 @@ export class MCP extends EventEmitter {
 
     return { client, transport, authProvider };
   }
+}
+
+function resolveOAuthConfig(
+  mcpName: string,
+  config: mcp.Config
+): LocalFileOAuthProvider | undefined {
+  if (!config.oauth?.enabled) return undefined;
+
+  const { clientId, clientSecret } = config.oauth;
+
+  return new LocalFileOAuthProvider(
+    mcpName,
+    clientId,
+    clientSecret,
+    config.oauth.scopes ?? []
+  );
 }
 
 export async function getMCPServer(name: string): Promise<MCP> {
