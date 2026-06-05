@@ -15,6 +15,12 @@
         "getTransitionsForJiraIssue"
       ]
     },
+    "github": {
+      "httpUrl": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer $GITHUB_PAT"
+      }
+    },
     "notion": {
       "command": "npx",
       "args": ["-y", "mcp-remote@latest", "https://mcp.notion.com/mcp"]

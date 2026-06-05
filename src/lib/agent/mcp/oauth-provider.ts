@@ -131,7 +131,7 @@ export class LocalFileOAuthProvider implements OAuthClientProvider {
     openBrowser(authorizationUrl.toString());
   }
 
-  waitForAuthorizationCode(): Promise<string> {
+  public waitForAuthorizationCode(): Promise<string> {
     if (!this._codePromise) {
       throw new Error(
         'redirectToAuthorization was not called before waitForAuthorizationCode'

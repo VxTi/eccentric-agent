@@ -6,6 +6,7 @@ const basicMcpConfig = z.object({
   autoApprove: z.optional(z.array(z.string())),
   env: z.optional(z.record(z.string(), z.string())),
   disabled: z.optional(z.boolean()),
+  headers: z.optional(z.record(z.string(), z.string().transform(resolveEnv))),
   oauth: z.optional(
     z.object({
       enabled: z.boolean(),
@@ -17,10 +18,7 @@ const basicMcpConfig = z.object({
 });
 
 function resolveEnv(value: string): string {
-  if (value.startsWith('$')) {
-    return requiredEnv(value.substring(1));
-  }
-  return value;
+  return value.replace(/\$(\w+)\b/, (_, secretId) => requiredEnv(secretId));
 }
 
 const commandConfig = z.object({

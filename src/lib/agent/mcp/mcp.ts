@@ -4,6 +4,8 @@ import {
   StreamableHTTPClientTransport,
   UnauthorizedError,
   type Transport,
+  createMiddleware,
+  applyMiddlewares,
 } from '@modelcontextprotocol/client';
 import { debug } from '../../events/messaging';
 import { LocalFileOAuthProvider } from './oauth-provider';
@@ -151,9 +153,17 @@ export class MCP extends EventEmitter {
 
     const authProvider = resolveOAuthConfig(name, config);
     const url = new URL(config.httpUrl);
+    const fetchMiddleware = createMiddleware(async (next, input, init) => {
+      const headers = new Headers(init?.headers);
+      Object.entries(config.headers ?? {}).forEach(([key, value]) =>
+        headers.set(key, value)
+      );
+      return next(input, { ...init, headers });
+    });
     const transport = new StreamableHTTPClientTransport(url, {
       protocolVersion,
       authProvider,
+      fetch: applyMiddlewares(fetchMiddleware)(fetch),
     });
     const client = new Client({ name: 'eccentric-agent', version: '1.0.0' });
     try {
