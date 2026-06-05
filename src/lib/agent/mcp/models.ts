@@ -4,12 +4,13 @@ const basicMcpConfig = z.object({
   args: z.optional(z.array(z.string())),
   autoApprove: z.optional(z.array(z.string())),
   env: z.optional(z.record(z.string(), z.string())),
+  disabled: z.optional(z.boolean()),
   oauth: z.optional(
     z.object({
       enabled: z.boolean(),
-      clientId: z.string(),
-      clientSecret: z.string(),
-      scopes: z.array(z.string()),
+      clientId: z.optional(z.string()),
+      clientSecret: z.optional(z.string()),
+      scopes: z.optional(z.array(z.string())),
     })
   ),
 });

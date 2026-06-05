@@ -47,8 +47,12 @@ export async function loadMcpConfig(signal: AbortSignal): Promise<MCP[]> {
     const json: unknown = JSON.parse(content);
     const parsed = mcpConfigSchema.parse(json);
 
+    const configs = Object.entries(parsed.mcpServers).filter(
+      ([, cfg]) => !cfg.disabled
+    );
+
     return await Promise.all(
-      Object.entries(parsed.mcpServers).map(
+      configs.map(
         async ([name, config]) => await MCP.create(name, config, signal)
       )
     );
@@ -101,18 +105,23 @@ export class MCP extends EventEmitter {
     config: mcp.Config,
     signal: AbortSignal
   ): Promise<MCP> {
-    const { transport, client, authProvider } = await this.makeTransport(
-      name,
-      config,
-      signal
-    );
+    try {
+      const { transport, client, authProvider } = await this.makeTransport(
+        name,
+        config,
+        signal
+      );
 
-    signal.addEventListener('abort', async () => {
-      await transport.close();
-      await client.close();
-    });
+      signal.addEventListener('abort', async () => {
+        await transport.close();
+        await client.close();
+      });
 
-    return new MCP(config, name, client, transport, authProvider);
+      return new MCP(config, name, client, transport, authProvider);
+    } catch (err) {
+      debug(`Failed to create transport for MCP ${name}`, err);
+      throw err;
+    }
   }
 
   private static async makeTransport(
@@ -142,7 +151,7 @@ export class MCP extends EventEmitter {
           name,
           requiredEnv('GOOGLE_OAUTH_CLIENT_ID'),
           requiredEnv('GOOGLE_OAUTH_CLIENT_SECRET'),
-          config.oauth.scopes
+          config.oauth.scopes ?? []
         )
       : undefined;
 
@@ -152,7 +161,6 @@ export class MCP extends EventEmitter {
       authProvider,
     });
     const client = new Client({ name: 'eccentric-agent', version: '1.0.0' });
-
     try {
       await client.connect(transport, { signal });
     } catch (err) {

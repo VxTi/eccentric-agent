@@ -16,7 +16,11 @@
       ]
     },
     "notion": {
-      "httpUrl": "https://mcp.notion.com/mcp"
+      "httpUrl": "https://mcp.notion.com/mcp",
+      "disabled": true,
+      "oauth": {
+        "enabled": true
+      }
     },
     "gmail": {
       "httpUrl": "https://gmailmcp.googleapis.com/mcp/v1",

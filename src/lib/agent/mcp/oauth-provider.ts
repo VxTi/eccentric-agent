@@ -15,7 +15,8 @@ import { StatusCode } from '../../types/status-codes';
 
 const CALLBACK_PORT = 3006;
 const CALLBACK_PATH = '/callback';
-const CALLBACK_URL = `http://localhost:${CALLBACK_PORT}${CALLBACK_PATH}`;
+const CALLBACK_IP = '127.0.0.1';
+const CALLBACK_URL = `http://${CALLBACK_IP}:${CALLBACK_PORT}${CALLBACK_PATH}`;
 
 function tokensDir(): string {
   return path.resolve(os.homedir(), '.eccentric-agent/mcp-tokens');
@@ -173,7 +174,7 @@ export class LocalFileOAuthProvider implements OAuthClientProvider {
       });
 
       server.on('error', reject);
-      server.listen(CALLBACK_PORT, 'localhost');
+      server.listen(CALLBACK_PORT, CALLBACK_IP);
     });
   }
 }

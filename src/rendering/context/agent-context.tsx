@@ -86,7 +86,7 @@ export function AgentProvider({
 
   useEffect(() => {
     setStatus({
-      text: chalk.blue('Loading MCP servers'),
+      text: chalk.blue('Connecting with MCP server...'),
       loading: true,
     });
     void loadMcpConfig(appSignal)
