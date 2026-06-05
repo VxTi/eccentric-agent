@@ -83,8 +83,8 @@ export default createTool({
 
   inputToString({ mcpServer, toolName }) {
     return toolName
-      ? `Fetching schema for MCP tool "${toolName}" on "${mcpServer}".`
-      : `Listing available MCP tools on "${mcpServer}".`;
+      ? `Retrieving schema for MCP tool \`${toolName}\` in \`${mcpServer}\``
+      : `Viewing available MCP tools in \`${mcpServer}\``;
   },
 
   outputToString({ mcpServer, tools }) {

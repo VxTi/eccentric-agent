@@ -31,6 +31,10 @@ Before invoking ANY tool, especially MCP tools, audit every argument:
 - If neither: you do NOT know it. Do not infer it from the project name,
   directory, repository, file contents, the user's email domain, prior
   unrelated context, or "what seems likely".
+- If you don't know its schema, invoke the mcp_list_tools tool with the name of the tool
+  you wish to invoke to get its model. This model is an ABSOLUTE REQUIREMENT. You NEED to invoke
+  this before executing any MCP tools, UNLESS you already did so before and were able to call the tool
+  successfully.
 
 If even one required argument is missing or ambiguous, STOP and ask the user a
 direct, specific question before calling the tool. It is always better to ask

@@ -96,7 +96,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
 
       channel.notify({
         loading: false,
-        content: `→ ${tool.outputToString(output, channel)}`,
+        content: `${chalk.yellow('→')} ${tool.outputToString(output, channel)}`,
       });
       notifier.unsubscribe(toolCallId);
       return output;

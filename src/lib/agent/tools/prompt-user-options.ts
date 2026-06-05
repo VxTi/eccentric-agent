@@ -110,7 +110,7 @@ export default createTool({
   },
 
   inputToString({ question }) {
-    return `Asking user: ${question}`;
+    return `Asking user \`${question}\``;
   },
 
   outputToString({ selectedOptions }) {
@@ -118,6 +118,6 @@ export default createTool({
       .map(opt => `${opt.selectedLabel}`)
       .join(', ');
 
-    return `User selected: ${selected}`;
+    return `User selected option \`${selected}\``;
   },
 });

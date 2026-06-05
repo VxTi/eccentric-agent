@@ -1,44 +1,42 @@
 import chalk from 'chalk';
+import { marked } from 'marked';
 import { type TerminalRendererOptions } from 'marked-terminal';
 
 export const defaultOptions: TerminalRendererOptions = {
   // Colors
-  code: chalk.yellow,
+  code: chalk.gray,
   blockquote: chalk.gray.italic,
   html: chalk.gray,
-  heading: chalk.green.bold,
-  firstHeading: chalk.magenta.underline.bold,
+  heading: chalk.blue.underline,
+  firstHeading: chalk.blue.bold,
   hr: chalk.reset,
   listitem: chalk.reset,
   table: chalk.reset,
   paragraph: chalk.reset,
   strong: chalk.bold,
   em: chalk.italic,
-  codespan: chalk.yellow,
+  codespan: chalk.whiteBright.bgBlack,
   del: chalk.dim.gray.strikethrough,
   link: chalk.blue,
   href: chalk.blue.underline,
 
   // Formats the bulletpoints and numbers for lists
-  list: (body, _ordered) => `${chalk.cyan('•')}${body}`,
+  list: (body, ordered) => {
+    const partiallyFormatted = body
+      .replace(/^\s*\*/, chalk.cyan(ordered ? `1.` : '•'))
+      .trim();
+    return marked.parse(partiallyFormatted, { async: false }).trim();
+  },
 
-  // Reflow and print-out width
-  width: 80, // only applicable when reflow is true
+  width: 80,
   reflowText: false,
-
-  // Should it prefix headers?
-  showSectionPrefix: true,
+  showSectionPrefix: false,
 
   // Whether or not to undo marked escaping
   // of enitities (" -> &quot; etc)
   unescape: true,
-
-  // Whether or not to show emojis
   emoji: true,
-
   // Options passed to cli-table3
   tableOptions: {},
-
-  // The size of tabs in number of spaces or as tab characters
-  tab: 3, // examples: 4, 2, \t, \t\t
+  tab: 0,
 };

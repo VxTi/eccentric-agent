@@ -1,5 +1,4 @@
 import * as z from 'zod';
-import { debug } from '../../../events/messaging';
 import { getMCPServer } from '../../mcp/mcp';
 import { createTool, ToolSelectionOption } from '../common';
 
@@ -69,9 +68,7 @@ export default createTool({
     );
 
     if (result.isError) {
-      debug(
-        `Something went wrong whilst executing MCP tool - ${JSON.stringify(result)}`
-      );
+      throw new Error(JSON.stringify(result.content));
     }
 
     return {
