@@ -1,5 +1,4 @@
 import * as z from 'zod';
-import { renderFencedBlock } from '../../../rendering/formatting';
 import { createTool, ToolSelectionOption } from './common';
 import { exec } from 'child_process';
 
@@ -141,12 +140,9 @@ export default createTool({
     if (exitCode === 0) {
       const lines = stdout.split('\n');
 
-      return `Command finished:${renderFencedBlock(
-        'plaintext',
-        lines
-          .slice(0, Math.min(lines.length, MAX_SHOWN_OUTPUT_LINES))
-          .join('\n')
-      )}`;
+      return `Command finished:\n${lines
+        .slice(0, Math.min(lines.length, MAX_SHOWN_OUTPUT_LINES))
+        .join('\n')}`;
     }
 
     return `Command exited with status \`${exitCode}\`: ${stderr.split('\n').slice(0, MAX_SHOWN_OUTPUT_LINES).join('\n')}`;

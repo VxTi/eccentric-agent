@@ -1,11 +1,11 @@
 import { tool as createTool, type Tool, type ToolSet } from 'ai';
 import chalk from 'chalk';
+import { marked } from 'marked';
 import { v7 as uuid } from 'uuid';
 import { emitMessage } from '../../events/messaging';
 import { type Notifier } from '../../events/notifier';
 import { requestUserInput } from '../../events/user-input';
 import { Result } from '../../result';
-import { formatMarkdown, previewArgs } from '../../../rendering/formatting';
 import {
   type IToolBase,
   type ToolChannelParams,
@@ -47,7 +47,10 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
 
         const [chosen] = await requestUserInput({
           title: 'Approval required',
-          description: `Tool \`${tool.name}\` requires approval\n ${previewArgs(input)}`,
+          description: marked.parse(
+            `Tool \`${tool.name}\` requires approval\n ${String(input)}`,
+            { async: false }
+          ),
           options: options.map(opt => ({ label: opt.text, id: opt.option })),
           allowMultiple: false,
         });
@@ -71,7 +74,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         }
       }
 
-      const inputText = formatMarkdown(tool.inputToString(input, channel));
+      const inputText = tool.inputToString(input, channel);
 
       channel.notify({ loading: true, content: inputText });
 
@@ -92,7 +95,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
 
       channel.notify({
         loading: false,
-        content: `→ ${formatMarkdown(tool.outputToString(output, channel))}`,
+        content: `→ ${tool.outputToString(output, channel)}`,
       });
       notifier.unsubscribe(toolCallId);
       return output;

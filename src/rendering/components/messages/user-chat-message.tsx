@@ -1,6 +1,6 @@
 import { Box, Text } from 'ink';
 import type { UserMessage } from '../../../lib/types/messages';
-import { MarkdownView } from '../MarkdownView';
+import { Markdown } from '../markdown';
 
 interface Props {
   viewportHeight: number;
@@ -25,7 +25,7 @@ export function UserChatMessage({ message, ...props }: Props) {
     >
       <Text>Me</Text>
       <Text color="#777777"> ▶ </Text>
-      <MarkdownView content={message.content} {...props} />
+      <Markdown content={message.content} {...props} />
     </Box>
   );
 }

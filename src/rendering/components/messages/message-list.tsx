@@ -54,6 +54,7 @@ export function MessageList(): JSX.Element {
     <Box
       ref={viewportRef}
       flexDirection="column"
+      alignItems="flex-start"
       flexGrow={1}
       flexShrink={1}
       minHeight={0}

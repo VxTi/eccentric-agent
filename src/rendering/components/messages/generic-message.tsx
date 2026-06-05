@@ -1,7 +1,7 @@
 import { Box, Text } from 'ink';
 import { useEffect, useState } from 'react';
 import { type GenericMessage } from '../../../lib/types/messages';
-import { MarkdownView } from '../MarkdownView';
+import { Markdown } from '../markdown';
 
 interface Props {
   viewportHeight: number;
@@ -19,7 +19,7 @@ export function GenericChatMessage({ message, ...props }: Props) {
       ) : (
         <LoadingSpinner loading={message.loading} />
       )}
-      <MarkdownView content={message.content} {...props} />
+      <Markdown content={message.content} {...props} />
     </Box>
   );
 }

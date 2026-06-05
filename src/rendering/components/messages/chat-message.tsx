@@ -13,7 +13,8 @@ interface Props {
 export function ChatMessage({ message, viewportHeight, scrollOffset }: Props) {
   return (
     <Box
-      alignSelf="center"
+      alignSelf="flex-start"
+      width="100%"
       justifyContent="flex-start"
       flexShrink={0}
       marginBottom={1}

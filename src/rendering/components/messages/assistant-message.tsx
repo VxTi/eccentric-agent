@@ -1,6 +1,6 @@
 import { Box, Text } from 'ink';
 import type { AssistantMessage } from '../../../lib/types/messages';
-import { MarkdownView } from '../MarkdownView';
+import { Markdown } from '../markdown';
 
 interface Props {
   viewportHeight: number;
@@ -11,7 +11,7 @@ export function AssistantChatMessage({ message, ...props }: Props) {
   return (
     <Box flexDirection="row" flexShrink={0} flexWrap="wrap">
       <Text color="blue">◆ </Text>
-      <MarkdownView content={message.content} {...props} />
+      <Markdown content={message.content} {...props} />
     </Box>
   );
 }

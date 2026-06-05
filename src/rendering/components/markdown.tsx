@@ -1,81 +1,20 @@
-import { highlight } from 'cli-highlight';
-import { Box, Text, type TextProps } from 'ink';
-import { memo, useMemo } from 'react';
-import ReactMarkdown, { type Components } from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { theme } from '../highlight-theme';
+import { Box, Text } from 'ink';
+import { marked } from 'marked';
+import { type JSX } from 'react';
 
-function TextFrag({ children, ...props }: TextProps) {
-  if (Array.isArray(children)) {
-    return children.map(element => <TextFrag {...props}>{element}</TextFrag>);
-  }
-
-  if (typeof children !== 'string') return;
-
-  return <Text {...props}>{children}</Text>;
+interface MarkdownViewProps {
+  content: string;
 }
 
-const components: Components = {
-  table: ({ children }) => (
-    <Box borderStyle="single" borderColor="gray">
-      {children}
-    </Box>
-  ),
-  sup: ({ children }) => <TextFrag italic>{children}</TextFrag>,
-  th: ({ children }) => (
-    <Box
-      borderBottom
-      borderTop={false}
-      borderLeft={false}
-      borderRight={false}
-      borderStyle="single"
-      borderColor="gray"
-    >
-      {children}
-    </Box>
-  ),
-  td: ({ children }) => (
-    <Box
-      borderBottom
-      borderTop={false}
-      borderLeft={false}
-      borderRight={false}
-      borderStyle="single"
-      borderColor="gray"
-    >
-      {children}
-    </Box>
-  ),
-  code({ className, children }) {
-    const match = /language-(\w+)/.exec(className || '');
-    const content = typeof children === 'string' ? children : '';
-
-    const formatted = useMemo(() => {
-      return highlight(content, {
-        language: 'json',
-        ignoreIllegals: true,
-        theme,
-      });
-    }, [content]);
-
-    if (match) {
-      return <TextFrag>{formatted}</TextFrag>;
-    }
-
-    return <TextFrag>{children}</TextFrag>;
-  },
-  b: ({ children }) => <TextFrag bold>{children}</TextFrag>,
-  h1: ({ children }) => <TextFrag bold>{children}</TextFrag>,
-  p: ({ children }) => <TextFrag>{children}</TextFrag>,
-  span: ({ children }) => <TextFrag>{children}</TextFrag>,
-};
-
-const Markdown = memo(({ content }: { content: string }) => {
+export function Markdown({ content }: MarkdownViewProps): JSX.Element {
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-      {content}
-    </ReactMarkdown>
+    <Box flexDirection="column" width="100%">
+      {marked
+        .parse(content, { async: false })
+        .split('\n')
+        .map((line, i) => (
+          <Text key={i}>{line}</Text>
+        ))}
+    </Box>
   );
-});
-
-export default Markdown;
+}
