@@ -7,7 +7,8 @@ import {
   createMiddleware,
   applyMiddlewares,
 } from '@modelcontextprotocol/client';
-import { debug } from '../../events/messaging';
+import { type z } from 'zod';
+import { debug, emitMessage } from '../../events/messaging';
 import { LocalFileOAuthProvider } from './oauth-provider';
 import first from 'lodash/first';
 import { EventEmitter } from 'node:events';
@@ -16,7 +17,7 @@ import * as os from 'node:os';
 import path from 'node:path';
 import { acquireContextInstance } from '../../events/context-acquisition';
 import type { PromiseResult } from '../../types/types';
-import { mcpConfigSchema } from './models';
+import { mcpConfigSchema, mcpServerConfigSchema } from './models';
 import { type mcp } from './types';
 import { config } from 'dotenv';
 
@@ -52,9 +53,34 @@ export async function loadMcpConfig(signal: AbortSignal): Promise<MCP[]> {
       return Promise.reject(parsed.error);
     }
 
-    const configs = Object.entries(parsed.data.mcpServers).filter(
-      ([, cfg]) => !cfg.disabled
-    );
+    const failed: string[] = [];
+    const configs = Object.entries(parsed.data.mcpServers)
+      .map(
+        ([key, value]): [
+          string,
+          z.infer<typeof mcpServerConfigSchema> | undefined,
+        ] => {
+          const parsed = mcpServerConfigSchema.safeParse(value);
+          if (!parsed.success) {
+            failed.push(key);
+            return [key, undefined];
+          }
+
+          return [key, parsed.data];
+        }
+      )
+      .filter(
+        (input): input is [string, z.infer<typeof mcpServerConfigSchema>] =>
+          !input[1]?.disabled
+      );
+
+    if (failed.length > 0) {
+      emitMessage({
+        type: 'generic',
+        failure: true,
+        content: `Failed to initialize the following MCPs:\n${failed.map(f => `- ${f}`).join('\n')}`,
+      });
+    }
 
     return await Promise.all(
       configs.map(
@@ -124,7 +150,6 @@ export class MCP extends EventEmitter {
 
       return new MCP(config, name, client, transport, authProvider);
     } catch (err) {
-      debug(`Failed to create transport for MCP ${name}`, err);
       throw err;
     }
   }

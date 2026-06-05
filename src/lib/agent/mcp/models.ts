@@ -34,7 +34,7 @@ const httpConfig = z.object({
 export const mcpServerConfigSchema = z.union([commandConfig, httpConfig]);
 
 export const mcpConfigSchema = z.object({
-  mcpServers: z.record(z.string(), mcpServerConfigSchema),
+  mcpServers: z.record(z.string(), z.unknown()),
 });
 
 export const basicJsonRpcResponseSchema = z.object({

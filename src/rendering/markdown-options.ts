@@ -1,5 +1,4 @@
 import chalk from 'chalk';
-import { marked } from 'marked';
 import { type TerminalRendererOptions } from 'marked-terminal';
 
 export const defaultOptions: TerminalRendererOptions = {
@@ -25,7 +24,7 @@ export const defaultOptions: TerminalRendererOptions = {
     const partiallyFormatted = body
       .replace(/^\s*\*/, chalk.cyan(ordered ? `1.` : '•'))
       .trim();
-    return marked.parse(partiallyFormatted, { async: false }).trim();
+    return partiallyFormatted; // marked.parse(partiallyFormatted, { async: false }).trim();
   },
 
   width: 80,

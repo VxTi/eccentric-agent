@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type JSX } from 'react';
 import { Box, measureElement, useInput, type DOMElement } from 'ink';
 import { useAgent } from '../../context';
 import { useUserInputField } from '../../context/user-input-context';
-import { ChatMessage } from './chat-message';
+import { useTerminalSize } from '../../hooks';
+import { MemoizedChatMessage } from './memoized-chat-message';
 
 const SCROLL_STEP = 1;
 
@@ -16,6 +17,7 @@ export function MessageList(): JSX.Element {
   const { messages } = useAgent();
   const { inputRequest } = useUserInputField();
 
+  const { height: terminalHeight } = useTerminalSize();
   const viewportRef = useRef<DOMElement | null>(null);
   const contentRef = useRef<DOMElement | null>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -31,14 +33,14 @@ export function MessageList(): JSX.Element {
       const { height } = measureElement(contentRef.current);
       setContentHeight(prev => (prev === height ? prev : height));
     }
-  }, [messages, inputRequest]);
+  }, [messages, inputRequest, terminalHeight]);
 
   const overflow = Math.max(0, contentHeight - viewportHeight);
   const clampedOffset = Math.min(Math.max(0, scrollOffset), overflow);
 
   useEffect(() => {
     if (clampedOffset !== scrollOffset) setScrollOffset(clampedOffset);
-  }, [clampedOffset, scrollOffset]);
+  }, [clampedOffset, scrollOffset, terminalHeight]);
 
   // Wheel up reveals older messages (larger offset); wheel down reveals newer.
   useInput(input => {
@@ -68,7 +70,7 @@ export function MessageList(): JSX.Element {
         marginTop={-(overflow - clampedOffset)}
       >
         {messages.map((message, idx) => (
-          <ChatMessage
+          <MemoizedChatMessage
             key={idx}
             message={message}
             viewportHeight={viewportHeight}

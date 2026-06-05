@@ -4,13 +4,17 @@ import { AssistantChatMessage } from './assistant-message';
 import { GenericChatMessage } from './generic-message';
 import { UserChatMessage } from './user-chat-message';
 
-interface Props {
+export interface ChatMessageProps {
   viewportHeight: number;
   scrollOffset: number;
   message: Message;
 }
 
-export function ChatMessage({ message, viewportHeight, scrollOffset }: Props) {
+export function ChatMessage({
+  message,
+  viewportHeight,
+  scrollOffset,
+}: ChatMessageProps) {
   return (
     <Box
       alignSelf="flex-start"

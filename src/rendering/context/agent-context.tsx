@@ -85,7 +85,6 @@ export function AgentProvider({
   const [mcpServers, setMcpServers] = useState<MCP[]>([]);
 
   useEffect(() => {
-    return;
     setStatus({
       text: chalk.blue('Connecting with MCP server...'),
       loading: true,

@@ -75,7 +75,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         }
       }
 
-      const inputText = tool.inputToString(input, channel);
+      const inputText = tool.inputToString(input, channel).trim();
 
       channel.notify({ loading: true, content: inputText });
 
@@ -96,7 +96,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
 
       channel.notify({
         loading: false,
-        content: `${chalk.yellow('→')} ${tool.outputToString(output, channel)}`,
+        content: `${chalk.yellow('→')} ${tool.outputToString(output, channel).trim()}`,
       });
       notifier.unsubscribe(toolCallId);
       return output;
