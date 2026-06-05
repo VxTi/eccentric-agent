@@ -6,13 +6,11 @@ import { marked } from 'marked';
 import TerminalRenderer from 'marked-terminal';
 import { stdin, stdout } from 'node:process';
 import { render } from 'ink';
-import {
-  AgentProvider,
-  ApplicationCancellationProvider,
-} from './rendering/context';
+import { AgentProvider } from './rendering/context';
 import { App } from './rendering/components/App';
 import { UserInputProvider } from './rendering/context/user-input-context';
 import { defaultOptions } from './rendering/markdown-options';
+import { appController } from './signal';
 
 const ANSI_ALT_SCREEN_ENTER = '\x1b[?1049h\x1b[H\x1b[2J';
 const ANSI_ALT_SCREEN_EXIT = '\x1b[3J\x1b[?1049l';
@@ -21,8 +19,6 @@ const ANSI_ALT_SCREEN_EXIT = '\x1b[3J\x1b[?1049l';
 // wheel scrolls; Ink surfaces the resulting sequences through `useInput`.
 const ANSI_MOUSE_ENABLE = '\x1b[?1000h\x1b[?1006h';
 const ANSI_MOUSE_DISABLE = '\x1b[?1006l\x1b[?1000l';
-
-const controller = new AbortController();
 
 marked.setOptions({
   // eslint-disable-next-line
@@ -43,16 +39,14 @@ async function main(): Promise<void> {
   stdout.write(ANSI_ALT_SCREEN_ENTER);
   stdout.write(ANSI_MOUSE_ENABLE);
 
-  controller.signal.addEventListener('abort', () => handleExit());
+  appController.signal.addEventListener('abort', () => handleExit());
 
   const { waitUntilExit } = render(
-    <ApplicationCancellationProvider controller={controller}>
-      <UserInputProvider>
-        <AgentProvider>
-          <App />
-        </AgentProvider>
-      </UserInputProvider>
-    </ApplicationCancellationProvider>,
+    <UserInputProvider>
+      <AgentProvider>
+        <App />
+      </AgentProvider>
+    </UserInputProvider>,
     {
       stdout,
       stdin,
@@ -68,8 +62,8 @@ async function main(): Promise<void> {
   await waitUntilExit();
 }
 
-process.on('SIGINT', controller.abort.bind(controller));
-process.on('SIGTERM', controller.abort.bind(controller));
+process.on('SIGINT', appController.abort.bind(appController));
+process.on('SIGTERM', appController.abort.bind(appController));
 
 main()
   .then(() => {

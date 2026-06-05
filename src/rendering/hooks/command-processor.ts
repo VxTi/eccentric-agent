@@ -3,11 +3,11 @@ import { isCommand } from '../../lib/commands';
 import { emitMessage } from '../../lib/events/messaging';
 import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
 import { TokenSource } from '../../lib/events/events';
-import { useAbort, useAgent } from '../context';
+import { appController } from '../../signal';
+import { useAgent } from '../context';
 
 export function useCommandProcessor() {
   const { setMessages, setModelMessages, systemPrompt } = useAgent();
-  const controller = useAbort();
 
   const processCommand = useCallback(
     (command: string) => {
@@ -27,7 +27,7 @@ export function useCommandProcessor() {
         }
         case 'exit':
         case 'quit': {
-          controller.abort(0);
+          appController.abort(0);
           break;
         }
         case 'system-prompt':
@@ -41,7 +41,7 @@ ${systemPrompt}`,
           break;
       }
     },
-    [controller, setMessages, setModelMessages, systemPrompt]
+    [setMessages, setModelMessages, systemPrompt]
   );
 
   return { processCommand };

@@ -25,7 +25,7 @@ import { TaskList } from '../../lib/tasks';
 import type { Message, UserMessage } from '../../lib/types/messages';
 import { registry } from '../../lib/agent/tools';
 import { constructToolset } from '../../lib/agent/tools/core';
-import { useSignal } from './application-cancellation';
+import { appSignal } from '../../signal';
 
 interface AgentStatus {
   loading: boolean;
@@ -66,8 +66,6 @@ export function AgentProvider({
     text: '',
   });
 
-  const signal = useSignal();
-
   const { taskList, notifier, model, fileCache } = useMemo(() => {
     return {
       taskList: new TaskList(),
@@ -91,7 +89,7 @@ export function AgentProvider({
       text: chalk.blue('Loading MCP servers'),
       loading: true,
     });
-    void loadMcpConfig(signal)
+    void loadMcpConfig(appSignal)
       .catch((): MCP[] => {
         setStatus({
           text: chalk.red('Failed to load MCP config'),
@@ -101,7 +99,7 @@ export function AgentProvider({
       })
       .then(setMcpServers)
       .then(() => setStatus({ text: '', loading: false }));
-  }, [signal]);
+  }, []);
 
   /**
    * System prompt construction
@@ -161,7 +159,7 @@ export function AgentProvider({
       }
       const result = streamText({
         allowSystemInMessages: true,
-        abortSignal: signal,
+        abortSignal: appSignal,
         model,
         messages: [
           { content: systemPrompt, role: 'system' },
@@ -234,15 +232,7 @@ export function AgentProvider({
         await processRequest(firstQueuedMessage, false);
       }
     },
-    [
-      messageQueue,
-      model,
-      modelMessages,
-      setMessage,
-      signal,
-      systemPrompt,
-      tools,
-    ]
+    [messageQueue, model, modelMessages, setMessage, systemPrompt, tools]
   );
 
   const submitMessage = useCallback(

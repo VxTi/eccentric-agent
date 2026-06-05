@@ -33,7 +33,7 @@ export class Agent<T = string> {
     private readonly signal: AbortSignal,
     private readonly channel: NotifierChannel<ToolChannelParams>
   ) {
-    this.toolset = this.constructToolset();
+    this.toolset = this.constructToolset(signal);
     this.model = geminiProvider('gemini-2.5-flash');
     this.messages = [
       { role: 'system', content: this.constructSystemPrompt() },
@@ -128,19 +128,19 @@ ${message.content}`,
     ].join('\n');
   }
 
-  private constructToolset(): ToolSet {
+  private constructToolset(signal: AbortSignal): ToolSet {
     return {
       [PRIMARY_GOAL_TOOL_NAME]: this.constructPrimaryGoalTool(),
       ...Object.fromEntries(
         agentTools.map((tool: IToolBase) => [
           tool.internalName,
-          this.constructTool(tool),
+          this.constructTool(tool, signal),
         ])
       ),
     };
   }
 
-  private constructTool(tool: IToolBase): Tool {
+  private constructTool(tool: IToolBase, signal: AbortSignal): Tool {
     const { inputSchema, description, outputSchema } = tool;
 
     return createTool({
@@ -151,7 +151,7 @@ ${message.content}`,
         this.channel.notify({
           content: tool.inputToString(input, this.channel),
         });
-        const output = await tool.handle(input, this.channel);
+        const output = await tool.handle(input, this.channel, signal);
         this.channel.notify({
           content: tool.outputToString(output, this.channel),
         });

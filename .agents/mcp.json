@@ -15,6 +15,9 @@
         "getTransitionsForJiraIssue"
       ]
     },
+    "notion": {
+      "httpUrl": "https://mcp.notion.com/mcp"
+    },
     "gmail": {
       "httpUrl": "https://gmailmcp.googleapis.com/mcp/v1",
       "oauth": {

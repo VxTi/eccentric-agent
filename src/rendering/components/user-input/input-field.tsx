@@ -9,7 +9,8 @@ import { Box, Text, useInput, usePaste } from 'ink';
 import { CURSOR_BLINK_INTERVAL_MS } from '../../../lib/constants';
 import { EventName, eventOn } from '../../../lib/events/events';
 import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
-import { useAbort, useAgent } from '../../context';
+import { appController } from '../../../signal';
+import { useAgent } from '../../context';
 import { useCommandProcessor } from '../../hooks/command-processor';
 import { useUserInputField } from '../../context/user-input-context';
 import { SuggestionType, useTerminalSize } from '../../hooks';
@@ -42,7 +43,6 @@ export default function InputField(): JSX.Element {
     setInputRequest,
   } = useUserInputField();
 
-  const controller = useAbort();
   const agent = useAgent();
 
   const handlePickSuggestion = useCallback(
@@ -100,7 +100,7 @@ export default function InputField(): JSX.Element {
 
   useInput((inputChar, key) => {
     if (key.ctrl && inputChar === 'c') {
-      controller.abort(0);
+      appController.abort(0);
     }
 
     // Handled in another component

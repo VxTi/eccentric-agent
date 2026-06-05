@@ -41,10 +41,14 @@ const outputSchema = z.discriminatedUnion('ok', [
 async function runSubAgent(
   name: string,
   goal: string,
-  channel: NotifierChannel<ToolChannelParams>
+  channel: NotifierChannel<ToolChannelParams>,
+  signal: AbortSignal
 ): Promise<z.infer<typeof outputSchema>> {
   return new Promise(resolve => {
     const controller = new AbortController();
+
+    // If main
+    signal.addEventListener('abort', () => controller.abort());
 
     new Agent<string>(
       goal,
@@ -82,8 +86,8 @@ export default createTool({
   inputSchema,
   outputSchema,
 
-  async handle({ agent: { goal, name } }, channel) {
-    return await runSubAgent(name, goal, channel);
+  async handle({ agent: { goal, name } }, channel, signal) {
+    return await runSubAgent(name, goal, channel, signal);
   },
 
   inputToString({ agent: { goal } }): string {

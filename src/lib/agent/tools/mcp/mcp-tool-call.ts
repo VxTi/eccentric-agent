@@ -61,14 +61,11 @@ export default createTool({
   inputSchema,
   outputSchema,
 
-  async handle({ mcpServer, toolName, arguments: args }) {
+  async handle({ mcpServer, toolName, arguments: args }, _, signal) {
     const mcp = await getMCPServer(mcpServer);
 
     const result = await mcp.withAuth(() =>
-      mcp.client.callTool({
-        name: toolName,
-        arguments: args,
-      })
+      mcp.client.callTool({ name: toolName, arguments: args }, { signal })
     );
 
     if (result.isError) {

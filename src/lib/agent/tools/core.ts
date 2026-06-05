@@ -2,6 +2,7 @@ import { tool as createTool, type Tool, type ToolSet } from 'ai';
 import chalk from 'chalk';
 import { marked } from 'marked';
 import { v7 as uuid } from 'uuid';
+import { appSignal } from '../../../signal';
 import { emitMessage } from '../../events/messaging';
 import { type Notifier } from '../../events/notifier';
 import { requestUserInput } from '../../events/user-input';
@@ -48,7 +49,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         const [chosen] = await requestUserInput({
           title: 'Approval required',
           description: marked.parse(
-            `Tool \`${tool.name}\` requires approval\n ${String(input)}`,
+            `Tool \`${tool.name}\` requires approval\n ${JSON.stringify(input)}`,
             { async: false }
           ),
           options: options.map(opt => ({ label: opt.text, id: opt.option })),
@@ -80,7 +81,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
 
       let output: unknown;
       try {
-        output = await tool.handle(input, channel);
+        output = await tool.handle(input, channel, appSignal);
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'unknown';
         const message = `\`${tool.name}\` failed: ${errMsg}`;

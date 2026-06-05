@@ -62,7 +62,8 @@ export interface IToolBase<
 
   handle(
     input: NoInfer<TIn>,
-    channel: NotifierChannel<ToolChannelParams>
+    channel: NotifierChannel<ToolChannelParams>,
+    signal: AbortSignal
   ): Promise<NoInfer<TOut>>;
 
   inputToString(
