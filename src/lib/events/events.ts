@@ -104,6 +104,15 @@ export function unsubscribeEvent<TEventName extends EventName>(
   eventTarget.removeEventListener(name, handler as never);
 }
 
+export function eventOn<TEventName extends EventName>(
+  name: TEventName,
+  handler: (event: EventRegistry[TEventName]) => any
+): () => void {
+  subscribeEvent(name, handler);
+
+  return () => unsubscribeEvent(name, handler);
+}
+
 export function emitEvent<TEventName extends EventName>(
   eventName: TEventName,
   ...parameters: ConstructorParameters<

@@ -41,6 +41,6 @@ export default createTool({
   },
 
   outputToString({ formatted }) {
-    return `Current user time: ${formatted}`;
+    return `Current user time is \`${formatted}\``;
   },
 });

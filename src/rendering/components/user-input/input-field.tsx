@@ -7,12 +7,7 @@ import {
 } from 'react';
 import { Box, Text, useInput, usePaste } from 'ink';
 import { CURSOR_BLINK_INTERVAL_MS } from '../../../lib/constants';
-import {
-  EventName,
-  subscribeEvent,
-  unsubscribeEvent,
-  type UserInputRequestEvent,
-} from '../../../lib/events/events';
+import { EventName, eventOn } from '../../../lib/events/events';
 import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
 import { useAbort, useAgent } from '../../context';
 import { useCommandProcessor } from '../../hooks/command-processor';
@@ -86,14 +81,9 @@ export default function InputField(): JSX.Element {
   }, [setSuggestionIndex, suggestions]);
 
   useEffect(() => {
-    const handleInputRequest = (event: UserInputRequestEvent) =>
-      setInputRequest(event.detail);
-
-    subscribeEvent(EventName.REQUEST_INPUT, handleInputRequest);
-
-    return () => {
-      unsubscribeEvent(EventName.REQUEST_INPUT, handleInputRequest);
-    };
+    return eventOn(EventName.REQUEST_INPUT, ({ detail }) =>
+      setInputRequest(detail)
+    );
   }, [setInputRequest]);
 
   const submitMessage = () => {
@@ -193,7 +183,7 @@ export default function InputField(): JSX.Element {
 
   return (
     <Box
-      width="80%"
+      width="100%"
       alignSelf="center"
       flexDirection="column"
       flexShrink={0}

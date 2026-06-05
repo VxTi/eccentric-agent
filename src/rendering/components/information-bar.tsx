@@ -7,10 +7,9 @@ import {
 import {
   type ConsumeTokenEvent,
   EventName,
-  subscribeEvent,
+  eventOn,
   type TokenConsumeProps,
   TokenSource,
-  unsubscribeEvent,
 } from '../../lib/events/events';
 import {
   formatPercentageSymbol,
@@ -31,26 +30,23 @@ export function InformationBar(): ReactNode {
   const { model } = useAgent();
 
   useEffect(() => {
-    const handleTokenConsumption = ({
-      detail: { input, output, source, reset },
-    }: ConsumeTokenEvent) => {
-      if (reset) {
-        setExtCount({ input: 0, output: 0 });
-        setCount({ input: 0, output: 0 });
-        return;
-      }
-      const updateState =
-        source === TokenSource.SUB_TASK ? setExtCount : setCount;
+    return eventOn(
+      EventName.CONSUME_TOKENS,
+      ({ detail: { input, output, source, reset } }: ConsumeTokenEvent) => {
+        if (reset) {
+          setExtCount({ input: 0, output: 0 });
+          setCount({ input: 0, output: 0 });
+          return;
+        }
+        const updateState =
+          source === TokenSource.SUB_TASK ? setExtCount : setCount;
 
-      updateState(prev => ({
-        input: prev.input + input,
-        output: prev.output + output,
-      }));
-    };
-    subscribeEvent(EventName.CONSUME_TOKENS, handleTokenConsumption);
-    return () => {
-      unsubscribeEvent(EventName.CONSUME_TOKENS, handleTokenConsumption);
-    };
+        updateState(prev => ({
+          input: prev.input + input,
+          output: prev.output + output,
+        }));
+      }
+    );
   }, []);
 
   const metadata: LanguageModelMetadata = useMemo(

@@ -1,11 +1,12 @@
-export type ErrorResult<T = undefined> = {
+export interface ErrorResult<T = undefined> {
   ok: false;
   error: T;
-};
-export type SuccessResult<T> = {
+}
+export interface SuccessResult<T> {
   ok: true;
   data: T;
-};
+}
+
 export type Result<Success, Error = string> =
   | SuccessResult<Success>
   | ErrorResult<Error>;

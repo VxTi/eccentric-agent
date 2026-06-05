@@ -23,7 +23,7 @@ export function StatusLine(): ReactNode {
   if (!loading && !text.length) return null;
 
   return (
-    <Box width="80%" alignSelf="center" paddingTop={1}>
+    <Box paddingTop={1}>
       {loading && <Text color="cyan">{SPINNER_FRAMES[frame]}</Text>}
       {text && <Text> {text}</Text>}
     </Box>

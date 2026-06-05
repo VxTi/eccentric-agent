@@ -11,7 +11,7 @@ interface Props {
 
 export function GenericChatMessage({ message, ...props }: Props) {
   return (
-    <Box maxWidth="80%" flexShrink={0} flexDirection="row">
+    <Box flexShrink={0} flexDirection="row">
       {message.failure ? (
         <Text color="red" bold>
           ✖{' '}

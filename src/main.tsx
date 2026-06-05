@@ -52,6 +52,7 @@ async function main(): Promise<void> {
       maxFps: 120,
       incrementalRendering: true,
       concurrent: true,
+      alternateScreen: true,
     }
   );
 

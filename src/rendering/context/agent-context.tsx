@@ -18,13 +18,7 @@ import { getRandomMessage } from '../../lib/agent/rotating-messages';
 import { constructSystemPrompt } from '../../lib/agent/system-prompt';
 import { DEFAULT_SYSTEM_PROMPT } from '../../lib/constants';
 import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
-import {
-  type AgentMessageEvent,
-  EventName,
-  subscribeEvent,
-  TokenSource,
-  unsubscribeEvent,
-} from '../../lib/events/events';
+import { EventName, eventOn, TokenSource } from '../../lib/events/events';
 import { Notifier } from '../../lib/events/notifier';
 import { FileCache } from '../../lib/file-cache';
 import { TaskList } from '../../lib/tasks';
@@ -140,15 +134,7 @@ export function AgentProvider({
    * Handling incoming messages from non-react world, and token consumption
    */
   useEffect(() => {
-    const handleIncomingMessage = (event: AgentMessageEvent) => {
-      setMessage(event.detail);
-    };
-
-    subscribeEvent(EventName.AGENT_MESSAGE, handleIncomingMessage);
-
-    return () => {
-      unsubscribeEvent(EventName.AGENT_MESSAGE, handleIncomingMessage);
-    };
+    return eventOn(EventName.AGENT_MESSAGE, ({ detail }) => setMessage(detail));
   }, [setMessage]);
 
   const processRequest = useCallback(
@@ -173,7 +159,6 @@ export function AgentProvider({
           { type: 'user', id: uuid(), content: prompt } satisfies UserMessage,
         ]);
       }
-      const messageId = uuid();
       const result = streamText({
         allowSystemInMessages: true,
         abortSignal: signal,
@@ -200,29 +185,39 @@ export function AgentProvider({
         stopWhen: stepCountIs(20),
         onError: ({ error }) => {
           setMessage({
-            id: messageId,
+            id: uuid(),
             type: 'assistant',
             content: String(error),
           });
         },
       });
 
+      let currentTextId: string | null = null;
       let buffer = '';
 
       try {
-        for await (const chunk of result.textStream) {
-          buffer += chunk;
+        for await (const part of result.fullStream) {
+          if (part.type === 'text-start') {
+            currentTextId = uuid();
+            buffer = '';
+          } else if (part.type === 'text-delta') {
+            buffer += part.text;
+            if (currentTextId) {
+              setMessage({
+                type: 'assistant',
+                id: currentTextId,
+                content: buffer,
+              });
+            }
+          } else if (part.type === 'text-end') {
+            currentTextId = null;
+          }
         }
         const response = await result.response;
 
         clearInterval(interval);
         setStatus({ text: '', loading: false });
         setModelMessages(prev => [...prev, ...response.messages]);
-        setMessage({
-          type: 'assistant',
-          id: messageId,
-          content: buffer,
-        });
       } catch (err) {
         setMessage({
           type: 'generic',

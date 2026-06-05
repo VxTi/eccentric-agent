@@ -1,11 +1,6 @@
 import { type ReactNode, useEffect } from 'react';
 import { Box, Text } from 'ink';
-import {
-  emitEvent,
-  EventName,
-  subscribeEvent,
-  unsubscribeEvent,
-} from '../../lib/events/events';
+import { emitEvent, EventName, eventOn } from '../../lib/events/events';
 import { useAgent } from '../context';
 import { useTerminalSize } from '../hooks';
 import { MessageList } from './messages/message-list';
@@ -18,15 +13,9 @@ export function App(): ReactNode {
   const context = useAgent();
 
   useEffect(() => {
-    const handleContextRetrieval = () => {
+    return eventOn(EventName.CONTEXT_SYNC_REQUEST, () => {
       emitEvent(EventName.CONTEXT_SYNC_RESULT, context);
-    };
-
-    subscribeEvent(EventName.CONTEXT_SYNC_REQUEST, handleContextRetrieval);
-
-    return () => {
-      unsubscribeEvent(EventName.CONTEXT_SYNC_REQUEST, handleContextRetrieval);
-    };
+    });
   }, [context]);
 
   return (
@@ -36,11 +25,21 @@ export function App(): ReactNode {
       height={height}
       borderColor="redBright"
       borderStyle="round"
+      alignItems="center"
     >
-      <WelcomingText />
-      <MessageList />
-      <StatusLine />
-      <InputField />
+      <Box width="60%" flexGrow={1} flexDirection="column">
+        <WelcomingText />
+        <Box
+          height="100%"
+          width="100%"
+          alignItems="flex-start"
+          flexDirection="column"
+        >
+          <MessageList />
+          <StatusLine />
+          <InputField />
+        </Box>
+      </Box>
     </Box>
   );
 }
@@ -51,7 +50,7 @@ function WelcomingText() {
 
   return (
     <Box flexDirection="column" alignItems="center">
-      <Box marginTop={1}>
+      <Box paddingY={1}>
         <Text color="blue">◆</Text>
         <Text bold> Eccentric Agent</Text>
       </Box>

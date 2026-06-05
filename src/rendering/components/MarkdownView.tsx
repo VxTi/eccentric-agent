@@ -1,15 +1,16 @@
 import { Box, Text } from 'ink';
-import { type JSX, useMemo } from 'react';
-import { formatMarkdown } from '../formatting';
+import { type JSX } from 'react';
+import Markdown from './markdown';
 
 interface MarkdownViewProps {
   content: string;
 }
 
 export function MarkdownView({ content }: MarkdownViewProps): JSX.Element {
-  const md = useMemo(() => formatMarkdown(content), [content]);
+  return <Markdown content={content} />;
+  /*const md = useMemo(() => formatMarkdown(content), [content]);
 
-  return <MarkdownLines text={md} />;
+  return <MarkdownLines text={md} />;*/
 }
 
 export function MarkdownLines({ text }: { text: string }): JSX.Element {

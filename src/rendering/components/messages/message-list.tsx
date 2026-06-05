@@ -66,6 +66,15 @@ export function MessageList(): JSX.Element {
         flexShrink={0}
         marginTop={-(overflow - clampedOffset)}
       >
+        <ChatMessage
+          viewportHeight={viewportHeight}
+          scrollOffset={scrollOffset}
+          message={{
+            type: 'user',
+            id: '123',
+            content: 'hello world 123 lorem ipsum *test test* _123_ ',
+          }}
+        />
         {messages.map((message, idx) => (
           <ChatMessage
             key={idx}
