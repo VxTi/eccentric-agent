@@ -12,10 +12,6 @@ export declare namespace TerminalMarked {
   };
 
   interface RendererOptions extends Partial<HeadingOptions> {
-    /**
-     * Whether to use GitHub-flavored Markdown
-     */
-    gfm?: boolean;
     image?: (title: string, href: string) => string;
     code?: Formatter;
     blockquote?: Formatter;

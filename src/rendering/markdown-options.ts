@@ -13,7 +13,7 @@ export const markdownFormattingOptions = {
   code: chalk.gray,
   blockquote: chalk.gray.italic,
   html: chalk.gray,
-  ...HEADINGS.map(h => ({ [h]: basicHighlightFormatting })),
+  ...Object.fromEntries(HEADINGS.map(h => [h, basicHighlightFormatting])),
   hr: chalk.reset,
   listitem: (item: string) => `${chalk.cyan('• ') + item}\n`,
   table: chalk.reset,

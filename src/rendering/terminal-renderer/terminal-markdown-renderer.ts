@@ -2,7 +2,7 @@
 
 import chalk from 'chalk';
 import Table from 'cli-table3';
-import { Renderer, type Tokens } from 'marked';
+import { type MarkedOptions, Renderer, type Tokens } from 'marked';
 import { highlight as highlightCli } from 'cli-highlight';
 import ansiEscapes from 'ansi-escapes';
 import supportsHyperlinks from 'supports-hyperlinks';
@@ -12,8 +12,6 @@ import { type TerminalMarked } from './types';
 const TABLE_CELL_SPLIT = '^*||*^';
 const TABLE_ROW_WRAP = '*|*|*|*';
 const TABLE_ROW_WRAP_REGEXP = new RegExp(escapeRegExp(TABLE_ROW_WRAP), 'g');
-
-const COLON_REPLACER = '*#COLON|*';
 
 const DEFAULT_INDENTATION = 2;
 const DEFAULT_LANG = 'plaintext';
@@ -53,8 +51,11 @@ export const HEADINGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const;
 export class TerminalRenderer extends Renderer {
   private readonly config: TerminalMarked.RendererOptions;
 
-  public constructor(options: TerminalMarked.RendererOptions) {
-    super();
+  public constructor(
+    options: TerminalMarked.RendererOptions,
+    markedOptions: MarkedOptions = {}
+  ) {
+    super(markedOptions);
     this.config = { ...defaultOptions, ...options };
   }
 
@@ -73,8 +74,12 @@ export class TerminalRenderer extends Renderer {
     return ' ';
   }
 
-  public text({ text }: Tokens.Text | Tokens.Escape): string {
-    return this.config.text?.(text) ?? text;
+  public text(token: Tokens.Text | Tokens.Escape): string {
+    const parsed =
+      'tokens' in token && token.tokens && token.tokens.length > 0
+        ? this.parser.parseInline(token.tokens)
+        : token.text;
+    return this.config.text?.(parsed) ?? parsed;
   }
 
   public override listitem({
@@ -113,7 +118,7 @@ export class TerminalRenderer extends Renderer {
       }
     }
 
-    text += this.parser.parseInline(tokens).trim();
+    text += this.parser.parse(tokens).trim();
 
     return this.config.listitem?.(text) ?? text;
   }
@@ -126,13 +131,13 @@ export class TerminalRenderer extends Renderer {
     return this.makeSection(this.config.list?.(transformed) ?? transformed);
   }
 
-  public override blockquote({ tokens }: Tokens.Blockquote): string {
-    const content = this.parser.parse(tokens);
+  public override blockquote({ tokens, text }: Tokens.Blockquote): string {
+    const content = this.parser.parse(tokens) || text;
     const formatted = this.indent(
       this.config.indentation ?? DEFAULT_INDENTATION,
       content.trim()
     );
-    return this.config.blockquote?.(formatted) ?? formatted;
+    return this.makeSection(this.config.blockquote?.(formatted) ?? formatted);
   }
 
   public override html({ text }: Tokens.HTML | Tokens.Tag): string {
@@ -140,15 +145,14 @@ export class TerminalRenderer extends Renderer {
   }
 
   public override heading({ tokens, depth, text }: Tokens.Heading): string {
-    const content = this.parser.parseInline(tokens) || text;
+    const content = this.parser.parse(tokens) || text;
     const formatted = this.config.reflowText
       ? this.reflowText(content)
       : content;
 
-    const formatter =
-      this.config[HEADINGS[Math.min(depth + 1, HEADINGS.length - 1)]];
-
-    return formatter?.(formatted) ?? formatted;
+    const headingIndex = Math.min(Math.max(depth - 1, 0), HEADINGS.length - 1);
+    const formatter = this.config[HEADINGS[headingIndex]];
+    return this.makeSection(formatter?.(formatted) ?? formatted);
   }
 
   public override hr(): string {
@@ -162,7 +166,7 @@ export class TerminalRenderer extends Renderer {
   }
 
   public override paragraph({ tokens }: Tokens.Paragraph): string {
-    const parsed = this.parser.parseInline(tokens);
+    const parsed = this.parser.parse(tokens);
     return this.reflowText(this.config.paragraph?.(parsed) ?? parsed);
   }
 
@@ -194,7 +198,7 @@ export class TerminalRenderer extends Renderer {
   }
 
   public override tablecell({ tokens }: Tokens.TableCell): string {
-    return this.parser.parseInline(tokens) + TABLE_CELL_SPLIT;
+    return this.parser.parse(tokens) + TABLE_CELL_SPLIT;
   }
 
   public override strong({ tokens, text }: Tokens.Strong): string {
@@ -212,10 +216,7 @@ export class TerminalRenderer extends Renderer {
   }
 
   public override codespan({ text }: Tokens.Codespan): string {
-    const formatted = this.fixHardReturn(
-      text,
-      this.config.reflowText ?? false
-    ).replace(/:/g, COLON_REPLACER);
+    const formatted = this.fixHardReturn(text, this.config.reflowText ?? false);
     return this.config.codespan?.(formatted) ?? formatted;
   }
 
@@ -305,7 +306,8 @@ export class TerminalRenderer extends Renderer {
 
   private indent(indent: number, text: string): string {
     if (!text) return text;
-    return indent + text.split('\n').join(`\n${indent}`);
+    const pad = ' '.repeat(indent);
+    return pad + text.split('\n').join(`\n${pad}`);
   }
 
   // Munge \n's and spaces in "text" so that the number of
@@ -313,7 +315,7 @@ export class TerminalRenderer extends Renderer {
   private reflowText(text: string) {
     // Hard break was inserted by Renderer.prototype.br or is
     // <br /> when gfm is true
-    const splitRe = this.config.gfm ? HARD_RETURN_GFM_RE : HARD_RETURN_RE;
+    const splitRe = this.options.gfm ? HARD_RETURN_GFM_RE : HARD_RETURN_RE;
     const sections: string[] = text.split(splitRe);
     const reflowed: string[] = [];
 
