@@ -9,24 +9,18 @@ export const defaultOptions: TerminalRendererOptions = {
   heading: chalk.blue.underline,
   firstHeading: chalk.blue.bold,
   hr: chalk.reset,
-  listitem: chalk.reset,
+  listitem: (item: string) => `${item}\n`,
   table: chalk.reset,
-  paragraph: chalk.reset,
+  paragraph: (p: string) => `${p.trim()}\n`,
   strong: chalk.bold,
   em: chalk.italic,
-  codespan: chalk.whiteBright.bgBlack,
+  codespan: chalk.cyan.bold,
   del: chalk.dim.gray.strikethrough,
   link: chalk.blue,
   href: chalk.blue.underline,
 
   // Formats the bulletpoints and numbers for lists
-  list: (body, ordered) => {
-    const partiallyFormatted = body
-      .replace(/^\s*\*/, chalk.cyan(ordered ? `1.` : '•'))
-      .trim();
-    return partiallyFormatted; // marked.parse(partiallyFormatted, { async: false }).trim();
-  },
-
+  list: (list: string) => list.trim(),
   width: 80,
   reflowText: false,
   showSectionPrefix: false,

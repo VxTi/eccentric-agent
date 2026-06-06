@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState, type JSX } from 'react';
-import { Box, measureElement, useInput, type DOMElement } from 'ink';
+import {
+  Box,
+  measureElement,
+  useInput,
+  type DOMElement,
+  useWindowSize,
+} from 'ink';
 import { useAgent } from '../../context';
 import { useUserInputField } from '../../context/user-input-context';
-import { useTerminalSize } from '../../hooks';
 import { MemoizedChatMessage } from './memoized-chat-message';
 
 const SCROLL_STEP = 1;
@@ -17,7 +22,7 @@ export function MessageList(): JSX.Element {
   const { messages } = useAgent();
   const { inputRequest } = useUserInputField();
 
-  const { height: terminalHeight } = useTerminalSize();
+  const { rows: terminalHeight } = useWindowSize();
   const viewportRef = useRef<DOMElement | null>(null);
   const contentRef = useRef<DOMElement | null>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -46,10 +51,11 @@ export function MessageList(): JSX.Element {
   useInput(input => {
     const button = Number(WHEEL_INPUT_PATTERN.exec(input)?.[1]);
 
-    if (button === WHEEL_UP_ANSI_CODE)
+    if (button === WHEEL_UP_ANSI_CODE) {
       setScrollOffset(prev => prev + SCROLL_STEP);
-    else if (button === WHEEL_DOWN_ANSI_CODE)
+    } else if (button === WHEEL_DOWN_ANSI_CODE) {
       setScrollOffset(prev => prev - SCROLL_STEP);
+    }
   });
 
   return (
@@ -60,7 +66,7 @@ export function MessageList(): JSX.Element {
       flexGrow={1}
       flexShrink={1}
       minHeight={0}
-      height={viewportHeight || undefined}
+      height={viewportHeight}
       overflow="hidden"
     >
       <Box

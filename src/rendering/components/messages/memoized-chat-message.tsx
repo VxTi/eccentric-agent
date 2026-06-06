@@ -1,4 +1,6 @@
 import { memo } from 'react';
-import { ChatMessage, type ChatMessageProps } from './chat-message';
+import { type Message } from '../../../lib/types/messages';
+import { ChatMessage } from './chat-message';
+import { type CommonProps } from './common';
 
-export const MemoizedChatMessage = memo<ChatMessageProps>(ChatMessage);
+export const MemoizedChatMessage = memo<CommonProps<Message>>(ChatMessage);

@@ -36,6 +36,7 @@ async function main(): Promise<void> {
     throw new Error('stdin not a TTY. CLI need interactive terminal.\n');
   }
 
+
   stdout.write(ANSI_ALT_SCREEN_ENTER);
   stdout.write(ANSI_MOUSE_ENABLE);
 
@@ -52,7 +53,7 @@ async function main(): Promise<void> {
       stdin,
       exitOnCtrlC: true,
       patchConsole: true,
-      maxFps: 120,
+      maxFps: 30,
       incrementalRendering: true,
       concurrent: true,
       alternateScreen: true,

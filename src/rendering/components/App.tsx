@@ -1,14 +1,14 @@
 import { type ReactNode, useEffect } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useWindowSize } from 'ink';
 import { emitEvent, EventName, eventOn } from '../../lib/events/events';
 import { useAgent } from '../context';
-import { useTerminalSize } from '../hooks';
+import { InformationBar } from './information-bar';
 import { MessageList } from './messages/message-list';
 import { StatusLine } from './StatusLine';
 import InputField from './user-input/input-field';
 
 export function App(): ReactNode {
-  const { width, height } = useTerminalSize();
+  const { columns: width, rows: height } = useWindowSize();
 
   const context = useAgent();
 
@@ -38,6 +38,7 @@ export function App(): ReactNode {
           <MessageList />
           <StatusLine />
           <InputField />
+          <InformationBar />
         </Box>
       </Box>
     </Box>

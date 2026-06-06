@@ -1,15 +1,13 @@
 import { Box, Text } from 'ink';
 import { useEffect, useState } from 'react';
 import { type GenericMessage } from '../../../lib/types/messages';
-import { Markdown } from '../markdown';
+import { ChatMessageContent }  from './chat-message-content';
+import { type CommonProps }    from './common';
 
-interface Props {
-  viewportHeight: number;
-  scrollOffset: number;
-  message: GenericMessage;
-}
-
-export function GenericChatMessage({ message, ...props }: Props) {
+export function GenericChatMessage({
+  message,
+  ...props
+}: CommonProps<GenericMessage>) {
   return (
     <Box flexShrink={0} flexDirection="row">
       {message.failure ? (
@@ -19,7 +17,7 @@ export function GenericChatMessage({ message, ...props }: Props) {
       ) : (
         <LoadingSpinner loading={message.loading} />
       )}
-      <Markdown content={message.content} {...props} />
+      <ChatMessageContent content={message.content} {...props} />
     </Box>
   );
 }

@@ -1,20 +1,15 @@
 import { Box } from 'ink';
 import { type Message } from '../../../lib/types/messages';
-import { AssistantChatMessage } from './assistant-message';
-import { GenericChatMessage } from './generic-message';
+import { AssistantChatMessage } from './assistant-chat-message';
+import { type CommonProps } from './common';
+import { GenericChatMessage } from './generic-chat-message';
 import { UserChatMessage } from './user-chat-message';
-
-export interface ChatMessageProps {
-  viewportHeight: number;
-  scrollOffset: number;
-  message: Message;
-}
 
 export function ChatMessage({
   message,
   viewportHeight,
   scrollOffset,
-}: ChatMessageProps) {
+}: CommonProps<Message>) {
   return (
     <Box
       alignSelf="flex-start"
@@ -32,7 +27,7 @@ export function ChatMessage({
   );
 }
 
-function ModelMessageText(props: Props) {
+function ModelMessageText(props: CommonProps<Message>) {
   switch (props.message.type) {
     case 'user':
       return <UserChatMessage {...props} message={props.message} />;

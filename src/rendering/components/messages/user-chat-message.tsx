@@ -1,14 +1,12 @@
 import { Box, Text } from 'ink';
-import type { UserMessage } from '../../../lib/types/messages';
-import { Markdown } from '../markdown';
+import type { UserMessage }   from '../../../lib/types/messages';
+import { ChatMessageContent } from './chat-message-content';
+import { type CommonProps }   from './common';
 
-interface Props {
-  viewportHeight: number;
-  scrollOffset: number;
-  message: UserMessage;
-}
-
-export function UserChatMessage({ message, ...props }: Props) {
+export function UserChatMessage({
+  message,
+  ...props
+}: CommonProps<UserMessage>) {
   return (
     <Box
       flexDirection="row"
@@ -25,7 +23,7 @@ export function UserChatMessage({ message, ...props }: Props) {
     >
       <Text>Me</Text>
       <Text color="#777777"> ▶ </Text>
-      <Markdown content={message.content} {...props} />
+      <ChatMessageContent content={message.content} {...props} />
     </Box>
   );
 }
