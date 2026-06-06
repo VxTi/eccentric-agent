@@ -59,7 +59,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         });
         const selectionOption = await tool.onOptionSelect(
           input,
-          chosen.id,
+          chosen?.id ?? '',
           channel
         );
 

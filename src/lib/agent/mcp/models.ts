@@ -18,7 +18,9 @@ const basicMcpConfig = z.object({
 });
 
 function resolveEnv(value: string): string {
-  return value.replace(/\$(\w+)\b/, (_, secretId) => requiredEnv(secretId));
+  return value.replace(/\$(\w+)\b/, (_, secretId: string) =>
+    requiredEnv(secretId)
+  );
 }
 
 const commandConfig = z.object({

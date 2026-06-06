@@ -71,7 +71,7 @@ export default createTool({
     const limit = maxResults ?? Infinity;
 
     for (let i = 0; i < lines.length && matches.length < limit; i++) {
-      const line = lines[i];
+      const line = lines[i] ?? '';
       regex.lastIndex = 0;
       let m: RegExpExecArray | null;
       while ((m = regex.exec(line)) !== null && matches.length < limit) {

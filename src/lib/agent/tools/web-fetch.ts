@@ -114,7 +114,7 @@ export default createTool({
     const count = websites.length;
 
     if (count === 1) {
-      const okStatus = Math.floor(websites[0].status / 100) === 2;
+      const okStatus = Math.floor((websites[0]?.status ?? 400) / 100) === 2;
 
       if (okStatus) {
         return `Website has been analysed`;

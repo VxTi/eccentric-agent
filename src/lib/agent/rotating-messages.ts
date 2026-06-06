@@ -22,7 +22,9 @@ export const AGENT_PROCESSING_MESSAGES: readonly string[] = [
 ];
 
 export function getRandomMessage(): string {
-  return AGENT_PROCESSING_MESSAGES[
-    Math.floor(Math.random() * AGENT_PROCESSING_MESSAGES.length)
-  ];
+  return (
+    AGENT_PROCESSING_MESSAGES[
+      Math.floor(Math.random() * AGENT_PROCESSING_MESSAGES.length)
+    ] ?? ''
+  );
 }

@@ -76,9 +76,10 @@ export class TerminalRenderer extends Renderer {
 
   public text(token: Tokens.Text | Tokens.Escape): string {
     const parsed =
-      'tokens' in token && token.tokens && token.tokens.length > 0
-        ? this.parser.parseInline(token.tokens)
+      token.type === 'text' && token.tokens?.length
+        ? this.parser.parse(token.tokens)
         : token.text;
+
     return this.config.text?.(parsed) ?? parsed;
   }
 
@@ -97,12 +98,12 @@ export class TerminalRenderer extends Renderer {
         checked: checked ?? false,
       });
       if (loose) {
-        if (tokens.length > 0 && tokens[0].type === 'paragraph') {
+        if (tokens.length > 0 && tokens[0]?.type === 'paragraph') {
           tokens[0].text = `${checkbox} ${tokens[0].text}`;
           if (
             tokens[0].tokens &&
             tokens[0].tokens.length > 0 &&
-            tokens[0].tokens[0].type === 'text'
+            tokens[0].tokens[0]?.type === 'text'
           ) {
             tokens[0].tokens[0].text = `${checkbox} ${tokens[0].tokens[0].text}`;
           }
@@ -128,7 +129,7 @@ export class TerminalRenderer extends Renderer {
       .map(item => this.listitem(item).trim())
       .join('\n');
 
-    return this.makeSection(this.config.list?.(transformed) ?? transformed);
+    return this.config.list?.(transformed) ?? transformed;
   }
 
   public override blockquote({ tokens, text }: Tokens.Blockquote): string {
@@ -145,14 +146,14 @@ export class TerminalRenderer extends Renderer {
   }
 
   public override heading({ tokens, depth, text }: Tokens.Heading): string {
-    const content = this.parser.parse(tokens) || text;
+    const content = this.parser.parseInline(tokens) || text;
     const formatted = this.config.reflowText
       ? this.reflowText(content)
       : content;
 
     const headingIndex = Math.min(Math.max(depth - 1, 0), HEADINGS.length - 1);
-    const formatter = this.config[HEADINGS[headingIndex]];
-    return this.makeSection(formatter?.(formatted) ?? formatted);
+    const formatter = this.config[HEADINGS[headingIndex] ?? 'h1'];
+    return this.makeSection(formatter?.(formatted) ?? formatted, 1);
   }
 
   public override hr(): string {
@@ -166,8 +167,8 @@ export class TerminalRenderer extends Renderer {
   }
 
   public override paragraph({ tokens }: Tokens.Paragraph): string {
-    const parsed = this.parser.parse(tokens);
-    return this.reflowText(this.config.paragraph?.(parsed) ?? parsed);
+    const parsed = this.parser.parseInline(tokens);
+    return this.reflowText(this.config.paragraph?.(parsed) ?? parsed).trim();
   }
 
   public override table({ header, rows }: Tokens.Table): string {
@@ -198,7 +199,7 @@ export class TerminalRenderer extends Renderer {
   }
 
   public override tablecell({ tokens }: Tokens.TableCell): string {
-    return this.parser.parse(tokens) + TABLE_CELL_SPLIT;
+    return this.parser.parseInline(tokens) + TABLE_CELL_SPLIT;
   }
 
   public override strong({ tokens, text }: Tokens.Strong): string {
@@ -225,12 +226,12 @@ export class TerminalRenderer extends Renderer {
   }
 
   public override del({ tokens }: Tokens.Del): string {
-    const parsed = this.parser.parseInline(tokens);
+    const parsed = this.parser.parse(tokens);
     return this.config.del?.(parsed) ?? parsed;
   }
 
   public override link({ href, tokens }: Tokens.Link): string {
-    const parsed = this.parser.parseInline(tokens);
+    const parsed = this.parser.parse(tokens);
 
     if (this.config.sanitizeUrls) {
       try {
@@ -328,7 +329,7 @@ export class TerminalRenderer extends Renderer {
       let lastWasEscapeChar = false;
 
       while (fragments.length) {
-        const fragment = fragments[0];
+        const fragment = fragments[0] ?? '';
 
         if (fragment === '') {
           fragments.splice(0, 1);
@@ -345,13 +346,8 @@ export class TerminalRenderer extends Renderer {
           continue;
         }
 
-        const words = fragment.split(/[ \t\n]+/);
-
-        for (let i = 0; i < words.length; i++) {
-          let word = words[i];
-          let additionalSpaces = column != 0 ? 1 : 0;
-
-          if (lastWasEscapeChar) additionalSpaces = 0;
+        fragment.split(/[ \t\n]+/).forEach(word => {
+          const additionalSpaces = !lastWasEscapeChar && column != 0 ? 1 : 0;
 
           // If adding the new word overflows the required width
           if (column + word.length + additionalSpaces > this.width) {
@@ -401,7 +397,7 @@ export class TerminalRenderer extends Renderer {
           }
 
           lastWasEscapeChar = false;
-        }
+        });
 
         fragments.splice(0, 1);
       }
@@ -412,8 +408,9 @@ export class TerminalRenderer extends Renderer {
     return reflowed.join('\n');
   }
 
-  private makeSection(text: string): string {
-    return `\n\n${text}\n\n`;
+  private makeSection(text: string, size: number = 2): string {
+    const newlines = '\n'.repeat(size);
+    return `${newlines}${text}${newlines}`;
   }
 }
 

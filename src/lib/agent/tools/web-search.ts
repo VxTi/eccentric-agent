@@ -1,6 +1,6 @@
-import * as z              from 'zod';
+import * as z from 'zod';
 import { getTavilyClient } from '../tavily';
-import { createTool }      from './common';
+import { createTool } from './common';
 
 const inputSchema = z.object({
   query: z
