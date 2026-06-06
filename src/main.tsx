@@ -9,7 +9,7 @@ import { render } from 'ink';
 import { AgentProvider } from './rendering/context';
 import { App } from './rendering/components/App';
 import { UserInputProvider } from './rendering/context/user-input-context';
-import { defaultOptions } from './rendering/markdown-options';
+import { markdownFormattingOptions } from './rendering/markdown-options';
 import { appController } from './signal';
 
 const ANSI_ALT_SCREEN_ENTER = '\x1b[?1049h\x1b[H\x1b[2J';
@@ -23,7 +23,7 @@ const ANSI_MOUSE_DISABLE = '\x1b[?1006l\x1b[?1000l';
 marked.setOptions({
   // eslint-disable-next-line
   // @ts-ignore
-  renderer: new TerminalRenderer(defaultOptions),
+  renderer: new TerminalRenderer(markdownFormattingOptions),
 });
 
 function restoreScreen(): void {
@@ -35,7 +35,6 @@ async function main(): Promise<void> {
   if (!stdin.isTTY) {
     throw new Error('stdin not a TTY. CLI need interactive terminal.\n');
   }
-
 
   stdout.write(ANSI_ALT_SCREEN_ENTER);
   stdout.write(ANSI_MOUSE_ENABLE);

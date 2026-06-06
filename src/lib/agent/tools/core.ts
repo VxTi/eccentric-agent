@@ -2,6 +2,7 @@ import { tool as createTool, type Tool, type ToolSet } from 'ai';
 import chalk from 'chalk';
 import { marked } from 'marked';
 import { v7 as uuid } from 'uuid';
+import { basicHighlightFormatting } from '../../../rendering/markdown-options';
 import { appSignal } from '../../../signal';
 import { emitMessage } from '../../events/messaging';
 import { type Notifier } from '../../events/notifier';
@@ -96,7 +97,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
 
       channel.notify({
         loading: false,
-        content: `${chalk.yellow('→')} ${tool.outputToString(output, channel).trim()}`,
+        content: `${basicHighlightFormatting('→')} ${tool.outputToString(output, channel).trim()}`,
       });
       notifier.unsubscribe(toolCallId);
       return output;

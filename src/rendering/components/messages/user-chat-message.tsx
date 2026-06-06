@@ -1,12 +1,9 @@
 import { Box, Text } from 'ink';
-import type { UserMessage }   from '../../../lib/types/messages';
+import type { UserMessage } from '../../../lib/types/messages';
 import { ChatMessageContent } from './chat-message-content';
-import { type CommonProps }   from './common';
+import { type BaseProps } from './common';
 
-export function UserChatMessage({
-  message,
-  ...props
-}: CommonProps<UserMessage>) {
+export function UserChatMessage({ message }: BaseProps<UserMessage>) {
   return (
     <Box
       flexDirection="row"
@@ -23,7 +20,7 @@ export function UserChatMessage({
     >
       <Text>Me</Text>
       <Text color="#777777"> ▶ </Text>
-      <ChatMessageContent content={message.content} {...props} />
+      <ChatMessageContent content={message.content} />
     </Box>
   );
 }

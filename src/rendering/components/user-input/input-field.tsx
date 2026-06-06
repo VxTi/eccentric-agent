@@ -5,7 +5,7 @@ import {
   useEffect,
   useState,
 } from 'react';
-import { Box, Text, useInput, usePaste, useWindowSize } from 'ink';
+import { Box, Text, useInput, usePaste } from 'ink';
 import { CURSOR_BLINK_INTERVAL_MS } from '../../../lib/constants';
 import { EventName, eventOn } from '../../../lib/events/events';
 import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
@@ -14,6 +14,7 @@ import { useAgent } from '../../context';
 import { useCommandProcessor } from '../../hooks/command-processor';
 import { useUserInputField } from '../../context/user-input-context';
 import { SuggestionType } from '../../hooks';
+import { useTerminalSize } from '../../hooks/terminal-size';
 import { Suggestions } from './input-suggestions';
 import { InputRequest } from './option-request';
 
@@ -21,7 +22,7 @@ const INPUT_PLACEHOLDER = 'Reference files with @, and type commands using /';
 const MIN_SUGGESTION_COUNT = 8;
 
 export default function InputField(): JSX.Element {
-  const { columns: height } = useWindowSize();
+  const { height } = useTerminalSize();
   const maxSuggestions = Math.ceil(
     Math.max(height / 2.5, MIN_SUGGESTION_COUNT)
   );

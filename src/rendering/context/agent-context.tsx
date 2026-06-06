@@ -26,6 +26,7 @@ import type { Message, UserMessage } from '../../lib/types/messages';
 import { registry } from '../../lib/agent/tools';
 import { constructToolset } from '../../lib/agent/tools/core';
 import { appSignal } from '../../signal';
+import { basicHighlightFormatting } from '../markdown-options';
 
 interface AgentStatus {
   loading: boolean;
@@ -86,7 +87,7 @@ export function AgentProvider({
 
   useEffect(() => {
     setStatus({
-      text: chalk.blue('Connecting with MCP server...'),
+      text: basicHighlightFormatting('Connecting with MCP server...'),
       loading: true,
     });
     void loadMcpConfig(appSignal)

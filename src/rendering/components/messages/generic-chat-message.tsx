@@ -1,13 +1,10 @@
 import { Box, Text } from 'ink';
-import { useEffect, useState } from 'react';
 import { type GenericMessage } from '../../../lib/types/messages';
-import { ChatMessageContent }  from './chat-message-content';
-import { type CommonProps }    from './common';
+import { Spinner } from '../spinner';
+import { ChatMessageContent } from './chat-message-content';
+import { type BaseProps } from './common';
 
-export function GenericChatMessage({
-  message,
-  ...props
-}: CommonProps<GenericMessage>) {
+export function GenericChatMessage({ message }: BaseProps<GenericMessage>) {
   return (
     <Box flexShrink={0} flexDirection="row">
       {message.failure ? (
@@ -15,27 +12,9 @@ export function GenericChatMessage({
           ✖{' '}
         </Text>
       ) : (
-        <LoadingSpinner loading={message.loading} />
+        <Spinner loading={message.loading ?? false} />
       )}
-      <ChatMessageContent content={message.content} {...props} />
+      <ChatMessageContent content={message.content} />
     </Box>
   );
-}
-
-function LoadingSpinner({ loading }: { loading?: boolean | undefined }) {
-  const [content, setContent] = useState('◎');
-
-  useEffect(() => {
-    const frames = ['ஃ', '⁘'];
-
-    let frame = 0;
-
-    setInterval(() => {
-      setContent(frames[++frame % frames.length]);
-    }, frames.length * 200);
-  }, []);
-
-  if (!loading) return;
-
-  return <Text>{content} </Text>;
 }

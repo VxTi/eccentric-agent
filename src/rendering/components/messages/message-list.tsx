@@ -1,76 +1,56 @@
-import { useEffect, useRef, useState, type JSX } from 'react';
-import {
-  Box,
-  measureElement,
-  useInput,
-  type DOMElement,
-  useWindowSize,
-} from 'ink';
+import { useEffect, useRef, useState, type JSX, useLayoutEffect } from 'react';
+import { Box, measureElement, type DOMElement } from 'ink';
 import { useAgent } from '../../context';
 import { useUserInputField } from '../../context/user-input-context';
+import { useScroll } from '../../hooks/scroll';
+import { useTerminalSize } from '../../hooks/terminal-size';
 import { MemoizedChatMessage } from './memoized-chat-message';
-
-const SCROLL_STEP = 1;
-
-// SGR wheel report: CSI < BTN ; X ; Y (M|m), with the leading ESC stripped by
-// Ink. Wheel-up button is 64, wheel-down is 65.
-const WHEEL_INPUT_PATTERN = /^\[?<(\d+);\d+;\d+[Mm]$/;
-const WHEEL_UP_ANSI_CODE = 64;
-const WHEEL_DOWN_ANSI_CODE = 65;
 
 export function MessageList(): JSX.Element {
   const { messages } = useAgent();
   const { inputRequest } = useUserInputField();
+  const { height: terminalHeight } = useTerminalSize();
 
-  const { rows: terminalHeight } = useWindowSize();
-  const viewportRef = useRef<DOMElement | null>(null);
-  const contentRef = useRef<DOMElement | null>(null);
-  const [viewportHeight, setViewportHeight] = useState(0);
+  const containerRef = useRef<DOMElement | null>(null);
+  const contentListRef = useRef<DOMElement | null>(null);
+  const [containerHeight, setContainerHeight] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
+
   const [scrollOffset, setScrollOffset] = useState(0);
 
-  useEffect(() => {
-    if (viewportRef.current) {
-      const { height } = measureElement(viewportRef.current);
-      setViewportHeight(prev => (prev === height ? prev : height));
+  const overflow = Math.max(0, contentHeight - containerHeight);
+  const clampedOffset = Math.min(Math.max(0, scrollOffset), overflow);
+
+  useLayoutEffect(() => {
+    if (containerRef.current) {
+      const { height } = measureElement(containerRef.current);
+      setContainerHeight(height);
     }
-    if (contentRef.current) {
-      const { height } = measureElement(contentRef.current);
-      setContentHeight(prev => (prev === height ? prev : height));
+    if (contentListRef.current) {
+      const { height } = measureElement(contentListRef.current);
+      setContentHeight(height);
     }
   }, [messages, inputRequest, terminalHeight]);
-
-  const overflow = Math.max(0, contentHeight - viewportHeight);
-  const clampedOffset = Math.min(Math.max(0, scrollOffset), overflow);
 
   useEffect(() => {
     if (clampedOffset !== scrollOffset) setScrollOffset(clampedOffset);
   }, [clampedOffset, scrollOffset, terminalHeight]);
 
-  // Wheel up reveals older messages (larger offset); wheel down reveals newer.
-  useInput(input => {
-    const button = Number(WHEEL_INPUT_PATTERN.exec(input)?.[1]);
-
-    if (button === WHEEL_UP_ANSI_CODE) {
-      setScrollOffset(prev => prev + SCROLL_STEP);
-    } else if (button === WHEEL_DOWN_ANSI_CODE) {
-      setScrollOffset(prev => prev - SCROLL_STEP);
-    }
-  });
+  useScroll(dy => setScrollOffset(prev => prev + dy));
 
   return (
     <Box
-      ref={viewportRef}
+      ref={containerRef}
       flexDirection="column"
       alignItems="flex-start"
       flexGrow={1}
       flexShrink={1}
       minHeight={0}
-      height={viewportHeight}
+      height={containerHeight}
       overflow="hidden"
     >
       <Box
-        ref={contentRef}
+        ref={contentListRef}
         flexDirection="column"
         flexShrink={0}
         marginTop={-(overflow - clampedOffset)}
@@ -79,7 +59,7 @@ export function MessageList(): JSX.Element {
           <MemoizedChatMessage
             key={idx}
             message={message}
-            viewportHeight={viewportHeight}
+            containerHeight={containerHeight}
             scrollOffset={scrollOffset}
           />
         ))}

@@ -7,7 +7,7 @@ import { UserChatMessage } from './user-chat-message';
 
 export function ChatMessage({
   message,
-  viewportHeight,
+  containerHeight,
   scrollOffset,
 }: CommonProps<Message>) {
   return (
@@ -20,7 +20,7 @@ export function ChatMessage({
     >
       <ModelMessageText
         message={message}
-        viewportHeight={viewportHeight}
+        containerHeight={containerHeight}
         scrollOffset={scrollOffset}
       />
     </Box>

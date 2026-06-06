@@ -1,22 +1,24 @@
 import chalk from 'chalk';
 import { type TerminalRendererOptions } from 'marked-terminal';
 
-export const defaultOptions: TerminalRendererOptions = {
+export const basicHighlightFormatting = chalk.cyan.bold;
+
+export const markdownFormattingOptions = {
   // Colors
   code: chalk.gray,
   blockquote: chalk.gray.italic,
   html: chalk.gray,
-  heading: chalk.blue.underline,
-  firstHeading: chalk.blue.bold,
+  heading: chalk.cyan.underline,
+  firstHeading: chalk.cyan.bold,
   hr: chalk.reset,
-  listitem: (item: string) => `${item}\n`,
+  listitem: (item: string) => item.trim(),
   table: chalk.reset,
-  paragraph: (p: string) => `${p.trim()}\n`,
+  paragraph: (p: string) => p.trim(),
   strong: chalk.bold,
   em: chalk.italic,
-  codespan: chalk.cyan.bold,
+  codespan: basicHighlightFormatting,
   del: chalk.dim.gray.strikethrough,
-  link: chalk.blue,
+  link: chalk.cyan,
   href: chalk.blue.underline,
 
   // Formats the bulletpoints and numbers for lists
@@ -32,4 +34,4 @@ export const defaultOptions: TerminalRendererOptions = {
   // Options passed to cli-table3
   tableOptions: {},
   tab: 0,
-};
+} satisfies TerminalRendererOptions;

@@ -32,7 +32,7 @@ export function useCommandProcessor() {
         }
         case 'system-prompt':
           emitMessage({
-            type: 'assistant',
+            type: 'user',
             content: `Here is the system prompt:
 
 ${systemPrompt}`,
