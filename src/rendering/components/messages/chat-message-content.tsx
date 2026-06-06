@@ -1,6 +1,6 @@
 import { Box, Text } from 'ink';
-import { marked } from 'marked';
 import { type JSX } from 'react';
+import { parseMarkdown } from '../../markdown-options';
 
 interface MarkdownViewProps {
   content: string;
@@ -9,9 +9,7 @@ interface MarkdownViewProps {
 export function ChatMessageContent({
   content,
 }: MarkdownViewProps): JSX.Element {
-  const lines: string[] = marked
-    .parse(content.trim(), { async: false, gfm: true })
-    .split('\n');
+  const lines: string[] = parseMarkdown(content).split('\n');
 
   return (
     <Box flexDirection="column" width="100%" paddingRight={1}>

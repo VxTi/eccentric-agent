@@ -1,5 +1,10 @@
 import chalk from 'chalk';
-import { type TerminalRendererOptions } from 'marked-terminal';
+import { marked } from 'marked';
+import {
+  HEADINGS,
+  TerminalRenderer,
+} from './terminal-renderer/terminal-markdown-renderer';
+import { type TerminalMarked } from './terminal-renderer/types';
 
 export const basicHighlightFormatting = chalk.cyan.bold;
 
@@ -8,10 +13,9 @@ export const markdownFormattingOptions = {
   code: chalk.gray,
   blockquote: chalk.gray.italic,
   html: chalk.gray,
-  heading: chalk.cyan.underline,
-  firstHeading: chalk.cyan.bold,
+  ...HEADINGS.map(h => ({ [h]: basicHighlightFormatting })),
   hr: chalk.reset,
-  listitem: (item: string) => item.trim(),
+  listitem: (item: string) => `${chalk.cyan('• ') + item}\n`,
   table: chalk.reset,
   paragraph: (p: string) => p.trim(),
   strong: chalk.bold,
@@ -20,18 +24,18 @@ export const markdownFormattingOptions = {
   del: chalk.dim.gray.strikethrough,
   link: chalk.cyan,
   href: chalk.blue.underline,
-
-  // Formats the bulletpoints and numbers for lists
-  list: (list: string) => list.trim(),
-  width: 80,
+  maxWidth: 80,
   reflowText: false,
-  showSectionPrefix: false,
-
-  // Whether or not to undo marked escaping
-  // of enitities (" -> &quot; etc)
   unescape: true,
-  emoji: true,
-  // Options passed to cli-table3
-  tableOptions: {},
-  tab: 0,
-} satisfies TerminalRendererOptions;
+  indentation: 2,
+} satisfies TerminalMarked.RendererOptions;
+
+export const terminalRenderer = new TerminalRenderer(markdownFormattingOptions);
+
+export function parseMarkdown(input: string): string {
+  return marked.parse(input, {
+    gfm: true,
+    renderer: terminalRenderer,
+    async: false,
+  });
+}

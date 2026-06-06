@@ -3,13 +3,12 @@ config({ quiet: true });
 
 import chalk from 'chalk';
 import { marked } from 'marked';
-import TerminalRenderer from 'marked-terminal';
 import { stdin, stdout } from 'node:process';
 import { render } from 'ink';
 import { AgentProvider } from './rendering/context';
 import { App } from './rendering/components/App';
 import { UserInputProvider } from './rendering/context/user-input-context';
-import { markdownFormattingOptions } from './rendering/markdown-options';
+import { terminalRenderer } from './rendering/markdown-options';
 import { appController } from './signal';
 
 const ANSI_ALT_SCREEN_ENTER = '\x1b[?1049h\x1b[H\x1b[2J';
@@ -23,7 +22,7 @@ const ANSI_MOUSE_DISABLE = '\x1b[?1006l\x1b[?1000l';
 marked.setOptions({
   // eslint-disable-next-line
   // @ts-ignore
-  renderer: new TerminalRenderer(markdownFormattingOptions),
+  renderer: terminalRenderer,
 });
 
 function restoreScreen(): void {
@@ -52,7 +51,7 @@ async function main(): Promise<void> {
       stdin,
       exitOnCtrlC: true,
       patchConsole: true,
-      maxFps: 30,
+      maxFps: 60,
       incrementalRendering: true,
       concurrent: true,
       alternateScreen: true,

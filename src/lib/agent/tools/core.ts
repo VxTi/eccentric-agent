@@ -38,6 +38,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         (...[message]: ToolChannelParams) =>
           emitMessage({
             ...message,
+            content: message.content.trim(),
             type: 'generic',
             id: toolCallId,
           })
@@ -76,9 +77,10 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         }
       }
 
-      const inputText = tool.inputToString(input, channel).trim();
-
-      channel.notify({ loading: true, content: inputText });
+      channel.notify({
+        loading: true,
+        content: tool.inputToString(input, channel),
+      });
 
       let output: unknown;
       try {

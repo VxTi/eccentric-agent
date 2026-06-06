@@ -1,6 +1,6 @@
 import { tavily, type TavilyClient } from '@tavily/core';
-import { config } from 'dotenv';
-import { requiredEnv } from './env';
+import { config }      from 'dotenv';
+import { requiredEnv } from '../env';
 
 config({ quiet: true });
 
