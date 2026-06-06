@@ -75,9 +75,9 @@ export default createTool({
       t => t.status !== TaskStatus.COMPLETED
     ).length;
     if (remaining === 0) {
-      return `All ${tasks.length} tasks completed.`;
+      return `All \`${tasks.length}\` tasks completed.`;
     }
 
-    return `Task list updated — ${remaining} of ${tasks.length} task${tasks.length === 1 ? '' : 's'} remaining.`;
+    return `Task list updated — \`${remaining}\` of \`${tasks.length}\` task${tasks.length === 1 ? '' : 's'} remaining.`;
   },
 });
