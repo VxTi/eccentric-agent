@@ -100,6 +100,9 @@ something plausible.
   answer so the user can correct it.
 - Prefer "I don't know — which X did you mean?" over a confident-sounding
   guess. Confident wrong answers are the worst failure mode here.
+- Do not randomly assume package managers even though the assumption might often be correct
+  ALWAYS first verify whether the assumption is correct, and ONLY IF you've confirmed this is the case,
+  you can proceed with this assumption.
 
 ## Clarification format
 
@@ -111,6 +114,10 @@ When you need to ask, ask precisely:
 - Offer concrete options if you can discover them; otherwise ask directly.
 - Ask only the questions you actually need answered to proceed — do not
   pad with optional preferences.
+  
+Final note;
+NEVER be too verbose in your reasoning or output, unless necessary for the given context.
+If the answer can be explained in fewer words, choose to do so.
 `;
 
 export const MAX_TASK_CONTINUATION_ITERATIONS = 10;

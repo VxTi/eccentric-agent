@@ -1,8 +1,9 @@
 import { Box, Text, useInput } from 'ink';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { emitEvent, EventName } from '../../../lib/events/events';
 import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
 import { useUserInputField } from '../../context/user-input-context';
+import { parseMarkdown } from '../../markdown-options';
 
 export function InputRequest(): ReactNode {
   const { inputRequest, setInputRequest } = useUserInputField();
@@ -10,7 +11,7 @@ export function InputRequest(): ReactNode {
     useState<number>(0);
   const [activeIndices, setActiveIndices] = useState<number[]>([]);
 
-  const { allowMultiple, options, description, title } = inputRequest;
+  const { allowMultiple, options, title } = inputRequest;
 
   useInput((char, key) => {
     if (!inputRequest.options.length) return;
@@ -56,6 +57,14 @@ export function InputRequest(): ReactNode {
       setUserSelectedInputIndex(-1);
     }
   });
+
+  const description = useMemo(() => {
+    if (!inputRequest.description) return;
+
+    const md = parseMarkdown(inputRequest.description);
+
+    return md.split('\n').slice(0, 5).join('\n');
+  }, [inputRequest.description]);
 
   return (
     <Box

@@ -1,9 +1,9 @@
-import chalk from 'chalk';
 import { readFile, writeFile } from 'fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
 import { acquireContextInstance } from '../../../events/context-acquisition';
 import { Result } from '../../../result';
+import { formatDiffMd } from '../../../utils/diff-utils';
 import { createTool } from '../common';
 
 const inputSchema = z.object({
@@ -74,7 +74,7 @@ export default createTool({
     if (hadTrailingNewline) lines.pop();
 
     if (line < 1 || line > lines.length) {
-      throw new Error(
+      return Result.Error(
         `\`line\` ${line} is out of range. File has ${lines.length} line(s);` +
           ` valid range is 1..${lines.length}.`
       );
@@ -82,7 +82,7 @@ export default createTool({
 
     const endLine = line + count - 1;
     if (endLine > lines.length) {
-      throw new Error(
+      return Result.Error(
         `Range \`line\` ${line} + \`count\` ${count} exceeds file length` +
           ` (${lines.length} line(s)).`
       );
@@ -106,12 +106,18 @@ export default createTool({
     await writeFile(absolutePath, updated, 'utf-8');
     await context.fileCache.update(absolutePath);
 
-    return Result.Ok({
-      bytesWritten: Buffer.byteLength(updated, 'utf-8'),
-      linesRemoved: count,
-      linesInserted: replacementLines.length,
-      filePath,
-    });
+    return Result.Ok(
+      {
+        bytesWritten: Buffer.byteLength(updated, 'utf-8'),
+        linesRemoved: count,
+        linesInserted: replacementLines.length,
+        filePath,
+      },
+      {
+        previous: original,
+        current: updated,
+      }
+    );
   },
 
   inputToString({ filePath, line, count }) {
@@ -121,9 +127,8 @@ export default createTool({
     return `Editing ${range} in \`${fileName}\``;
   },
 
-  outputToString({ linesRemoved, linesInserted, filePath }) {
+  outputToString({ filePath }, _, { previous, current }) {
     const fileName = path.basename(filePath);
-
-    return `Edited \`${fileName}\` ${chalk.redBright(`-${linesRemoved}`)} ${chalk.greenBright(`+${linesInserted}`)}`;
+    return `Edited \`${fileName}\`${formatDiffMd(previous, current)}`;
   },
 });

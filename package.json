@@ -6,6 +6,7 @@
   "scripts": {
     "lint": "eslint --fix \"./src/**/*.{ts,tsx}\"",
     "lint:ci": "eslint --fix \"./src/**/*.{ts,tsx}\" --max-warnings 0",
+    "test": "vitest",
     "check:types": "tsc --noEmit",
     "start": "vite-node src/main.tsx",
     "build": "esbuild src/main.tsx --bundle --packages=external --minify --platform=node --format=esm --outfile=./dist/index.js"
@@ -46,6 +47,7 @@
     "cheerio": "^1.2.0",
     "cli-highlight": "^2.1.11",
     "cli-table3": "^0.6.5",
+    "diff": "^9.0.0",
     "dotenv": "^17.4.2",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",

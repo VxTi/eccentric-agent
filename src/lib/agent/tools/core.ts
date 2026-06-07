@@ -83,7 +83,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
       if (result.ok) {
         channel.notify({
           loading: false,
-          content: `${basicHighlightFormatting('→')} ${tool.outputToString(result.data, channel).trim()}`,
+          content: `${basicHighlightFormatting('→')} ${tool.outputToString(result.data, channel, result.metadata).trim()}`,
         });
       } else {
         channel.notify({

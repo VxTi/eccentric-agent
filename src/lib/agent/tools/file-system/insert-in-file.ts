@@ -103,8 +103,7 @@ export default createTool({
     }
 
     let updated = lines.join('\n');
-    if (hadTrailingNewline || content.endsWith('\n') || original.length === 0)
-      updated += '\n';
+    if (hadTrailingNewline && !updated.endsWith('\n')) updated += '\n';
 
     await writeFile(absolutePath, updated, 'utf-8');
     await context.fileCache.update(absolutePath);
@@ -113,10 +112,6 @@ export default createTool({
       bytesWritten: Buffer.byteLength(updated, 'utf-8'),
       linesInserted: insertLines.length,
     });
-  },
-
-  requiresApproval() {
-    return true;
   },
 
   inputToString({ lineNumber, filePath }) {

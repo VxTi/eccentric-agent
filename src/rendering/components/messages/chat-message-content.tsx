@@ -9,13 +9,16 @@ interface MarkdownViewProps {
 export function ChatMessageContent({
   content,
 }: MarkdownViewProps): JSX.Element {
-  const lines: string[] = parseMarkdown(content.trim()).split('\n');
+  const lines: string[] = parseMarkdown(content.trim())
+    .trim()
+    .split('\n')
+    .map(line => line.trim() || ' ');
 
   return (
     <Box flexDirection="column" width="100%" paddingRight={1}>
       {lines.map((line, i) => (
         <Text key={i} wrap="wrap">
-          {!line.length && i + 1 < lines.length ? ' ' : line}
+          {line}
         </Text>
       ))}
     </Box>

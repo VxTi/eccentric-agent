@@ -7,6 +7,7 @@ import { highlight as highlightCli } from 'cli-highlight';
 import ansiEscapes from 'ansi-escapes';
 import supportsHyperlinks from 'supports-hyperlinks';
 import ansiRegex from 'ansi-regex';
+import { generateSideBySideDiff } from '../../lib/utils/diff-utils';
 import { type TerminalMarked } from './types';
 
 const TABLE_CELL_SPLIT = '^*||*^';
@@ -17,6 +18,9 @@ const DEFAULT_INDENTATION = 2;
 const DEFAULT_LANG = 'plaintext';
 
 const ANSI_REGEXP = ansiRegex();
+
+export const DIFF_LANG = '$diff';
+export const DIFF_SEPARATOR = '---DIFF_SEPARATOR---';
 
 // HARD_RETURN holds a character sequence used to indicate text has a
 // hard (no-reflowing) line break.  Previously \r and \r\n were turned
@@ -40,7 +44,6 @@ const defaultOptions: TerminalMarked.RendererOptions = {
   del: chalk.dim.gray.strikethrough,
   link: chalk.blue,
   href: chalk.blue.underline,
-  unescape: true,
   maxWidth: 80,
   reflowText: false,
   indentation: 4,
@@ -64,6 +67,20 @@ export class TerminalRenderer extends Renderer {
   }
 
   public override code({ text, lang }: Tokens.Code) {
+    if (lang === DIFF_LANG) {
+      const parts = text.split(DIFF_SEPARATOR);
+      if (parts.length === 2) {
+        const oldStr = parts[0] ?? '';
+        const newStr = parts[1] ?? '';
+        return this.renderDiff(oldStr, newStr, lang);
+      }
+      // Fallback for 'diff' language if separator is not found
+      return this.indent(
+        this.config.indentation ?? DEFAULT_INDENTATION,
+        this.highlightCode(text, lang)
+      );
+    }
+    // Original behavior for other languages
     return this.indent(
       this.config.indentation ?? DEFAULT_INDENTATION,
       this.highlightCode(text, lang ?? DEFAULT_LANG)
@@ -143,6 +160,68 @@ export class TerminalRenderer extends Renderer {
 
   public override html({ text }: Tokens.HTML | Tokens.Tag): string {
     return this.config.html?.(text) ?? text;
+  }
+  public renderDiff(
+    oldStr: string,
+    newStr: string,
+    lang: string = DEFAULT_LANG
+  ): string {
+    const diff = generateSideBySideDiff(oldStr, newStr);
+    const lineNumberWidth = String(
+      Math.max(oldStr.split('\n').length, newStr.split('\n').length)
+    ).length;
+    let result = '';
+
+    diff.forEach(([left, right]) => {
+      const leftLineNumber = left.lineNumberOriginal
+        ? String(left.lineNumberOriginal).padStart(lineNumberWidth, ' ')
+        : ' '.repeat(lineNumberWidth);
+      const rightLineNumber = right.lineNumberModified
+        ? String(right.lineNumberModified).padStart(lineNumberWidth, ' ')
+        : ' '.repeat(lineNumberWidth);
+
+      let leftContent = left.value;
+      let rightContent = right.value;
+
+      if (lang && this.isFormattingEnabled) {
+        try {
+          if (leftContent) {
+            leftContent = this.highlightCode(leftContent, lang);
+          }
+          if (rightContent) {
+            rightContent = this.highlightCode(rightContent, lang);
+          }
+        } catch (error) {
+          console.error(`Highlighting error for language ${lang}:`, error);
+        }
+      }
+
+      if (left.removed) {
+        leftContent = chalk.bgRed(leftContent);
+      }
+      if (right.added) {
+        rightContent = chalk.bgGreen(rightContent);
+      }
+
+      const leftPrefix = left.removed ? '- ' : left.added ? '+ ' : '  ';
+      const rightPrefix = right.added ? '+ ' : right.removed ? '- ' : '  ';
+
+      const maxLineLength =
+        Math.max(this.textLength(leftContent), this.textLength(rightContent)) +
+        2;
+      const paddedLeftContent = this.padRight(
+        leftPrefix + leftContent,
+        maxLineLength
+      );
+      const paddedRightContent = this.padRight(
+        rightPrefix + rightContent,
+        maxLineLength
+      );
+
+      result += `${chalk.dim(leftLineNumber)} ${paddedLeftContent} | ${chalk.dim(rightLineNumber)} ${paddedRightContent}\n`;
+    });
+
+    return result;
   }
 
   public override heading({ tokens, depth, text }: Tokens.Heading): string {
@@ -411,6 +490,12 @@ export class TerminalRenderer extends Renderer {
   private makeSection(text: string, size: number = 2): string {
     const newlines = '\n'.repeat(size);
     return `${newlines}${text}${newlines}`;
+  }
+
+  private padRight(input: string, length: number): string {
+    const currentLength = this.textLength(input);
+    const padding = length - currentLength;
+    return input + (padding > 0 ? ' '.repeat(padding) : '');
   }
 }
 
