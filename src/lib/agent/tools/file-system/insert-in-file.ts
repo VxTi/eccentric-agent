@@ -1,8 +1,8 @@
 import * as z from 'zod';
 import { readFile, writeFile } from 'fs/promises';
-import { acquireContextInstance } from '../../events/context-acquisition';
-import { Result } from '../../result';
-import { createTool } from './common';
+import { acquireContextInstance } from '../../../events/context-acquisition';
+import { Result } from '../../../result';
+import { createTool } from '../common';
 
 const inputSchema = z.object({
   filePath: z
@@ -119,9 +119,8 @@ export default createTool({
     return true;
   },
 
-  inputToString({ lineNumber, inclusive, filePath }) {
-    const action = inclusive ? 'Replacing line' : 'Inserting after line';
-    return `${action} ${lineNumber} in \`${filePath}\``;
+  inputToString({ lineNumber, filePath }) {
+    return `Inserting ${lineNumber} in \`${filePath}\``;
   },
 
   outputToString({ linesInserted, bytesWritten }) {

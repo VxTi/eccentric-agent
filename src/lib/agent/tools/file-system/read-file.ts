@@ -1,9 +1,9 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as z from 'zod';
-import { acquireContextInstance } from '../../events/context-acquisition';
-import { Result } from '../../result';
-import { createTool } from './common';
+import { acquireContextInstance } from '../../../events/context-acquisition';
+import { Result } from '../../../result';
+import { createTool } from '../common';
 
 const inputSchema = z.object({
   filePath: z

@@ -2,9 +2,9 @@ import chalk from 'chalk';
 import { readFile, writeFile } from 'fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
-import { acquireContextInstance } from '../../events/context-acquisition';
-import { Result } from '../../result';
-import { createTool } from './common';
+import { acquireContextInstance } from '../../../events/context-acquisition';
+import { Result } from '../../../result';
+import { createTool } from '../common';
 
 const inputSchema = z.object({
   filePath: z
@@ -118,12 +118,12 @@ export default createTool({
     const fileName = path.basename(filePath);
     const range =
       count === 1 ? `line ${line}` : `lines ${line}-${line + count - 1}`;
-    return `Replacing ${range} in \`${fileName}\``;
+    return `Editing ${range} in \`${fileName}\``;
   },
 
   outputToString({ linesRemoved, linesInserted, filePath }) {
     const fileName = path.basename(filePath);
 
-    return `Updated \`${fileName}\` ${chalk.redBright(`-${linesRemoved}`)} ${chalk.greenBright(`+${linesInserted}`)}`;
+    return `Edited \`${fileName}\` ${chalk.redBright(`-${linesRemoved}`)} ${chalk.greenBright(`+${linesInserted}`)}`;
   },
 });

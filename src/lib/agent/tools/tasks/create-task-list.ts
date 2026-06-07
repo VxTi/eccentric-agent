@@ -69,7 +69,7 @@ export default createTool({
   },
 
   outputToString({ tasks }) {
-    const lines = tasks.map(task => `- [ ] ${task.description}`).join('\n');
-    return `Created task list\n\n${lines}`;
+    const lines = tasks.map(task => `- ${task.description}`).join('\n');
+    return `Created task list\n${lines}`;
   },
 });

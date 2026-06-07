@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import * as z from 'zod';
-import { Result } from '../../result';
-import { createTool } from './common';
+import { Result } from '../../../result';
+import { createTool } from '../common';
 import { glob } from 'glob';
 
 const inputSchema = z.object({

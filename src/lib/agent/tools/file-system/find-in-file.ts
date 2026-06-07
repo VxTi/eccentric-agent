@@ -1,6 +1,6 @@
 import * as z from 'zod';
-import { Result } from '../../result';
-import { createTool } from './common';
+import { Result } from '../../../result';
+import { createTool } from '../common';
 import { readFile } from 'fs/promises';
 
 const inputSchema = z.object({

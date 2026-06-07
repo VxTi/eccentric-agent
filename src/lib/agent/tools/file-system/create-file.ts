@@ -1,7 +1,7 @@
 import * as z from 'zod';
-import { Result } from '../../result';
-import { formatBytes } from '../../text-formatting';
-import { createTool } from './common';
+import { Result } from '../../../result';
+import { formatBytes } from '../../../text-formatting';
+import { createTool } from '../common';
 import { mkdir, writeFile, access } from 'fs/promises';
 import { dirname } from 'path';
 
