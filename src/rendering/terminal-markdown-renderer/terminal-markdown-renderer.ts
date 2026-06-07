@@ -182,16 +182,11 @@ export class TerminalRenderer extends Renderer {
     //   = lineNumberWidth + 1 + colWidth + 1 + 1 + 1 + lineNumberWidth + 1 + colWidth
     //   = 2*lineNumberWidth + 2*colWidth + 5
     const fixedOverhead = 2 * lineNumberWidth + 5;
-    const colWidth = Math.max(
-      10,
-      Math.floor((this.width - fixedOverhead) / 2)
-    );
+    const colWidth = Math.max(10, Math.floor((this.width - fixedOverhead) / 2));
 
     let result = '';
 
     diff.forEach(([left, right]) => {
-      if (!left || !right) return;
-
       if (left.collapsed || right.collapsed) {
         const gap = chalk.dim('⋯'.repeat(colWidth));
         const blankLn = ' '.repeat(lineNumberWidth);
@@ -228,7 +223,10 @@ export class TerminalRenderer extends Renderer {
       if (left.removed) leftContent = chalk.bgRed(leftContent);
       if (right.added) rightContent = chalk.bgGreen(rightContent);
 
-      const paddedLeftContent = this.padRight(leftPrefix + leftContent, colWidth);
+      const paddedLeftContent = this.padRight(
+        leftPrefix + leftContent,
+        colWidth
+      );
       const paddedRightContent = this.padRight(
         rightPrefix + rightContent,
         colWidth
@@ -244,7 +242,7 @@ export class TerminalRenderer extends Renderer {
     if (maxLength <= 0) return '';
     if (input.length <= maxLength) return input;
     if (maxLength === 1) return '…';
-    return input.substring(0, maxLength - 1) + '…';
+    return `${input.substring(0, maxLength - 1)}…`;
   }
 
   public override heading({ tokens, depth, text }: Tokens.Heading): string {

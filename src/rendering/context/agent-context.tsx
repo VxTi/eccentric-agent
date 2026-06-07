@@ -26,7 +26,7 @@ import type { Message, UserMessage } from '../../lib/types/messages';
 import { registry } from '../../lib/agent/tools';
 import { constructToolset } from '../../lib/agent/tools/core';
 import { appSignal } from '../../signal';
-import { basicHighlightFormatting } from '../markdown-options';
+import { basicHighlightFormatting } from '../terminal-markdown-renderer/markdown-renderer';
 
 interface AgentStatus {
   loading: boolean;

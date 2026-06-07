@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { plain, type Theme } from 'cli-highlight';
 
-export const theme: Theme = {
+export const githubDark: Theme = {
   /**
    * keyword in a regular Algol-style language
    * GitHub Dark: Orange/Red #ff7b72

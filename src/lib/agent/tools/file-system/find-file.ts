@@ -81,6 +81,7 @@ export default createTool({
     if (files.length === 0) {
       return `Unable to find any files`;
     }
-    return `Found \`${files.length} file${files.length === 1 ? '' : 's'}\``;
+    const formattedFiles = files.map(file => `- ${file}`).join('\n');
+    return `Found ${files.length} file(s):\n${formattedFiles}`;
   },
 });

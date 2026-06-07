@@ -1,8 +1,8 @@
 import * as z from 'zod';
 import { acquireContextInstance } from '../../../events/context-acquisition';
 import { Result } from '../../../result';
-import { formatBytes } from '../../../text-formatting';
 import { createTool } from '../common';
+import { formatDiffMd } from '../../../utils/diff-utils';
 import { mkdir, writeFile, access } from 'fs/promises';
 import { dirname } from 'path';
 
@@ -75,19 +75,20 @@ export default createTool({
 
     await context.fileCache.update(filePath);
     await writeFile(filePath, content, 'utf-8');
-
-    return Result.Ok({
-      filePath,
-      bytesWritten: Buffer.byteLength(content, 'utf-8'),
-      created: !alreadyExists,
-    });
+    return Result.Ok(
+      {
+        filePath,
+        bytesWritten: Buffer.byteLength(content, 'utf-8'),
+        created: !alreadyExists,
+      },
+      { current: content }
+    );
   },
-
   inputToString({ filePath }) {
     return `Create file \`${filePath}\``;
   },
-
-  outputToString({ filePath, created, bytesWritten }) {
-    return `${created ? 'Created' : 'Wrote to'} file \`${filePath}\` (\`${formatBytes(bytesWritten)}\`)`;
+  outputToString({ filePath, created }, _, { current }) {
+    const previous = created ? '' : 'File existed prior to write.';
+    return `Updated \`${filePath}\`\\n${formatDiffMd(previous, current)}`;
   },
 });

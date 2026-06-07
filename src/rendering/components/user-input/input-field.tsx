@@ -253,7 +253,7 @@ export function formatReferencedFiles(input: string): string {
   let match: RegExpExecArray | null;
   let sanitized = input;
   while ((match = re.exec(input)) !== null) {
-    const path = match[1]?.replace(/[.,;:!?)\]]+$/, '') ?? '';
+    const path = match[1]?.replace(/[.,;:!?)\]]+$/, '');
     sanitized = sanitized.replace(match[0], `\`${path}\``);
   }
   return sanitized;

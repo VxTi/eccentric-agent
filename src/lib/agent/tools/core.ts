@@ -1,7 +1,7 @@
 import { tool as createTool, type Tool, type ToolSet } from 'ai';
 import chalk from 'chalk';
 import { v7 as uuid } from 'uuid';
-import { basicHighlightFormatting } from '../../../rendering/markdown-options';
+import { basicHighlightFormatting } from '../../../rendering/terminal-markdown-renderer/markdown-renderer';
 import { appSignal } from '../../../signal';
 import { emitMessage } from '../../events/messaging';
 import { type Notifier } from '../../events/notifier';

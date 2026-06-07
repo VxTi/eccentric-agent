@@ -3,7 +3,7 @@ import { type ReactNode, useMemo, useState } from 'react';
 import { emitEvent, EventName } from '../../../lib/events/events';
 import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
 import { useUserInputField } from '../../context/user-input-context';
-import { parseMarkdown } from '../../markdown-options';
+import { parseMarkdown }     from '../../terminal-markdown-renderer/markdown-renderer';
 
 export function InputRequest(): ReactNode {
   const { inputRequest, setInputRequest } = useUserInputField();
@@ -49,7 +49,7 @@ export function InputRequest(): ReactNode {
 
       emitEvent(
         EventName.INPUT_RESPONSE,
-        indices.map(idx => inputRequest.options[idx]!),
+        indices.map(idx => inputRequest.options[idx]),
         inputRequest.channelId
       );
 

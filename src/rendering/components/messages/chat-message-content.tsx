@@ -1,6 +1,6 @@
 import { Box, Text } from 'ink';
 import { type JSX } from 'react';
-import { parseMarkdown } from '../../markdown-options';
+import { parseMarkdown } from '../../terminal-markdown-renderer/markdown-renderer';
 
 interface MarkdownViewProps {
   content: string;

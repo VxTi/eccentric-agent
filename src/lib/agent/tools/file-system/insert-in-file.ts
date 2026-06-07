@@ -2,6 +2,7 @@ import * as z from 'zod';
 import { readFile, writeFile } from 'fs/promises';
 import { acquireContextInstance } from '../../../events/context-acquisition';
 import { Result } from '../../../result';
+import { formatDiffMd } from '../../../utils/diff-utils';
 import { createTool } from '../common';
 
 const inputSchema = z.object({
@@ -103,17 +104,20 @@ export default createTool({
     await writeFile(absolutePath, updated, 'utf-8');
     await context.fileCache.update(absolutePath);
 
-    return Result.Ok({
-      bytesWritten: Buffer.byteLength(updated, 'utf-8'),
-      linesInserted: insertLines.length,
-    });
+    return Result.Ok(
+      {
+        bytesWritten: Buffer.byteLength(updated, 'utf-8'),
+        linesInserted: insertLines.length,
+      },
+      { previous: original, current: updated, filePath }
+    );
   },
 
   inputToString({ lineNumber, filePath }) {
     return `Inserting ${lineNumber} in \`${filePath}\``;
   },
 
-  outputToString({ linesInserted, bytesWritten }) {
-    return `Inserted \`${linesInserted}\` line(s) (\`${bytesWritten}\` bytes total).`;
+  outputToString({}, _, { previous, current, filePath }) {
+    return `Updated \`${filePath}\`\n${formatDiffMd(previous, current)}`;
   },
 });

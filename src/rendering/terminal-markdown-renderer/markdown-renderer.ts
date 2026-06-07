@@ -1,12 +1,10 @@
 import chalk from 'chalk';
 import { marked } from 'marked';
-import {
-  HEADINGS,
-  TerminalRenderer,
-} from './terminal-renderer/terminal-markdown-renderer';
-import { type TerminalMarked } from './terminal-renderer/types';
+import { githubDark } from './code-highlight-theme';
+import { HEADINGS, TerminalRenderer } from './terminal-markdown-renderer';
+import { type TerminalMarked } from './types';
 
-export const basicHighlightFormatting = chalk.cyan.bold;
+export const basicHighlightFormatting = chalk.yellow.bold;
 
 export const markdownFormattingOptions = {
   // Colors
@@ -28,6 +26,7 @@ export const markdownFormattingOptions = {
   reflowText: false,
   unescape: true,
   indentation: 2,
+  codeHighlighting: { theme: githubDark },
 } satisfies TerminalMarked.RendererOptions;
 
 export const terminalRenderer = new TerminalRenderer(markdownFormattingOptions);

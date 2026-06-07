@@ -61,7 +61,7 @@ export function useInputSuggestionProvider(
 
       // MARK: Fails silently
     } else if ((matches = COMMAND_PATTERN.exec(preCursorInput)) !== null) {
-      const command = matches[1] ?? '';
+      const command = matches[1];
 
       setSuggestions({
         type: SuggestionType.COMMAND,

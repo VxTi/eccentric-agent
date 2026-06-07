@@ -94,6 +94,15 @@ export default createTool({
   },
 
   outputToString({ matches }): string {
-    return `Found \`${matches.length === 0 ? 'no' : matches.length}\` matches.`;
+    if (matches.length === 0) {
+      return `Found no matches.`;
+    }
+    const formattedMatches = matches
+      .map(
+        match =>
+          `- Line ${match.line}, Column ${match.column}: \`${match.match}\` in \`${match.lineContent}\``
+      )
+      .join('\n');
+    return `Found ${matches.length} match(es):\n${formattedMatches}`;
   },
 });

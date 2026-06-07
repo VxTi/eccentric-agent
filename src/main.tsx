@@ -8,7 +8,7 @@ import { render } from 'ink';
 import { AgentProvider } from './rendering/context';
 import { App } from './rendering/components/App';
 import { UserInputProvider } from './rendering/context/user-input-context';
-import { terminalRenderer } from './rendering/markdown-options';
+import { terminalRenderer } from './rendering/terminal-markdown-renderer/markdown-renderer';
 import { appController } from './signal';
 
 const ANSI_ALT_SCREEN_ENTER = '\x1b[?1049h\x1b[H\x1b[2J';

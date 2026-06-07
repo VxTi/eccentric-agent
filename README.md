@@ -60,7 +60,7 @@ The `eccentric-agent` is a versatile tool. Here are a few ideas to get you start
 *   **Information Retrieval:** Ask it to "Find the latest news on [topic]" or "Summarize the key points from [URL]".
 *   **Code Assistance:** Use it to "Explain this code snippet: [code]" or "Suggest a refactoring for [function name]".
 *   **Task Automation:** Experiment with chaining commands to automate repetitive tasks.
-*   **Creative Writing:** Ask it to "Draft a short story about [theme]" or "Generate ideas for a [type of content]".
+*   **Creative Writing:** Ask it to "Draft a short story about [githubDark]" or "Generate ideas for a [type of content]".
 *   **Personal Productivity:** Integrate it into your workflow for quick lookups, scheduling, or note-taking.
 
 Don't hesitate to experiment and discover new ways `eccentric-agent` can assist you!

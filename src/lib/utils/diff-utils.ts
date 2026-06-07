@@ -2,7 +2,7 @@ import { diffLines, type Change } from 'diff';
 import {
   DIFF_LANG,
   DIFF_SEPARATOR,
-} from '../../rendering/terminal-renderer/terminal-markdown-renderer';
+} from '../../rendering/terminal-markdown-renderer/terminal-markdown-renderer';
 
 export interface DiffLine {
   value: string;
@@ -95,7 +95,7 @@ function collapseUnchangedRegions(
 
   const keep = new Array<boolean>(rows.length).fill(false);
   for (let i = 0; i < rows.length; i++) {
-    if (isChanged(rows[i]!)) {
+    if (isChanged(rows[i] ?? [])) {
       const start = Math.max(0, i - contextLines);
       const end = Math.min(rows.length - 1, i + contextLines);
       for (let j = start; j <= end; j++) {
@@ -111,10 +111,13 @@ function collapseUnchangedRegions(
   let inGap = false;
   for (let i = 0; i < rows.length; i++) {
     if (keep[i]) {
-      result.push(rows[i]!);
+      result.push(rows[i]);
       inGap = false;
     } else if (!inGap) {
-      result.push([{ value: '', collapsed: true }, { value: '', collapsed: true }]);
+      result.push([
+        { value: '', collapsed: true },
+        { value: '', collapsed: true },
+      ]);
       inGap = true;
     }
   }

@@ -93,7 +93,7 @@ export default createTool({
     }
 
     if (tools.length === 1) {
-      const tool = tools[0]!;
+      const tool = tools[0];
       return Result.Ok({
         mcpServer,
         toolName: tool.name,
