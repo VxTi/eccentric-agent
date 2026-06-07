@@ -16,6 +16,7 @@ export function ChatMessage({
       width="100%"
       justifyContent="flex-start"
       flexShrink={0}
+      paddingBottom={1}
     >
       <ModelMessageText
         message={message}

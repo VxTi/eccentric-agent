@@ -73,17 +73,12 @@ export default createTool({
     const lines = original.length === 0 ? [] : original.split('\n');
 
     const hadTrailingNewline = original.endsWith('\n');
-    // `split('\n')` on text ending in '\n' yields a trailing empty string; drop
-    // it so `lines.length` equals the number of actual content lines.
-    if (hadTrailingNewline) lines.pop();
+    if (hadTrailingNewline) lines.pop(); // Remove the empty string caused by splitting on a trailing newline
 
     const insertLines = content.split('\n');
-    // A trailing '\n' in content would otherwise inject a blank line between
-    // the inserted block and the following file content.
     if (insertLines.length > 1 && insertLines[insertLines.length - 1] === '') {
       insertLines.pop();
     }
-
     if (inclusive) {
       if (lineNumber < 1 || lineNumber > lines.length) {
         return Result.Error(
@@ -103,7 +98,7 @@ export default createTool({
     }
 
     let updated = lines.join('\n');
-    if (hadTrailingNewline && !updated.endsWith('\n')) updated += '\n';
+    if (hadTrailingNewline && lines.length > 0) updated += '\n';
 
     await writeFile(absolutePath, updated, 'utf-8');
     await context.fileCache.update(absolutePath);

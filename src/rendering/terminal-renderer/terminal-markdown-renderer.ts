@@ -72,18 +72,24 @@ export class TerminalRenderer extends Renderer {
       if (parts.length === 2) {
         const oldStr = parts[0] ?? '';
         const newStr = parts[1] ?? '';
-        return this.renderDiff(oldStr, newStr, lang);
+        return this.makeSection(this.renderDiff(oldStr, newStr, lang), 2);
       }
       // Fallback for 'diff' language if separator is not found
-      return this.indent(
-        this.config.indentation ?? DEFAULT_INDENTATION,
-        this.highlightCode(text, lang)
+      return this.makeSection(
+        this.indent(
+          this.config.indentation ?? DEFAULT_INDENTATION,
+          this.highlightCode(text, lang)
+        ),
+        2
       );
     }
     // Original behavior for other languages
-    return this.indent(
-      this.config.indentation ?? DEFAULT_INDENTATION,
-      this.highlightCode(text, lang ?? DEFAULT_LANG)
+    return this.makeSection(
+      this.indent(
+        this.config.indentation ?? DEFAULT_INDENTATION,
+        this.highlightCode(text, lang ?? DEFAULT_LANG)
+      ),
+      2
     );
   }
 
@@ -170,9 +176,29 @@ export class TerminalRenderer extends Renderer {
     const lineNumberWidth = String(
       Math.max(oldStr.split('\n').length, newStr.split('\n').length)
     ).length;
+
+    // Layout per row:
+    //   "<LN> <leftCol> | <LN> <rightCol>"
+    //   = lineNumberWidth + 1 + colWidth + 1 + 1 + 1 + lineNumberWidth + 1 + colWidth
+    //   = 2*lineNumberWidth + 2*colWidth + 5
+    const fixedOverhead = 2 * lineNumberWidth + 5;
+    const colWidth = Math.max(
+      10,
+      Math.floor((this.width - fixedOverhead) / 2)
+    );
+
     let result = '';
 
     diff.forEach(([left, right]) => {
+      if (!left || !right) return;
+
+      if (left.collapsed || right.collapsed) {
+        const gap = chalk.dim('⋯'.repeat(colWidth));
+        const blankLn = ' '.repeat(lineNumberWidth);
+        result += `${blankLn} ${gap} | ${blankLn} ${gap}\n`;
+        return;
+      }
+
       const leftLineNumber = left.lineNumberOriginal
         ? String(left.lineNumberOriginal).padStart(lineNumberWidth, ' ')
         : ' '.repeat(lineNumberWidth);
@@ -180,48 +206,45 @@ export class TerminalRenderer extends Renderer {
         ? String(right.lineNumberModified).padStart(lineNumberWidth, ' ')
         : ' '.repeat(lineNumberWidth);
 
-      let leftContent = left.value;
-      let rightContent = right.value;
+      const leftPrefix = left.removed ? '- ' : left.added ? '+ ' : '  ';
+      const rightPrefix = right.added ? '+ ' : right.removed ? '- ' : '  ';
+
+      // Reserve 2 chars for the prefix; truncate plain text BEFORE highlighting
+      // so the ANSI escapes stay intact.
+      const contentMax = colWidth - leftPrefix.length;
+      let leftContent = this.truncatePlain(left.value, contentMax);
+      let rightContent = this.truncatePlain(right.value, contentMax);
 
       if (lang && this.isFormattingEnabled) {
         try {
-          if (leftContent) {
-            leftContent = this.highlightCode(leftContent, lang);
-          }
-          if (rightContent) {
+          if (leftContent) leftContent = this.highlightCode(leftContent, lang);
+          if (rightContent)
             rightContent = this.highlightCode(rightContent, lang);
-          }
         } catch (error) {
           console.error(`Highlighting error for language ${lang}:`, error);
         }
       }
 
-      if (left.removed) {
-        leftContent = chalk.bgRed(leftContent);
-      }
-      if (right.added) {
-        rightContent = chalk.bgGreen(rightContent);
-      }
+      if (left.removed) leftContent = chalk.bgRed(leftContent);
+      if (right.added) rightContent = chalk.bgGreen(rightContent);
 
-      const leftPrefix = left.removed ? '- ' : left.added ? '+ ' : '  ';
-      const rightPrefix = right.added ? '+ ' : right.removed ? '- ' : '  ';
-
-      const maxLineLength =
-        Math.max(this.textLength(leftContent), this.textLength(rightContent)) +
-        2;
-      const paddedLeftContent = this.padRight(
-        leftPrefix + leftContent,
-        maxLineLength
-      );
+      const paddedLeftContent = this.padRight(leftPrefix + leftContent, colWidth);
       const paddedRightContent = this.padRight(
         rightPrefix + rightContent,
-        maxLineLength
+        colWidth
       );
 
       result += `${chalk.dim(leftLineNumber)} ${paddedLeftContent} | ${chalk.dim(rightLineNumber)} ${paddedRightContent}\n`;
     });
 
     return result;
+  }
+
+  private truncatePlain(input: string, maxLength: number): string {
+    if (maxLength <= 0) return '';
+    if (input.length <= maxLength) return input;
+    if (maxLength === 1) return '…';
+    return input.substring(0, maxLength - 1) + '…';
   }
 
   public override heading({ tokens, depth, text }: Tokens.Heading): string {

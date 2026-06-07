@@ -10,11 +10,15 @@ export interface DiffLine {
   added?: boolean;
   lineNumberOriginal?: number;
   lineNumberModified?: number;
+  collapsed?: boolean;
 }
+
+const DEFAULT_CONTEXT_LINES = 3;
 
 export function generateSideBySideDiff(
   original: string,
-  modified: string
+  modified: string,
+  contextLines: number = DEFAULT_CONTEXT_LINES
 ): DiffLine[][] {
   const changes = diffLines(original, modified);
 
@@ -65,7 +69,6 @@ export function generateSideBySideDiff(
     });
   });
 
-  // Pad shorter side with empty lines to match length
   while (left.length < right.length) {
     left.push({ value: '' });
   }
@@ -73,12 +76,49 @@ export function generateSideBySideDiff(
     right.push({ value: '' });
   }
 
-  const sideBySideDiff: DiffLine[][] = [];
+  const rows: DiffLine[][] = [];
   for (let i = 0; i < left.length; i++) {
-    sideBySideDiff.push([left[i], right[i]]);
+    rows.push([left[i], right[i]]);
   }
 
-  return sideBySideDiff;
+  return collapseUnchangedRegions(rows, contextLines);
+}
+
+function collapseUnchangedRegions(
+  rows: DiffLine[][],
+  contextLines: number
+): DiffLine[][] {
+  const isChanged = (row: DiffLine[]): boolean => {
+    const [l, r] = row;
+    return Boolean(l?.added || l?.removed || r?.added || r?.removed);
+  };
+
+  const keep = new Array<boolean>(rows.length).fill(false);
+  for (let i = 0; i < rows.length; i++) {
+    if (isChanged(rows[i]!)) {
+      const start = Math.max(0, i - contextLines);
+      const end = Math.min(rows.length - 1, i + contextLines);
+      for (let j = start; j <= end; j++) {
+        keep[j] = true;
+      }
+    }
+  }
+
+  const hasAnyChange = keep.some(Boolean);
+  if (!hasAnyChange) return [];
+
+  const result: DiffLine[][] = [];
+  let inGap = false;
+  for (let i = 0; i < rows.length; i++) {
+    if (keep[i]) {
+      result.push(rows[i]!);
+      inGap = false;
+    } else if (!inGap) {
+      result.push([{ value: '', collapsed: true }, { value: '', collapsed: true }]);
+      inGap = true;
+    }
+  }
+  return result;
 }
 
 export function formatDiffMd(previous: string, current: string): string {

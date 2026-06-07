@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { acquireContextInstance } from '../../../events/context-acquisition';
 import { Result } from '../../../result';
 import { formatBytes } from '../../../text-formatting';
 import { createTool } from '../common';
@@ -57,6 +58,7 @@ export default createTool({
   outputSchema,
 
   async handle({ overwrite, createDirectories, filePath, content }) {
+    const context = await acquireContextInstance();
     const override = overwrite ?? false;
     const createDirs = createDirectories ?? true;
 
@@ -71,6 +73,7 @@ export default createTool({
       await mkdir(dirname(filePath), { recursive: true });
     }
 
+    await context.fileCache.update(filePath);
     await writeFile(filePath, content, 'utf-8');
 
     return Result.Ok({
