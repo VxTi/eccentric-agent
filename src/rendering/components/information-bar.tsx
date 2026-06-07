@@ -1,4 +1,4 @@
-import { Box, Spacer, Text } from 'ink';
+import { Box, Text } from 'ink';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import {
   getModelMetadata,
@@ -60,11 +60,17 @@ export function InformationBar(): ReactNode {
     ((output + extOut) / 1_000_000) * metadata.outputTokenPricing;
 
   return (
-    <Box flexDirection="row" flexShrink={0} gap={1} width="100%">
+    <Box
+      flexDirection="row"
+      flexShrink={0}
+      gap={1}
+      width="100%"
+      flexWrap="wrap"
+      justifyContent="space-between"
+    >
       <Text color="gray">
         ↑ {formatTokenCount(input)} • ↓ {formatTokenCount(output)}
       </Text>
-      <Spacer />
       <Box gap={1}>
         <Box paddingRight={1} gap={2}>
           <Text underline>{model}</Text>

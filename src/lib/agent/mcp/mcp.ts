@@ -40,6 +40,7 @@ export async function loadMcpConfig(signal: AbortSignal): Promise<MCP[]> {
     path.resolve(cwd, '.cursor/mcp.json'),
     path.resolve(home, '.cursor/mcp.json'),
   ];
+
   for (const path of localPaths) {
     if (!fs.existsSync(path)) {
       continue;
@@ -154,6 +155,22 @@ export class MCP extends EventEmitter {
     }
   }
 
+  private static async makeStdioTransport(
+    config: mcp.CommandConfig,
+    signal: AbortSignal
+  ) {
+    const transport = new StdioClientTransport({
+      command: config.command,
+      args: config.args,
+      env: config.env,
+      stderr: 'ignore',
+    });
+    const client = new Client({ name: 'eccentric-agent', version: '1.0.0' });
+    await client.connect(transport, { signal });
+
+    return { client, transport };
+  }
+
   private static async makeTransport(
     name: string,
     config: mcp.Config,
@@ -164,16 +181,7 @@ export class MCP extends EventEmitter {
     authProvider?: LocalFileOAuthProvider;
   }> {
     if ('command' in config) {
-      const transport = new StdioClientTransport({
-        command: config.command,
-        args: config.args,
-        env: config.env,
-        stderr: 'ignore',
-      });
-      const client = new Client({ name: 'eccentric-agent', version: '1.0.0' });
-      await client.connect(transport, { signal });
-
-      return { client, transport };
+      return await this.makeStdioTransport(config, signal);
     }
 
     const authProvider = resolveOAuthConfig(name, config);

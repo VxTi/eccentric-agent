@@ -52,9 +52,9 @@ async function main(): Promise<void> {
       exitOnCtrlC: true,
       patchConsole: true,
       maxFps: 60,
-      incrementalRendering: true,
+      incrementalRendering: false,
       concurrent: true,
-      alternateScreen: true,
+      alternateScreen: false,
     }
   );
 

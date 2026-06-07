@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { Result } from '../../result';
 import { formatBytes } from '../../text-formatting';
 import { createTool } from './common';
 import { mkdir, writeFile, access } from 'fs/promises';
@@ -61,7 +62,7 @@ export default createTool({
 
     const alreadyExists = await safeExists(filePath);
     if (alreadyExists && !override) {
-      throw new Error(
+      return Result.Error(
         `File already exists at ${filePath}. Pass overwrite: true to replace it.`
       );
     }
@@ -72,11 +73,11 @@ export default createTool({
 
     await writeFile(filePath, content, 'utf-8');
 
-    return {
+    return Result.Ok({
       filePath,
       bytesWritten: Buffer.byteLength(content, 'utf-8'),
       created: !alreadyExists,
-    };
+    });
   },
 
   inputToString({ filePath }) {

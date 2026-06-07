@@ -20,10 +20,10 @@ export function emitMessage(
 }
 
 export function debug(message: string, ...args: any[]): void {
-  // if (process.env.NODE_ENV !== 'production') {
-  emitMessage({
-    type: 'generic',
-    content: `${message} ${args.map(a => JSON.stringify(a)).join(', ')}`,
-  });
-  // }
+  if (process.env.NODE_ENV === 'debug') {
+    emitMessage({
+      type: 'generic',
+      content: `${message} ${args.map(a => JSON.stringify(a)).join(', ')}`,
+    });
+  }
 }

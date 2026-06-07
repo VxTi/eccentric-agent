@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { readFile, writeFile } from 'fs/promises';
 import { acquireContextInstance } from '../../events/context-acquisition';
+import { Result } from '../../result';
 import { createTool } from './common';
 
 const inputSchema = z.object({
@@ -85,7 +86,7 @@ export default createTool({
 
     if (inclusive) {
       if (lineNumber < 1 || lineNumber > lines.length) {
-        throw new Error(
+        return Result.Error(
           `\`lineNumber\` ${lineNumber} is out of range for inclusive mode.` +
             ` File has ${lines.length} line(s); valid range is 1..${lines.length}.`
         );
@@ -93,7 +94,7 @@ export default createTool({
       lines.splice(lineNumber - 1, 1, ...insertLines);
     } else {
       if (lineNumber < 0 || lineNumber > lines.length) {
-        throw new Error(
+        return Result.Error(
           `\`lineNumber\` ${lineNumber} is out of range. File has` +
             ` ${lines.length} line(s); valid range is 0..${lines.length}.`
         );
@@ -108,11 +109,10 @@ export default createTool({
     await writeFile(absolutePath, updated, 'utf-8');
     await context.fileCache.update(absolutePath);
 
-    return {
-      success: true,
+    return Result.Ok({
       bytesWritten: Buffer.byteLength(updated, 'utf-8'),
       linesInserted: insertLines.length,
-    };
+    });
   },
 
   requiresApproval() {
@@ -124,8 +124,7 @@ export default createTool({
     return `${action} ${lineNumber} in \`${filePath}\``;
   },
 
-  outputToString({ linesInserted, success, bytesWritten }) {
-    if (!success) return `Unable to insert into file`;
+  outputToString({ linesInserted, bytesWritten }) {
     return `Inserted \`${linesInserted}\` line(s) (\`${bytesWritten}\` bytes total).`;
   },
 });

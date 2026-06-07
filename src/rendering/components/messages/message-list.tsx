@@ -9,7 +9,7 @@ import { MemoizedChatMessage } from './memoized-chat-message';
 export function MessageList(): JSX.Element {
   const { messages } = useAgent();
   const { inputRequest } = useUserInputField();
-  const { height: terminalHeight } = useTerminalSize();
+  const { width: terminalWidth, height: terminalHeight } = useTerminalSize();
 
   const containerRef = useRef<DOMElement | null>(null);
   const contentListRef = useRef<DOMElement | null>(null);
@@ -30,11 +30,11 @@ export function MessageList(): JSX.Element {
       const { height } = measureElement(contentListRef.current);
       setContentHeight(height);
     }
-  }, [messages, inputRequest, terminalHeight]);
+  }, [messages, inputRequest, terminalHeight, terminalWidth]);
 
   useEffect(() => {
     if (clampedOffset !== scrollOffset) setScrollOffset(clampedOffset);
-  }, [clampedOffset, scrollOffset, terminalHeight]);
+  }, [clampedOffset, scrollOffset]);
 
   useScroll(dy => setScrollOffset(prev => prev + dy));
 

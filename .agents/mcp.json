@@ -19,7 +19,10 @@
       "httpUrl": "https://api.githubcopilot.com/mcp/",
       "headers": {
         "Authorization": "Bearer $GITHUB_PAT"
-      }
+      },
+      "autoApprove": [
+        "list_issues"
+      ]
     },
     "notion": {
       "command": "npx",

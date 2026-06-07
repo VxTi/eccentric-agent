@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { Result } from '../../result';
 import { getTavilyClient } from '../tavily';
 import { createTool } from './common';
 
@@ -77,7 +78,7 @@ export default createTool({
       })
     );
 
-    return { query, results };
+    return Result.Ok({ query, results });
   },
 
   inputToString({ query, country }) {

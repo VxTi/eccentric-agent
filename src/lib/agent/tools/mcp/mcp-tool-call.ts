@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { Result } from '../../../result';
 import { getMCPServer } from '../../mcp/mcp';
 import { createTool, ToolSelectionOption } from '../common';
 
@@ -68,14 +69,14 @@ export default createTool({
     );
 
     if (result.isError) {
-      throw new Error(JSON.stringify(result.content));
+      return Result.Error(JSON.stringify(result.content));
     }
 
-    return {
+    return Result.Ok({
       mcpServer,
       toolName,
       result: JSON.stringify(result),
-    };
+    });
   },
 
   async requiresApproval({ mcpServer, toolName }) {

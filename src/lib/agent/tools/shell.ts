@@ -1,4 +1,6 @@
+import { type ExecException } from 'node:child_process';
 import * as z from 'zod';
+import { Result } from '../../result';
 import { createTool, ToolSelectionOption } from './common';
 import { exec } from 'child_process';
 
@@ -32,6 +34,7 @@ const outputSchema = z.object({
 });
 
 const MAX_SHOWN_OUTPUT_LINES = 5;
+const MAX_BUFFER_10_MB = 10 * 1024 * 1024;
 
 export const ALLOWED_COMMAND_PATTERNS: RegExp[] = [
   /^ls(\s|$)/,
@@ -77,16 +80,16 @@ export default createTool({
 
   async handle({ command, timeoutMs, cwd }, channel) {
     try {
-      return new Promise(resolve => {
+      return new Promise<Result<z.infer<typeof outputSchema>>>(resolve => {
         const process = exec(
           command,
-          { cwd, timeout: timeoutMs ?? 30_000, maxBuffer: 10 * 1024 * 1024 },
+          { cwd, timeout: timeoutMs ?? 30_000, maxBuffer: MAX_BUFFER_10_MB },
           (error, stdout, stderr) => {
             const totalErr = error
               ? [stderr, error.message].join('\n')
               : stderr;
 
-            resolve({ stdout, stderr: totalErr, exitCode: 0 });
+            resolve(Result.Ok({ stdout, stderr: totalErr, exitCode: 0 }));
           }
         );
         process.on('message', msg => {
@@ -94,17 +97,14 @@ export default createTool({
         });
       });
     } catch (err: unknown) {
-      const e = err as {
-        stdout?: string;
-        stderr?: string;
-        code?: number;
-        message?: string;
-      };
-      return {
+      const e = err as ExecException;
+      // It might've just been a command error, but we still deem it as 'ok', as
+      // error results are still processed correctly
+      return Result.Ok({
         stdout: e.stdout ?? '',
-        stderr: e.stderr ?? e.message ?? '',
+        stderr: e.stderr ?? e.message,
         exitCode: typeof e.code === 'number' ? e.code : 1,
-      };
+      });
     }
   },
 

@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { Result } from '../../result';
 import { createTool } from './common';
 
 const inputSchema = z.object();
@@ -19,7 +20,7 @@ export default createTool({
   inputSchema,
   outputSchema,
 
-  async handle() {
+  handle() {
     const now = new Date();
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
@@ -29,7 +30,7 @@ export default createTool({
       timeZone,
     }).format(now);
 
-    return Promise.resolve({
+    return Result.Ok({
       formatted,
       timeZone,
       iso: now.toISOString(),

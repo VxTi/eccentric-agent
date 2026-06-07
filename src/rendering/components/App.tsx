@@ -19,6 +19,8 @@ export function App(): ReactNode {
     });
   }, [context]);
 
+  const boxWidth = width <= 72 ? '100%' : '60%';
+
   return (
     <Box
       flexDirection="column"
@@ -28,7 +30,7 @@ export function App(): ReactNode {
       borderStyle="round"
       alignItems="center"
     >
-      <Box width="60%" flexGrow={1} flexDirection="column">
+      <Box width={boxWidth} flexGrow={1} flexDirection="column">
         <WelcomingText />
         <Box
           height="100%"

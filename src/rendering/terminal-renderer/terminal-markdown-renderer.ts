@@ -77,7 +77,7 @@ export class TerminalRenderer extends Renderer {
   public text(token: Tokens.Text | Tokens.Escape): string {
     const parsed =
       token.type === 'text' && token.tokens?.length
-        ? this.parser.parse(token.tokens)
+        ? this.parser.parseInline(token.tokens)
         : token.text;
 
     return this.config.text?.(parsed) ?? parsed;
@@ -129,7 +129,7 @@ export class TerminalRenderer extends Renderer {
       .map(item => this.listitem(item).trim())
       .join('\n');
 
-    return this.config.list?.(transformed) ?? transformed;
+    return this.makeSection(this.config.list?.(transformed) ?? transformed, 1);
   }
 
   public override blockquote({ tokens, text }: Tokens.Blockquote): string {
@@ -153,7 +153,7 @@ export class TerminalRenderer extends Renderer {
 
     const headingIndex = Math.min(Math.max(depth - 1, 0), HEADINGS.length - 1);
     const formatter = this.config[HEADINGS[headingIndex] ?? 'h1'];
-    return this.makeSection(formatter?.(formatted) ?? formatted, 1);
+    return this.makeSection(formatter?.(formatted) ?? formatted, 2);
   }
 
   public override hr(): string {
@@ -168,7 +168,7 @@ export class TerminalRenderer extends Renderer {
 
   public override paragraph({ tokens }: Tokens.Paragraph): string {
     const parsed = this.parser.parseInline(tokens);
-    return this.reflowText(this.config.paragraph?.(parsed) ?? parsed).trim();
+    return `${this.reflowText(this.config.paragraph?.(parsed) ?? parsed).trim()}\n`;
   }
 
   public override table({ header, rows }: Tokens.Table): string {
@@ -226,12 +226,12 @@ export class TerminalRenderer extends Renderer {
   }
 
   public override del({ tokens }: Tokens.Del): string {
-    const parsed = this.parser.parse(tokens);
+    const parsed = this.parser.parseInline(tokens);
     return this.config.del?.(parsed) ?? parsed;
   }
 
   public override link({ href, tokens }: Tokens.Link): string {
-    const parsed = this.parser.parse(tokens);
+    const parsed = this.parser.parseInline(tokens);
 
     if (this.config.sanitizeUrls) {
       try {

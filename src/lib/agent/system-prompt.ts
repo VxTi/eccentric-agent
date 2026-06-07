@@ -17,7 +17,7 @@ export async function constructSystemPrompt(
     await Promise.all(
       mcps.map(async mcp => {
         const { tools } = await mcp.withAuth(() => mcp.client.listTools());
-        return `- ${mcp.name}\n   With tools:\n${tools.map(t => `   - ${t.name}`).join('\n')}`;
+        return `- ${mcp.name}\n    With tools:\n${tools.map(t => `   - ${t.name}`).join('\n')}`;
       })
     )
   ).join('\n');

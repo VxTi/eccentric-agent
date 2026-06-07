@@ -32,8 +32,6 @@ export function useInputSuggestionProvider(
   const [suggestionCursorIndex, setSuggestionCursorIndex] = useState(0);
 
   useEffect(() => {
-    if (cursorOffset === 0) return;
-
     const preCursorInput = input.slice(0, cursorOffset);
 
     let matches: RegExpExecArray | null;

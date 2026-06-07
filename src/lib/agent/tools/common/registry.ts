@@ -16,8 +16,9 @@ import WebFetch from '../web-fetch';
 import WebSearch from '../web-search';
 import ListMcpTools from '../mcp/mcp-list-tools';
 import CallMcpTool from '../mcp/mcp-tool-call';
+import DiscoverMcpTool from '../mcp/mcp-tool-discovery';
 
-export const agentTools = [
+export const agentTools: IToolBase[] = [
   FindFile,
   FindInFile,
   ReadFile,
@@ -27,11 +28,12 @@ export const agentTools = [
   GetUserLocation,
   CreateTaskList,
   UpdateTaskList,
+  DiscoverMcpTool,
   ListMcpTools,
   CallMcpTool,
-] satisfies IToolBase[];
+];
 
-export const registry = [
+export const registry: IToolBase[] = [
   SpawnAgents,
   PromptUserOptions,
   Shell,
@@ -39,4 +41,4 @@ export const registry = [
   ReplaceInFile,
   CreateFile,
   ...agentTools,
-] satisfies IToolBase[];
+];

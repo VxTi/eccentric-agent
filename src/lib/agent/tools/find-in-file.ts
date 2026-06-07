@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { Result } from '../../result';
 import { createTool } from './common';
 import { readFile } from 'fs/promises';
 
@@ -85,7 +86,7 @@ export default createTool({
       }
     }
 
-    return { matches };
+    return Result.Ok({ matches });
   },
 
   inputToString({ pattern, filePath }) {

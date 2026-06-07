@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { Result } from '../../result';
 import { createTool } from './common';
 
 const inputSchema = z.object({
@@ -91,14 +92,14 @@ export default createTool({
     const { urls, maxBytes } = input;
 
     if (urls.length === 0) {
-      throw new Error('List of URLs must be greater than 0 ');
+      return Result.Error('List of URLs must be greater than 0 ');
     }
 
     const websites = await Promise.all(
-      urls.map(async url => makeRequest(url, maxBytes))
+      urls.map(url => makeRequest(url, maxBytes))
     );
 
-    return { websites };
+    return Result.Ok({ websites });
   },
 
   inputToString(input): string {

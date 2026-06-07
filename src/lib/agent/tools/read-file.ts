@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as z from 'zod';
 import { acquireContextInstance } from '../../events/context-acquisition';
+import { Result } from '../../result';
 import { createTool } from './common';
 
 const inputSchema = z.object({
@@ -68,27 +69,27 @@ export default createTool({
     if (lineCount === undefined) {
       // Returns all the file's contents
       if (fromLine === 0) {
-        return {
+        return Result.Ok({
           filePath,
           content: prefixWithLineNumbers(lines, newline),
-        };
+        });
       }
 
       // Returns file content starting from line
-      return {
+      return Result.Ok({
         filePath,
         content: prefixWithLineNumbers(lines.slice(fromLine), newline),
-      };
+      });
     }
 
     // Returns file content frame from a -> b
-    return {
+    return Result.Ok({
       content: prefixWithLineNumbers(
         lines.slice(fromLine, fromLine + lineCount),
         newline
       ),
       filePath,
-    };
+    });
   },
 
   inputToString({ filePath }) {

@@ -1,5 +1,6 @@
 import compact from 'lodash/compact';
 import * as z from 'zod';
+import { Result } from '../../../result';
 import { getMCPServer, type McpTool } from '../../mcp/mcp';
 import { createTool } from '../common';
 
@@ -57,7 +58,7 @@ export default createTool({
 
     if (toolName) {
       const tool = allTools.get(toolName);
-      return {
+      return Result.Ok({
         mcpServer,
         tools: compact([
           tool && {
@@ -69,16 +70,16 @@ export default createTool({
               : undefined,
           },
         ]),
-      };
+      });
     }
 
-    return {
+    return Result.Ok({
       mcpServer,
       tools: Array.from(allTools.values()).map(tool => ({
         name: tool.name,
         description: tool.description,
       })),
-    };
+    });
   },
 
   inputToString({ mcpServer, toolName }) {

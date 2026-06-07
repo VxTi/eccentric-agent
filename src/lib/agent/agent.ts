@@ -8,6 +8,7 @@ import {
   type ToolSet,
 } from 'ai';
 import * as z from 'zod';
+import { sleepFor } from '../utils/async-util';
 import { agentTools, type IToolBase, type ToolChannelParams } from './tools';
 import { emitConsumeTokenEvent } from '../events/token-usage';
 import { TokenSource } from '../events/events';
@@ -33,7 +34,7 @@ export class Agent<T = string> {
     private readonly signal: AbortSignal,
     private readonly channel: NotifierChannel<ToolChannelParams>
   ) {
-    this.toolset = this.constructToolset(signal);
+    this.toolset = this.constructToolset();
     this.model = geminiProvider('gemini-2.5-flash');
     this.messages = [
       { role: 'system', content: this.constructSystemPrompt() },
@@ -42,6 +43,7 @@ export class Agent<T = string> {
 
     this.channel.addInterceptor((...[message]) => [
       {
+        loading: true,
         content: `Agent - \`${goal}\`
 
 ${message.content}`,
@@ -88,21 +90,13 @@ ${message.content}`,
       });
 
       try {
-        let buffer = '';
-        for await (const chunk of result.textStream) {
-          buffer += chunk;
-        }
         const response = await result.response;
-        this.channel.notify({ content: buffer });
-        this.messages.push(...response.messages, {
-          role: 'assistant',
-          content: buffer,
-        });
+        this.messages.push(...response.messages);
       } catch (e) {
         this.channel.notify({
           content: `An error occurred in agent task - ${String(e)}`,
         });
-        await new Promise(res => setTimeout(res, 1000));
+        await sleepFor(1_000);
       }
     }
 
@@ -128,19 +122,19 @@ ${message.content}`,
     ].join('\n');
   }
 
-  private constructToolset(signal: AbortSignal): ToolSet {
+  private constructToolset(): ToolSet {
     return {
       [PRIMARY_GOAL_TOOL_NAME]: this.constructPrimaryGoalTool(),
       ...Object.fromEntries(
         agentTools.map((tool: IToolBase) => [
           tool.internalName,
-          this.constructTool(tool, signal),
+          this.constructTool(tool),
         ])
       ),
     };
   }
 
-  private constructTool(tool: IToolBase, signal: AbortSignal): Tool {
+  private constructTool(tool: IToolBase): Tool {
     const { inputSchema, description, outputSchema } = tool;
 
     return createTool({
@@ -151,12 +145,20 @@ ${message.content}`,
         this.channel.notify({
           content: tool.inputToString(input, this.channel),
         });
-        const output = await tool.handle(input, this.channel, signal);
+        const output = await Result.trySafe(() =>
+          tool.handle(input, this.channel, this.signal)
+        );
+        if (!output.ok) {
+          this.channel.notify({
+            content: `Failed to invoke tool \`${tool.name}\` - ${output.error}`,
+          });
+          return output;
+        }
         this.channel.notify({
           content: tool.outputToString(output, this.channel),
         });
 
-        return output;
+        return output.data;
       },
     });
   }

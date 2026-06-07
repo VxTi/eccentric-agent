@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { acquireContextInstance } from '../../../events/context-acquisition';
+import { Result } from '../../../result';
 import { type Task, TaskStatus } from '../../../tasks';
 import { createTool } from '../common';
 
@@ -52,14 +53,14 @@ export default createTool({
   async handle(input) {
     const context = await acquireContextInstance();
     if (!context.taskList.hasTasks) {
-      throw new Error(
+      return Result.Error(
         'No task list exists. Call `create_task_list` before updating tasks.'
       );
     }
 
     const tasks: Task[] = context.taskList.updateTasks(input.updates);
 
-    return Promise.resolve({ tasks });
+    return Result.Ok({ tasks });
   },
 
   inputToString(input) {

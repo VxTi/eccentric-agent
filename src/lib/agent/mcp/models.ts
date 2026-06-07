@@ -34,6 +34,8 @@ const httpConfig = z.object({
 });
 
 export const mcpServerConfigSchema = z.union([commandConfig, httpConfig]);
+export type McpServerCommandConfig = z.infer<typeof commandConfig>;
+export type McpServerHttpConfig = z.infer<typeof httpConfig>;
 
 export const mcpConfigSchema = z.object({
   mcpServers: z.record(z.string(), z.unknown()),

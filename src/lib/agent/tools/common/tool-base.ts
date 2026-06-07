@@ -1,4 +1,5 @@
 import type * as z from 'zod';
+import { type Result } from '../../../result';
 import { type GenericMessage } from '../../../types/messages';
 import { type NotifierChannel } from '../../../events/notifier';
 import {
@@ -21,7 +22,8 @@ export type ToolChannelParams = [Omit<GenericMessage, 'id' | 'type'>];
 
 export interface IToolBase<
   TIn = unknown,
-  TOut = unknown,
+  TOut extends object = object,
+  TOutMeta = never,
   TApprovalOption extends string = string,
 > {
   readonly internalName: string;
@@ -64,7 +66,7 @@ export interface IToolBase<
     input: TIn,
     channel: NotifierChannel<ToolChannelParams>,
     signal: AbortSignal
-  ): Promise<TOut>;
+  ): MaybePromise<Result<TOut, string, TOutMeta>>;
 
   inputToString(
     input: TIn,
@@ -79,20 +81,22 @@ export interface IToolBase<
 
 type ToolProps<
   TIn = unknown,
-  TOut = unknown,
+  TOut extends object = object,
+  TOutMeta = never,
   TApprovalOption extends string = string,
 > = MakeOptional<
-  IToolBase<TIn, TOut, TApprovalOption>,
+  IToolBase<TIn, TOut, TOutMeta, TApprovalOption>,
   'approvalOptions' | 'requiresApproval' | 'onOptionSelect'
 > & {};
 
 export function createTool<
   TIn = unknown,
-  TOut = unknown,
+  TOut extends object = object,
+  TOutMeta = never,
   TApprovalOption extends string = string,
 >(
-  props: ToolProps<TIn, TOut, TApprovalOption>
-): IToolBase<TIn, TOut, TApprovalOption> {
+  props: ToolProps<TIn, TOut, TOutMeta, TApprovalOption>
+): IToolBase<TIn, TOut, TOutMeta, TApprovalOption> {
   return {
     ...props,
     approvalOptions:

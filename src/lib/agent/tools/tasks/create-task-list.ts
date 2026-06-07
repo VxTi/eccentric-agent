@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { acquireContextInstance } from '../../../events/context-acquisition';
+import { Result } from '../../../result';
 import { type Task, TaskStatus } from '../../../tasks';
 import { createTool } from '../common';
 
@@ -60,17 +61,15 @@ export default createTool({
 
     context.taskList.set(tasks);
 
-    return Promise.resolve({ tasks });
+    return Result.Ok({ tasks });
   },
 
-  inputToString(input) {
-    const lines = input.tasks
-      .map(task => ` ${task.id}. ${task.description}`)
-      .join('\n');
-    return `Create task list:\n${lines}`;
+  inputToString({ tasks }) {
+    return `Creating task list with ${tasks.length} task${tasks.length === 1 ? '' : 's'}`;
   },
 
-  outputToString(output) {
-    return `Created task list with ${output.tasks.length} task${output.tasks.length === 1 ? '' : 's'}.`;
+  outputToString({ tasks }) {
+    const lines = tasks.map(task => `- [ ] ${task.description}`).join('\n');
+    return `Created task list\n\n${lines}`;
   },
 });

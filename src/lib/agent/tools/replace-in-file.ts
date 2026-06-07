@@ -3,6 +3,7 @@ import { readFile, writeFile } from 'fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
 import { acquireContextInstance } from '../../events/context-acquisition';
+import { Result } from '../../result';
 import { createTool } from './common';
 
 const inputSchema = z.object({
@@ -36,7 +37,6 @@ const inputSchema = z.object({
 });
 
 const outputSchema = z.object({
-  success: z.boolean(),
   bytesWritten: z.number(),
   linesRemoved: z.number(),
   linesInserted: z.number(),
@@ -106,13 +106,12 @@ export default createTool({
     await writeFile(absolutePath, updated, 'utf-8');
     await context.fileCache.update(absolutePath);
 
-    return {
-      success: true,
+    return Result.Ok({
       bytesWritten: Buffer.byteLength(updated, 'utf-8'),
       linesRemoved: count,
       linesInserted: replacementLines.length,
       filePath,
-    };
+    });
   },
 
   inputToString({ filePath, line, count }) {
@@ -122,10 +121,8 @@ export default createTool({
     return `Replacing ${range} in \`${fileName}\``;
   },
 
-  outputToString({ success, linesRemoved, linesInserted, filePath }) {
+  outputToString({ linesRemoved, linesInserted, filePath }) {
     const fileName = path.basename(filePath);
-
-    if (!success) return `Unable to update contents of ${filePath}`;
 
     return `Updated \`${fileName}\` ${chalk.redBright(`-${linesRemoved}`)} ${chalk.greenBright(`+${linesInserted}`)}`;
   },

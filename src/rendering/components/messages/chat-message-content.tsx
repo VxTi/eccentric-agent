@@ -9,7 +9,7 @@ interface MarkdownViewProps {
 export function ChatMessageContent({
   content,
 }: MarkdownViewProps): JSX.Element {
-  const lines: string[] = parseMarkdown(content).split('\n');
+  const lines: string[] = parseMarkdown(content.trim()).split('\n');
 
   return (
     <Box flexDirection="column" width="100%" paddingRight={1}>

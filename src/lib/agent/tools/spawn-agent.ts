@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { Result } from '../../result';
 import { Agent } from '../agent';
 import { type NotifierChannel } from '../../events/notifier';
 import { createTool, type ToolChannelParams } from './common';
@@ -20,48 +21,36 @@ const agentSpecSchema = z.object({
 });
 
 const inputSchema = z.object({
-  agent: agentSpecSchema,
+  agents: z
+    .array(agentSpecSchema)
+    .describe(
+      'A list of agents that have to perform specific tasks. All of the given agents must have tasks ' +
+        'that are categorically different, to ensure the most optimal outcome of the requested task. ' +
+        'This means tasks will have to be fragmented into more specific categories, before spawning an agent.'
+    ),
+});
+const taskResultSchema = z.object({
+  taskName: z.string(),
+  taskResult: z.string(),
+  success: z.boolean(),
+});
+type TaskResult = z.infer<typeof taskResultSchema>;
+
+const outputSchema = z.object({
+  results: z.array(taskResultSchema),
 });
 
-const outputSchema = z.discriminatedUnion('ok', [
-  z.object({
-    name: z.string().describe('The label of the sub-agent.'),
-    ok: z.literal(true),
-    result: z.string().describe('The final result produced by the sub-agent.'),
-  }),
-  z.object({
-    name: z.string().describe('The label of the sub-agent.'),
-    ok: z.literal(false),
-    error: z
-      .string()
-      .describe('The error message describing why the sub-agent failed.'),
-  }),
-]);
-
 async function runSubAgent(
-  name: string,
   goal: string,
   channel: NotifierChannel<ToolChannelParams>,
   signal: AbortSignal
-): Promise<z.infer<typeof outputSchema>> {
+): Promise<Result<string, Error>> {
   return new Promise(resolve => {
     const controller = new AbortController();
 
-    // If main
     signal.addEventListener('abort', () => controller.abort());
 
-    new Agent<string>(
-      goal,
-      result => {
-        if (result.ok) {
-          resolve({ name, ok: true, result: result.data });
-        } else {
-          resolve({ name, ok: false, error: result.error.message });
-        }
-      },
-      controller.signal,
-      channel
-    );
+    new Agent<string>(goal, resolve, controller.signal, channel);
   });
 }
 
@@ -86,19 +75,39 @@ export default createTool({
   inputSchema,
   outputSchema,
 
-  async handle({ agent: { goal, name } }, channel, signal) {
-    return await runSubAgent(name, goal, channel, signal);
+  async handle({ agents }, channel, signal) {
+    const result = await Promise.allSettled(
+      agents.map(async ({ goal, name }) => {
+        const result = await runSubAgent(goal, channel, signal);
+
+        return { taskName: name, result };
+      })
+    );
+
+    const results: TaskResult[] = result
+      .filter(res => res.status === 'fulfilled')
+      .map(({ value: { result, taskName } }) => ({
+        taskName,
+        success: result.ok,
+        taskResult: result.ok ? result.data : result.error.message,
+      }));
+
+    return Result.Ok({ results });
   },
 
-  inputToString({ agent: { goal } }): string {
-    return `Running side task \`${goal}\``;
+  inputToString({ agents }): string {
+    return `Running ${agents.length} side task${agents.length === 1 ? '' : 's'}`;
   },
 
-  outputToString({ ok, name }) {
-    if (!ok) {
-      return `Failed to finalize side task \`${name}\``;
+  outputToString({ results }) {
+    if (results.length === 0) return `No tasks were performed`;
+
+    const failedTasks = results.filter(res => !res.success);
+
+    if (failedTasks.length === 0) {
+      return `All side tasks finished`;
     }
 
-    return `Side task \`${name}\` succeeded`;
+    return `\`${results.length - failedTasks.length}\` out of \`${results.length}\` tasks succeeded`;
   },
 });

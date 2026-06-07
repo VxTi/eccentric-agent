@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { requestUserInput } from '../../events/user-input';
+import { Result } from '../../result';
 import { createTool } from './common';
 
 const optionSchema = z.object({
@@ -78,14 +79,14 @@ export default createTool({
 
   async handle({ options, question, selectMultiple }) {
     const ids = new Set<string>();
-    for (const option of options) {
+    options.forEach(option => {
       if (ids.has(option.id)) {
         throw new Error(
           `Duplicate option id "${option.id}". Each option must have a unique id.`
         );
       }
       ids.add(option.id);
-    }
+    });
 
     const chosen = await requestUserInput({
       title: 'Your attention is needed',
@@ -95,18 +96,18 @@ export default createTool({
     });
 
     if (chosen.length === 0) {
-      throw new Error(
+      return Result.Error(
         `User selected an unrecognised option(s) id "${chosen.map(({ id }) => id).join(', ')}". Expected one of:` +
           ` ${options.map(option => option.id).join(', ')}.`
       );
     }
 
-    return {
+    return Result.Ok({
       selectedOptions: chosen.map(match => ({
         selectedId: match.id,
         selectedLabel: match.label,
       })),
-    };
+    });
   },
 
   inputToString({ question }) {

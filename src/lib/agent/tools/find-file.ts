@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import * as z from 'zod';
+import { Result } from '../../result';
 import { createTool } from './common';
 import { glob } from 'glob';
 
@@ -63,13 +64,13 @@ export default createTool({
   async handle({ filePattern, directoryPath, maxResults }) {
     const cwd = path.resolve(process.cwd(), directoryPath);
 
-    const results: string[] = await glob(filePattern, {
-      cwd,
-    }).then(files => files.map(file => path.join(cwd, file)));
+    const results: string[] = await glob(filePattern, { cwd }).then(
+      (files: string[]): string[] => files.map(file => path.join(cwd, file))
+    );
 
-    return {
+    return Result.Ok({
       files: results.slice(0, maxResults),
-    };
+    });
   },
 
   inputToString({ filePattern, directoryPath }): string {

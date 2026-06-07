@@ -1,6 +1,5 @@
 import { tool as createTool, type Tool, type ToolSet } from 'ai';
 import chalk from 'chalk';
-import { marked } from 'marked';
 import { v7 as uuid } from 'uuid';
 import { basicHighlightFormatting } from '../../../rendering/markdown-options';
 import { appSignal } from '../../../signal';
@@ -50,10 +49,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
 
         const [chosen] = await requestUserInput({
           title: 'Approval required',
-          description: marked.parse(
-            `Tool \`${tool.name}\` requires approval\n ${JSON.stringify(input)}`,
-            { async: false }
-          ),
+          description: `Tool \`${tool.name}\` requires approval\n ${JSON.stringify(input)}`,
           options: options.map(opt => ({ label: opt.text, id: opt.option })),
           allowMultiple: false,
         });
@@ -81,28 +77,26 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         loading: true,
         content: tool.inputToString(input, channel),
       });
-
-      let output: unknown;
-      try {
-        output = await tool.handle(input, channel, appSignal);
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : 'unknown';
-        const message = `\`${tool.name}\` failed: ${errMsg}`;
-
+      const result = await Result.trySafe(() =>
+        tool.handle(input, channel, appSignal)
+      );
+      if (result.ok) {
+        channel.notify({
+          loading: false,
+          content: `${basicHighlightFormatting('→')} ${tool.outputToString(result.data, channel).trim()}`,
+        });
+      } else {
         channel.notify({
           failure: true,
-          content: chalk.red(`${message}\n`),
+          content: chalk.red(`\`${tool.name}\` failed: ${result.error}`),
         });
-        notifier.unsubscribe(toolCallId);
-        return Result.Error(message);
       }
-
-      channel.notify({
-        loading: false,
-        content: `${basicHighlightFormatting('→')} ${tool.outputToString(output, channel).trim()}`,
-      });
       notifier.unsubscribe(toolCallId);
-      return output;
+
+      // Exclude metadata from result to omit from model context window.
+      // Metadata is only present for passing data between functions within the same tool
+      const { metadata: _, ...safeResult } = result;
+      return safeResult;
     },
   });
 }
