@@ -65,22 +65,22 @@ export function isAllowedCommand(command: string): boolean {
   return ALLOWED_COMMAND_PATTERNS.some(pattern => pattern.test(trimmed));
 }
 
+type Metadata = { command: string };
+
 export default createTool({
   internalName: 'shell',
   name: 'Shell',
   description:
-    'Executes a shell command and returns its stdout, stderr, and exit code. Commands are restricted to an' +
-    ' internal allow-list of safe read-only patterns (e.g. `ls`, `cat`, `git status`, `pnpm list`). Any' +
-    ' command outside that list is rejected. Use this tool to inspect the environment, list files, read' +
-    ' file contents, or query version control state. Do NOT use it to mutate the filesystem, install' +
-    ' packages, or run arbitrary user-supplied commands. This tool requires explicit user permission' +
-    ' before each invocation.',
+    'Executes a shell command and returns its stdout, stderr, and exit code. ' +
+    'ONLY use this tool if no other tools are available.',
   inputSchema,
   outputSchema,
 
   async handle({ command, timeoutMs, cwd }, channel) {
     try {
-      return new Promise<Result<z.infer<typeof outputSchema>>>(resolve => {
+      return new Promise<
+        Result<z.infer<typeof outputSchema>, string, Metadata>
+      >(resolve => {
         const process = exec(
           command,
           { cwd, timeout: timeoutMs ?? 30_000, maxBuffer: MAX_BUFFER_10_MB },
@@ -103,14 +103,12 @@ export default createTool({
       return Result.Ok({
         stdout: e.stdout ?? '',
         stderr: e.stderr ?? e.message,
-        exitCode: typeof e.code === 'number' ? e.code : 1,
+        exitCode: e.code ?? 1,
       });
     }
   },
 
-  requiresApproval({ command }) {
-    return !isAllowedCommand(command);
-  },
+  requiresApproval: ({ command }) => !isAllowedCommand(command),
 
   onOptionSelect({ command }, option: Option) {
     if (option === Option.DENY) return ToolSelectionOption.DENY;
@@ -130,17 +128,13 @@ export default createTool({
     ];
   },
 
-  inputToString({ command }) {
-    return `Executing \`${command}\``;
-  },
+  inputToString: ({ command }) => `Shell \`${command}\``,
 
-  outputToString(output) {
-    const { exitCode, stderr, stdout } = output;
-
+  outputToString({ exitCode, stderr, stdout }, _, { command }) {
     if (exitCode === 0) {
       const lines = stdout.split('\n');
 
-      return `Command finished:\n${lines
+      return `Shell \`${command}\`\n${lines
         .slice(0, Math.min(lines.length, MAX_SHOWN_OUTPUT_LINES))
         .join('\n')}`;
     }

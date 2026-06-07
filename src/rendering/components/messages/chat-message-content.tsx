@@ -15,7 +15,7 @@ export function ChatMessageContent({
     <Box flexDirection="column" width="100%" paddingRight={1}>
       {lines.map((line, i) => (
         <Text key={i} wrap="wrap">
-          {!line.length ? ' ' : line}
+          {!line.length && i + 1 < lines.length ? ' ' : line}
         </Text>
       ))}
     </Box>

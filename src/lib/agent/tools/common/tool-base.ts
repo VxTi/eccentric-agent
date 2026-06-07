@@ -75,7 +75,8 @@ export interface IToolBase<
 
   outputToString(
     output: TOut,
-    channel: NotifierChannel<ToolChannelParams>
+    channel: NotifierChannel<ToolChannelParams>,
+    metadata: TOutMeta
   ): string;
 }
 
