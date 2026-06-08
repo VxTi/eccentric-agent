@@ -19,7 +19,7 @@ export function App(): ReactNode {
     });
   }, [context]);
 
-  const boxWidth = width <= 72 ? '100%' : '60%';
+  const boxWidth = width <= 100 ? '100%' : width <= 120 ? '80%' : '60%';
 
   return (
     <Box

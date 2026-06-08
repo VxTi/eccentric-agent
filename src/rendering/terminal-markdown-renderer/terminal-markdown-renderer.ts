@@ -54,6 +54,7 @@ export const HEADINGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const;
 
 export class TerminalRenderer extends Renderer {
   private readonly config: TerminalMarked.RendererOptions;
+  private shellWidth: number;
 
   public constructor(
     options: TerminalMarked.RendererOptions,
@@ -61,6 +62,7 @@ export class TerminalRenderer extends Renderer {
   ) {
     super(markedOptions);
     this.config = { ...defaultOptions, ...options };
+    this.shellWidth = options.maxWidth ?? process.stdout.columns;
   }
 
   public textLength(input: string): number {
@@ -189,8 +191,8 @@ export class TerminalRenderer extends Renderer {
 
     const result: string[] = [];
 
-    diff.forEach(([left, right]) => {
-      if (left.collapsed || right.collapsed) {
+    diff.forEach(([left, right], i) => {
+      if ((left.collapsed || right.collapsed) && i + 1 < diff.length) {
         const gap = chalk.dim('—'.repeat(colWidth));
         const blankLn = ' '.repeat(lineNumberWidth);
         result.push(`${blankLn} ${gap} | ${blankLn} ${gap}`);
@@ -224,7 +226,7 @@ export class TerminalRenderer extends Renderer {
       }
 
       if (left.removed) leftContent = chalk.bgRed(leftContent);
-      if (right.added) rightContent = chalk.bgGreenBright(rightContent);
+      if (right.added) rightContent = chalk.bgRgb(30, 150, 34)(rightContent);
 
       const paddedLeftContent = this.padRight(
         leftPrefix + leftContent,
@@ -381,11 +383,11 @@ export class TerminalRenderer extends Renderer {
   /* ------------------------------------------------------------------ */
 
   private get width(): number {
-    return this.config.maxWidth ?? process.stdout.columns;
+    return this.shellWidth;
   }
 
   public setWidth(newWidth: number): void {
-    this.config.maxWidth = newWidth;
+    this.shellWidth = newWidth;
   }
 
   private get isFormattingEnabled(): boolean {

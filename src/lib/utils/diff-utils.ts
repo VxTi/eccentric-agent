@@ -1,4 +1,4 @@
-import { diffLines, type Change } from 'diff';
+import { type Change, diffTrimmedLines } from 'diff';
 import {
   DIFF_LANG,
   DIFF_SEPARATOR,
@@ -20,7 +20,7 @@ export function generateSideBySideDiff(
   modified: string,
   contextLines: number = DEFAULT_CONTEXT_LINES
 ): DiffLine[][] {
-  const changes = diffLines(original, modified);
+  const changes = diffTrimmedLines(original, modified);
 
   const diffs: DiffLine[][] = [];
 

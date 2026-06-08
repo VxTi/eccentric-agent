@@ -24,7 +24,7 @@ export function useTerminalSize(): TerminalDimensions {
     return () => {
       stdout.off('resize', handler);
     };
-  }, [stdout]);
+  }, [size.width, stdout]);
 
   return size;
 }
