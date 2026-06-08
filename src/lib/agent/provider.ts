@@ -16,6 +16,11 @@ export interface LanguageModelMetadata {
 }
 
 export const MODEL_METADATA = {
+  'gemini-3.5-flash': {
+    inputTokenPricing: 1.0,
+    outputTokenPricing: 9.0,
+    contextWindow: 1_048_576,
+  },
   'gemini-2.5-flash': {
     inputTokenPricing: 0.3,
     outputTokenPricing: 2.5,

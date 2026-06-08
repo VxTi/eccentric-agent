@@ -1,8 +1,9 @@
+import { glob } from 'glob';
 import * as path from 'node:path';
 import * as z from 'zod';
 import { Result } from '../../../result';
+import { Ellipsize, ellipsize } from '../../../utils/string-utils';
 import { createTool } from '../common';
-import { glob } from 'glob';
 
 const inputSchema = z.object({
   directoryPath: z
@@ -65,7 +66,8 @@ export default createTool({
     const cwd = path.resolve(process.cwd(), directoryPath);
 
     const results: string[] = await glob(filePattern, { cwd }).then(
-      (files: string[]): string[] => files.map(file => path.join(cwd, file))
+      (files: string[]): string[] =>
+        files.map(file => ellipsize(path.join(cwd, file), 30, Ellipsize.START))
     );
 
     return Result.Ok({

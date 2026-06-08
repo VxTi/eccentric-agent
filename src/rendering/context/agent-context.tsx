@@ -230,12 +230,12 @@ export function AgentProvider({
         return;
       }
 
-      if (taskList.hasIncompleteTasks()) {
+      /*if (taskList.hasIncompleteTasks()) {
         await processRequest(
           "Your task list is not yet finished. Proceed until you're done",
           true
         );
-      }
+      }*/
 
       const firstQueuedMessage = messageQueue.shift();
       if (firstQueuedMessage) {

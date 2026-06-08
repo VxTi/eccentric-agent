@@ -284,6 +284,11 @@ export class TerminalRenderer extends Renderer {
     }, '');
     formattedHeader += this.tablerow({ text: '' });
 
+    const table = new Table({
+      head: generateTableRow(formattedHeader),
+      ...(this.config.tableOptions ?? {}),
+    });
+
     const body = rows.reduce((text, tableCells) => {
       const cell = tableCells.reduce((text, tableCell) => {
         return text + this.tablecell(tableCell);
@@ -292,13 +297,10 @@ export class TerminalRenderer extends Renderer {
       return text + this.tablerow({ text: cell });
     }, '');
 
-    const table = new Table({
-      head: generateTableRow(formattedHeader),
-      ...(this.config.tableOptions ?? {}),
-    });
-
     generateTableRow(body).forEach(row => table.push({ text: row }));
-    return this.config.table?.(table.toString()) ?? table.toString();
+    const content = table.toString();
+
+    return this.makeSection(this.config.table?.(content) ?? content, 2);
   }
 
   public override tablerow({ text }: Tokens.TableRow): string {
@@ -531,13 +533,9 @@ export class TerminalRenderer extends Renderer {
   }
 }
 
-function generateTableRow(
-  text: string,
-  escape?: (input: string) => string
-): string[] {
+function generateTableRow(text: string): string[] {
   if (!text) return [];
-  escape = escape || ($ => $);
-  const lines = escape(text).split('\n');
+  const lines = text.split('\n');
 
   const data: string[] = [];
   lines.forEach(line => {

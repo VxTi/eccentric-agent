@@ -71,8 +71,8 @@ export default createTool({
   internalName: 'shell',
   name: 'Shell',
   description:
-    'Executes a shell command and returns its stdout, stderr, and exit code. ' +
-    'ONLY use this tool if no other tools are available.',
+    'Executes a command and returns its stdout, stderr, and exit code. ' +
+    'Use this tool if no other tools are available, or when the user makes the request to do so.',
   inputSchema,
   outputSchema,
 
