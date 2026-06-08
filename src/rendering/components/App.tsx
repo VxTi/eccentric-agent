@@ -26,7 +26,7 @@ export function App(): ReactNode {
       flexDirection="column"
       width={width}
       height={height}
-      borderColor="redBright"
+      borderColor="#333333"
       borderStyle="round"
       alignItems="center"
     >

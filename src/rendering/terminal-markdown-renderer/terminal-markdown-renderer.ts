@@ -19,7 +19,7 @@ const DEFAULT_LANG = 'plaintext';
 
 const ANSI_REGEXP = ansiRegex();
 
-export const DIFF_LANG = '$diff';
+export const DIFF_LANG = 'diff';
 export const DIFF_SEPARATOR = '---DIFF_SEPARATOR---';
 
 // HARD_RETURN holds a character sequence used to indicate text has a
@@ -31,6 +31,7 @@ const HARD_RETURN = '\r',
   HARD_RETURN_GFM_RE = new RegExp(`${HARD_RETURN}|<br />`);
 
 const defaultOptions: TerminalMarked.RendererOptions = {
+  text: chalk.whiteBright,
   code: chalk.yellow,
   blockquote: chalk.gray.italic,
   html: chalk.gray,
@@ -67,28 +68,29 @@ export class TerminalRenderer extends Renderer {
   }
 
   public override code({ text, lang }: Tokens.Code) {
+    let renderedContent: string;
+
     if (lang === DIFF_LANG) {
       const parts = text.split(DIFF_SEPARATOR);
       if (parts.length === 2) {
         const oldStr = parts[0] ?? '';
         const newStr = parts[1] ?? '';
-        return this.makeSection(this.renderDiff(oldStr, newStr, lang), 2);
+        renderedContent = this.renderDiff(oldStr, newStr, lang);
+      } else {
+        // Fallback for 'diff' language if separator is not found
+        renderedContent = this.highlightCode(text, lang);
       }
-      // Fallback for 'diff' language if separator is not found
-      return this.makeSection(
-        this.indent(
-          this.config.indentation ?? DEFAULT_INDENTATION,
-          this.highlightCode(text, lang)
-        ),
-        2
-      );
+    } else {
+      // Original behavior for other languages
+      renderedContent = this.highlightCode(text, lang ?? DEFAULT_LANG);
     }
-    // Original behavior for other languages
+
+    const finalContent = this.config.reflowText
+      ? this.reflowText(renderedContent)
+      : renderedContent;
+
     return this.makeSection(
-      this.indent(
-        this.config.indentation ?? DEFAULT_INDENTATION,
-        this.highlightCode(text, lang ?? DEFAULT_LANG)
-      ),
+      this.indent(this.config.indentation ?? DEFAULT_INDENTATION, finalContent),
       2
     );
   }
@@ -167,6 +169,7 @@ export class TerminalRenderer extends Renderer {
   public override html({ text }: Tokens.HTML | Tokens.Tag): string {
     return this.config.html?.(text) ?? text;
   }
+
   public renderDiff(
     oldStr: string,
     newStr: string,
@@ -184,13 +187,13 @@ export class TerminalRenderer extends Renderer {
     const fixedOverhead = 2 * lineNumberWidth + 5;
     const colWidth = Math.max(10, Math.floor((this.width - fixedOverhead) / 2));
 
-    let result = '';
+    const result: string[] = [];
 
     diff.forEach(([left, right]) => {
       if (left.collapsed || right.collapsed) {
-        const gap = chalk.dim('⋯'.repeat(colWidth));
+        const gap = chalk.dim('—'.repeat(colWidth));
         const blankLn = ' '.repeat(lineNumberWidth);
-        result += `${blankLn} ${gap} | ${blankLn} ${gap}\n`;
+        result.push(`${blankLn} ${gap} | ${blankLn} ${gap}`);
         return;
       }
 
@@ -221,7 +224,7 @@ export class TerminalRenderer extends Renderer {
       }
 
       if (left.removed) leftContent = chalk.bgRed(leftContent);
-      if (right.added) rightContent = chalk.bgGreen(rightContent);
+      if (right.added) rightContent = chalk.bgGreenBright(rightContent);
 
       const paddedLeftContent = this.padRight(
         leftPrefix + leftContent,
@@ -232,10 +235,12 @@ export class TerminalRenderer extends Renderer {
         colWidth
       );
 
-      result += `${chalk.dim(leftLineNumber)} ${paddedLeftContent} | ${chalk.dim(rightLineNumber)} ${paddedRightContent}\n`;
+      result.push(
+        `${chalk.dim(leftLineNumber)} ${paddedLeftContent} | ${chalk.dim(rightLineNumber)} ${paddedRightContent}`
+      );
     });
 
-    return result;
+    return result.join('\n');
   }
 
   private truncatePlain(input: string, maxLength: number): string {
@@ -377,6 +382,10 @@ export class TerminalRenderer extends Renderer {
 
   private get width(): number {
     return this.config.maxWidth ?? process.stdout.columns;
+  }
+
+  public setWidth(newWidth: number): void {
+    this.config.maxWidth = newWidth;
   }
 
   private get isFormattingEnabled(): boolean {

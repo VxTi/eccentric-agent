@@ -4,7 +4,7 @@ import { githubDark } from './code-highlight-theme';
 import { HEADINGS, TerminalRenderer } from './terminal-markdown-renderer';
 import { type TerminalMarked } from './types';
 
-export const basicHighlightFormatting = chalk.yellow.bold;
+export const basicHighlightFormatting = chalk.rgb(165, 214, 255);
 
 export const markdownFormattingOptions = {
   // Colors
@@ -22,7 +22,7 @@ export const markdownFormattingOptions = {
   del: chalk.dim.gray.strikethrough,
   link: chalk.cyan,
   href: chalk.blue.underline,
-  maxWidth: 80,
+  maxWidth: 120,
   reflowText: false,
   unescape: true,
   indentation: 2,

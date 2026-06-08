@@ -13,7 +13,7 @@ export interface DiffLine {
   collapsed?: boolean;
 }
 
-const DEFAULT_CONTEXT_LINES = 3;
+const DEFAULT_CONTEXT_LINES = 2;
 
 export function generateSideBySideDiff(
   original: string,
@@ -22,75 +22,61 @@ export function generateSideBySideDiff(
 ): DiffLine[][] {
   const changes = diffLines(original, modified);
 
-  const left: DiffLine[] = [];
-  const right: DiffLine[] = [];
+  const diffs: DiffLine[][] = [];
 
   let originalLineNumber = 1;
   let modifiedLineNumber = 1;
 
   changes.forEach((part: Change) => {
-    const lines = part.value
-      .split('\n')
-      .filter(line => line.length > 0 || part.value.endsWith('\n'));
+    const lines = part.value.split('\n');
 
     lines.forEach(line => {
       if (part.added) {
-        right.push({
-          value: line,
-          added: true,
-          lineNumberModified: modifiedLineNumber,
-        });
-        left.push({
-          value: '',
-        });
+        diffs.push([
+          { value: '' },
+          {
+            value: line,
+            added: true,
+            lineNumberModified: modifiedLineNumber,
+          },
+        ]);
         modifiedLineNumber++;
       } else if (part.removed) {
-        left.push({
-          value: line,
-          removed: true,
-          lineNumberOriginal: originalLineNumber,
-        });
-        right.push({
-          value: '',
-        });
+        diffs.push([
+          {
+            value: line,
+            removed: true,
+            lineNumberOriginal: originalLineNumber,
+          },
+          { value: '' },
+        ]);
         originalLineNumber++;
       } else {
-        left.push({
-          value: line,
-          lineNumberOriginal: originalLineNumber,
-        });
-        right.push({
-          value: line,
-          lineNumberModified: modifiedLineNumber,
-        });
+        diffs.push([
+          {
+            value: line,
+            lineNumberOriginal: originalLineNumber,
+          },
+          {
+            value: line,
+            lineNumberModified: modifiedLineNumber,
+          },
+        ]);
         originalLineNumber++;
         modifiedLineNumber++;
       }
     });
   });
 
-  while (left.length < right.length) {
-    left.push({ value: '' });
-  }
-  while (right.length < left.length) {
-    right.push({ value: '' });
-  }
-
-  const rows: DiffLine[][] = [];
-  for (let i = 0; i < left.length; i++) {
-    rows.push([left[i], right[i]]);
-  }
-
-  return collapseUnchangedRegions(rows, contextLines);
+  return collapseUnchangedRegions(diffs, contextLines);
 }
 
 function collapseUnchangedRegions(
   rows: DiffLine[][],
   contextLines: number
 ): DiffLine[][] {
-  const isChanged = (row: DiffLine[]): boolean => {
-    const [l, r] = row;
-    return Boolean(l?.added || l?.removed || r?.added || r?.removed);
+  const isChanged = ([left, right]: DiffLine[]): boolean => {
+    return Boolean(left.added || left.removed || right.added || right.removed);
   };
 
   const keep = new Array<boolean>(rows.length).fill(false);
