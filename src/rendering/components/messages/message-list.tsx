@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type JSX, useLayoutEffect } from 'react';
 import { Box, measureElement, type DOMElement } from 'ink';
 import { type Dimensions } from '../../../lib/types/types';
-import { formatDiffMd } from '../../../lib/utils/diff-utils';
 import { useAgent } from '../../context';
 import { useUserInputField } from '../../context/user-input-context';
 import { useScroll } from '../../hooks/scroll';
@@ -46,7 +45,8 @@ export function MessageList(): JSX.Element {
   }, [messages, inputRequest, terminalHeight, terminalWidth]);
 
   useEffect(() => {
-    terminalRenderer.setWidth(contentDimensions.width);
+    const edgeMargin = 4;
+    terminalRenderer.setWidth(contentDimensions.width - edgeMargin);
   }, [contentDimensions.width]);
 
   useEffect(() => {
@@ -72,13 +72,6 @@ export function MessageList(): JSX.Element {
         flexShrink={0}
         marginTop={-(overflow - clampedOffset)}
       >
-        <MemoizedChatMessage
-          message={{
-            type: 'generic',
-            content: formatDiffMd(text.substring(27), text),
-            id: '123',
-          }}
-        />
         {messages.map((message, idx) => (
           <MemoizedChatMessage key={idx} message={message} />
         ))}
@@ -86,35 +79,3 @@ export function MessageList(): JSX.Element {
     </Box>
   );
 }
-
-const text = `import { Box } from 'ink';
-import { type Message } from '../../../lib/types/messages';
-import { AssistantChatMessage } from './assistant-chat-message';
-import { type BaseProps } from './common';
-import { GenericChatMessage } from './generic-chat-message';
-import { UserChatMessage } from './user-chat-message';
-
-export function ChatMessage({ message }: BaseProps<Message>) {
-  return (
-    <Box
-      alignSelf="flex-start"
-      width="100%"
-      justifyContent="flex-start"
-      flexShrink={0}
-      paddingBottom={1}
-    >
-      <ModelMessageText message={message} />
-    </Box>
-  );
-}
-
-function ModelMessageText(props: BaseProps<Message>) {
-  switch (props.message.type) {
-    case 'user':
-      return <UserChatMessage message={props.message} />;
-    case 'assistant':
-      return <AssistantChatMessage message={props.message} />;
-    case 'generic':
-      return <GenericChatMessage message={props.message} />;
-  }
-}`;

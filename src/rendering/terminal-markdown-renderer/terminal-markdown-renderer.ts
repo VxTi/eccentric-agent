@@ -249,7 +249,7 @@ export class TerminalRenderer extends Renderer {
     if (maxLength <= 0) return '';
     if (input.length <= maxLength) return input;
     if (maxLength === 1) return '…';
-    return `${input.substring(0, maxLength - 1)}…`;
+    return `${input.substring(0, maxLength - 2)}…`;
   }
 
   public override heading({ tokens, depth, text }: Tokens.Heading): string {
