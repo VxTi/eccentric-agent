@@ -17,7 +17,7 @@ import {
 } from '../../lib/text-formatting';
 import { useAgent } from '../context';
 
-export function InformationBar(): ReactNode {
+export function ModelInfoBar(): ReactNode {
   const [{ input, output }, setCount] = useState<
     Omit<TokenConsumeProps, 'source'>
   >({

@@ -5,7 +5,7 @@ import { useAgent } from '../context';
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 const SPINNER_INTERVAL_MS = 80;
 
-export function StatusLine(): ReactNode {
+export function LoadingStatusLine(): ReactNode {
   const {
     status: { loading, text },
   } = useAgent();

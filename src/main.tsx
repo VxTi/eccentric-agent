@@ -7,6 +7,7 @@ import { stdin, stdout } from 'node:process';
 import { render } from 'ink';
 import { AgentProvider } from './rendering/context';
 import { App } from './rendering/components/App';
+import { GitInfoProvider } from './rendering/context/git-info';
 import { UserInputProvider } from './rendering/context/user-input-context';
 import { terminalRenderer } from './rendering/terminal-markdown-renderer/markdown-renderer';
 import { appController } from './signal';
@@ -41,11 +42,13 @@ async function main(): Promise<void> {
   appController.signal.addEventListener('abort', () => handleExit());
 
   const { waitUntilExit } = render(
-    <UserInputProvider>
-      <AgentProvider>
-        <App />
-      </AgentProvider>
-    </UserInputProvider>,
+    <GitInfoProvider>
+      <UserInputProvider>
+        <AgentProvider>
+          <App />
+        </AgentProvider>
+      </UserInputProvider>
+    </GitInfoProvider>,
     {
       stdout,
       stdin,

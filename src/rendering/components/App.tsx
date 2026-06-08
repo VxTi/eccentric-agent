@@ -3,9 +3,10 @@ import { Box, Text } from 'ink';
 import { emitEvent, EventName, eventOn } from '../../lib/events/events';
 import { useAgent } from '../context';
 import { useTerminalSize } from '../hooks/terminal-size';
-import { InformationBar } from './information-bar';
+import { GitInfoLine } from './git-info-line';
+import { ModelInfoBar } from './model-info-bar';
 import { MessageList } from './messages/message-list';
-import { StatusLine } from './StatusLine';
+import { LoadingStatusLine } from './loading-status-line';
 import InputField from './user-input/input-field';
 
 export function App(): ReactNode {
@@ -39,9 +40,10 @@ export function App(): ReactNode {
           flexDirection="column"
         >
           <MessageList />
-          <StatusLine />
+          <LoadingStatusLine />
+          <GitInfoLine />
           <InputField />
-          <InformationBar />
+          <ModelInfoBar />
         </Box>
       </Box>
     </Box>
