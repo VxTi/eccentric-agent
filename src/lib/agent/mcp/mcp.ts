@@ -1,10 +1,10 @@
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import type { PromiseResult } from '../../types/types';
 import type { mcp } from './types';
 import {
   applyMiddlewares,
   Client,
   createMiddleware,
-  StdioClientTransport,
   StreamableHTTPClientTransport,
   type Transport,
   UnauthorizedError,

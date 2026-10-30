@@ -3,7 +3,7 @@ import { generateText, Output } from 'ai';
 import * as z from 'zod';
 import { Result } from '../../../../result';
 import { getMCPServer, type McpTool } from '../../../mcp/mcp';
-import { geminiProvider } from '../../../provider';
+import { getModelForTask, ModelTaskType } from '../../../models';
 import { createTool } from '../../common';
 
 const inputSchema = z.object({
@@ -123,7 +123,7 @@ export const discoverMcpTool = createTool({
     const {
       output: { toolName, reasoning },
     } = await generateText({
-      model: geminiProvider('gemini-2.5-flash-lite'),
+      model: getModelForTask(ModelTaskType.INVESTIGATION).modelName,
       output: Output.object({
         schema: selectionSchema,
       }),

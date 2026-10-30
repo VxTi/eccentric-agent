@@ -1,11 +1,15 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { type ModelMessage } from 'ai';
-import { TaskList, type Task, type TaskUpdate } from '../tasks';
-import { FileCache } from '../file-cache';
-import type { Message } from '../types/messages';
-import type { ModelName } from '../agent/provider';
 import type { MCP } from '../agent/mcp/mcp';
+import {
+  getModelForTask,
+  type LanguageModelMetadata,
+  ModelTaskType,
+} from '../agent/models';
 import { DEFAULT_SYSTEM_PROMPT } from '../constants';
+import { FileCache } from '../file-cache';
+import { type Task, TaskList, type TaskUpdate } from '../tasks';
+import type { Message } from '../types/messages';
 
 export interface AgentStatus {
   loading: boolean;
@@ -18,7 +22,7 @@ export interface AgentState {
   messages: Message[];
   modelMessages: ModelMessage[];
   status: AgentStatus;
-  model: ModelName;
+  model: LanguageModelMetadata;
   mcpServers: MCP[];
   systemPrompt: string;
   messageQueue: string[];
@@ -33,7 +37,7 @@ const initialState: AgentState = {
     loading: false,
     text: '',
   },
-  model: 'gemini-2.5-flash',
+  model: getModelForTask(ModelTaskType.INVESTIGATION),
   mcpServers: [],
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   messageQueue: [],
@@ -71,7 +75,7 @@ export const agentSlice = createSlice({
     setStatus: (state, action: PayloadAction<AgentStatus>) => {
       state.status = action.payload;
     },
-    setModel: (state, action: PayloadAction<ModelName>) => {
+    setModel: (state, action: PayloadAction<LanguageModelMetadata>) => {
       state.model = action.payload;
     },
     setSystemPrompt: (state, action: PayloadAction<string>) => {

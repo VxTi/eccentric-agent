@@ -1,9 +1,6 @@
 import { Box, Text } from 'ink';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import {
-  getModelMetadata,
-  type LanguageModelMetadata,
-} from '../../lib/agent/provider';
+import { type ReactNode, useEffect, useState } from 'react';
+
 import {
   type ConsumeTokenEvent,
   EventName,
@@ -11,11 +8,11 @@ import {
   type TokenConsumeProps,
   TokenSource,
 } from '../../lib/events/events';
+import { useAppSelector } from '../../lib/state';
 import {
   formatPercentageSymbol,
   formatTokenCount,
 } from '../../lib/text-formatting';
-import { useAgent } from '../context';
 
 export function ModelInfoBar(): ReactNode {
   const [{ input, output }, setCount] = useState<
@@ -27,7 +24,7 @@ export function ModelInfoBar(): ReactNode {
   const [{ input: extIn, output: extOut }, setExtCount] = useState<
     Omit<TokenConsumeProps, 'source'>
   >({ input: 0, output: 0 });
-  const { model } = useAgent();
+  const { modelName, ...metadata } = useAppSelector(state => state.agent.model);
 
   useEffect(() => {
     return eventOn(
@@ -49,10 +46,6 @@ export function ModelInfoBar(): ReactNode {
     );
   }, []);
 
-  const metadata: LanguageModelMetadata = useMemo(
-    () => getModelMetadata(model),
-    [model]
-  );
   const contextWindowUsedPercentage =
     100 * ((input + output) / metadata.contextWindow);
   const cost =
@@ -73,7 +66,7 @@ export function ModelInfoBar(): ReactNode {
       </Text>
       <Box gap={1}>
         <Box paddingRight={1} gap={2}>
-          <Text underline>{model}</Text>
+          <Text underline>{modelName}</Text>
           <Text>${cost.toFixed(cost < 100 ? 2 : 1)}</Text>
         </Box>
         <Box>

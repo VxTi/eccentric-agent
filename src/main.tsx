@@ -7,9 +7,12 @@ import { stdin, stdout } from 'node:process';
 import { render } from 'ink';
 import { Provider } from 'react-redux';
 import { store } from './lib/state';
-import { AgentProvider, FileSystemProvider } from './rendering/context';
+import {
+  AgentProvider,
+  FileSystemProvider,
+  UserInputProvider,
+} from './rendering/context';
 import { App } from './rendering/components/App';
-import { UserInputProvider } from './rendering/context';
 import { terminalRenderer } from './rendering/terminal-markdown-renderer/markdown-renderer';
 
 // const ANSI_ALT_SCREEN_ENTER = '\x1b[?1049h\x1b[H\x1b[2J';

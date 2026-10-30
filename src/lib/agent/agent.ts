@@ -14,7 +14,7 @@ import { emitConsumeTokenEvent } from '../events/token-usage';
 import { TokenSource } from '../events/events';
 import { type NotifierChannel } from '../events/notifier';
 import { Result } from '../result';
-import { geminiProvider } from './provider';
+import { geminiProvider } from './models';
 
 const AGENT_MAX_LOOP_ITERATIONS = 200;
 

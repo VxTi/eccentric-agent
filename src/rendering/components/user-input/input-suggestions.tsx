@@ -1,18 +1,13 @@
-import { isNonEmptyArray } from '@vxti/typed';
+import { isNonEmptyArray, isNonEmptyString } from '@vxti/typed';
 import { type ReactNode, useMemo, useRef } from 'react';
 import { Box, type DOMElement, Text, useBoxMetrics } from 'ink';
 import { Position, ellipsize } from '../../../lib/utils/string-utils';
-import { useUserInputField } from '../../context/user-input-context';
-import type { Suggestion } from '../../hooks';
-import { useTerminalSize } from '../../hooks/terminal-size';
+import { useUserInputField } from '../../context';
+import { type Suggestion } from '../../hooks';
 
-const MIN_SUGGESTION_COUNT = 8;
+const MAX_SUGGESTION_COUNT = 14;
 
 export function Suggestions(): ReactNode {
-  const { height } = useTerminalSize();
-  const maxSuggestions = Math.ceil(
-    Math.max(height / 2.5, MIN_SUGGESTION_COUNT)
-  );
   const { suggestions, suggestionIndex } = useUserInputField();
   const containerRef = useRef<DOMElement>(null);
   const containerSize = useBoxMetrics(containerRef);
@@ -22,7 +17,7 @@ export function Suggestions(): ReactNode {
 
     const { values } = suggestions;
 
-    if (values.length <= maxSuggestions) {
+    if (values.length <= MAX_SUGGESTION_COUNT) {
       return {
         shown: values,
         itemsAfter: 0,
@@ -31,20 +26,20 @@ export function Suggestions(): ReactNode {
       };
     }
 
-    const halfWindow = Math.floor(maxSuggestions / 2);
-    const maxOffset = values.length - maxSuggestions;
+    const halfWindow = Math.floor(MAX_SUGGESTION_COUNT / 2);
+    const maxOffset = values.length - MAX_SUGGESTION_COUNT;
 
     const targetOffset = suggestionIndex - halfWindow;
 
     const offsetIndex = Math.max(0, Math.min(maxOffset, targetOffset));
-    const offsetUpperBound = offsetIndex + maxSuggestions;
+    const offsetUpperBound = offsetIndex + MAX_SUGGESTION_COUNT;
 
     return {
       offsetIndex,
       shown: values.slice(offsetIndex, offsetUpperBound),
       itemsAfter: values.length - offsetUpperBound,
     };
-  }, [suggestions, maxSuggestions, suggestionIndex]);
+  }, [suggestions, suggestionIndex]);
 
   if (!state) return;
 
@@ -58,7 +53,7 @@ export function Suggestions(): ReactNode {
       borderStyle="round"
       ref={containerRef}
     >
-      {suggestions && suggestions.values.length > maxSuggestions && (
+      {suggestions && suggestions.values.length > MAX_SUGGESTION_COUNT && (
         <Text color="gray">{'  ...'}</Text>
       )}
       {shown.map((suggestion, i) => (
@@ -84,18 +79,12 @@ interface SuggestionTextProps {
 }
 
 function SuggestionText({
-  children,
+  children: { value, description },
   selected,
   containerWidth,
 }: SuggestionTextProps): ReactNode {
-  const { width } = useTerminalSize();
-
   const edgeMargin = 6;
-  const text = ellipsize(
-    children.value,
-    containerWidth - edgeMargin,
-    Position.START
-  );
+  const text = ellipsize(value, containerWidth - edgeMargin, Position.START);
 
   return (
     <Box flexShrink={0} gap={2}>
@@ -103,9 +92,9 @@ function SuggestionText({
         {selected ? '▶ ' : '  '}
         {text}
       </Text>
-      {children.description !== undefined && width > 100 && (
+      {isNonEmptyString(description, true) && (
         <Text color="gray" italic>
-          {children.description}
+          {description}
         </Text>
       )}
     </Box>

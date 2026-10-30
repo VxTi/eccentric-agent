@@ -13,7 +13,6 @@ import {
 } from 'react';
 import { v7 as uuid } from 'uuid';
 import { loadMcpConfig, type MCP } from '../../lib/agent/mcp/mcp';
-import { geminiProvider, type ModelName } from '../../lib/agent/provider';
 import { getRandomMessage } from '../../lib/agent/rotating-messages';
 import { constructSystemPrompt } from '../../lib/agent/system-prompt';
 import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
@@ -25,7 +24,7 @@ import { type TaskList } from '../../lib/tasks';
 import type { Message, UserMessage } from '../../lib/types/messages';
 import { toolRegistry } from '../../lib/agent/tools';
 import { makeToolSet } from '../../lib/agent/tools/core';
-import { useAppDispatch, useAppSelector, store } from '../../lib/state/store';
+import { useAppDispatch, useAppSelector, store } from '../../lib/state';
 import {
   type AgentStatus,
   setMessages as setMessagesAction,
@@ -52,7 +51,6 @@ export interface AgentContext {
   setModelMessages: Dispatch<SetStateAction<ModelMessage[]>>;
   status: AgentStatus;
   setStatus: Dispatch<SetStateAction<AgentStatus>>;
-  model: ModelName;
   mcpServers: MCP[];
   systemPrompt: string;
 }
@@ -73,14 +71,9 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
     git: { ignored },
   } = useFileSystem();
 
-  const {
-    taskList,
-    model: modelName,
-    mcpServers,
-  } = useAppSelector(state => state.agent);
+  const { taskList, model, mcpServers } = useAppSelector(state => state.agent);
 
   const notifier = useMemo(() => new Notifier(), []);
-  const model = useMemo(() => geminiProvider(modelName), [modelName]);
   const tools = useMemo<ToolSet>(
     () => makeToolSet(toolRegistry, notifier, controller.signal),
     [notifier, controller]
@@ -174,7 +167,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
       const result = streamText({
         allowSystemInMessages: true,
         abortSignal: controller.signal,
-        model,
+        model: model.modelName,
         messages: [
           { content: currentSystemPrompt, role: 'system' },
           ...updatedMessages,
@@ -210,7 +203,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
       let buffer = '';
 
       try {
-        for await (const part of result.fullStream) {
+        for await (const part of result.stream) {
           if (part.type === 'text-start') {
             currentTextId = uuid();
             buffer = '';
@@ -229,7 +222,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
             currentTextId = null;
           }
         }
-        const response = await result.response;
+        const response = (await result.finalStep).response;
 
         clearInterval(interval);
         dispatch(setStatusAction({ text: '', loading: false }));
@@ -292,7 +285,6 @@ export function useAgent(): AgentContext {
     messages,
     modelMessages: _modelMessages,
     status,
-    model,
     mcpServers,
     systemPrompt,
   } = useAppSelector(state => state.agent);
@@ -350,7 +342,6 @@ export function useAgent(): AgentContext {
     setModelMessages,
     status,
     setStatus,
-    model,
     mcpServers,
     systemPrompt,
   };
