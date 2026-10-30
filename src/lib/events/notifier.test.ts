@@ -28,9 +28,7 @@ describe('notifier', () => {
   describe('interception', () => {
     it('intercepts function parameters before final notification', () => {
       const notifier = new Notifier();
-      const interceptor = vi.fn(
-        (input: string) => [`${input} intercepted`] as [_input: string]
-      );
+      const interceptor = vi.fn((input: string) => `${input} intercepted`);
 
       const messenger = vi.fn((_input: string) => 'test');
 

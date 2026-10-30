@@ -130,6 +130,6 @@ export const replaceInFile = createTool({
 
   outputToString({ filePath }, _, { previous, current }) {
     const fileName = path.basename(filePath);
-    return `Edited \`${fileName}\`\n${formatDiffMd(previous, current)}`;
+    return `Edited \`${fileName}\`\n\n${formatDiffMd(previous, current)}`;
   },
 });
