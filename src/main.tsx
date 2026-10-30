@@ -46,11 +46,11 @@ async function main(): Promise<void> {
   const { waitUntilExit } = render(
     <AppProvider controller={controller} stdin={stdin} stdout={stdout}>
       <FileSystemProvider>
-        <UserInputProvider>
-          <AgentProvider>
+        <AgentProvider>
+          <UserInputProvider>
             <App />
-          </AgentProvider>
-        </UserInputProvider>
+          </UserInputProvider>
+        </AgentProvider>
       </FileSystemProvider>
     </AppProvider>,
     {
@@ -59,7 +59,7 @@ async function main(): Promise<void> {
       exitOnCtrlC: true,
       patchConsole: true,
       maxFps: 60,
-      incrementalRendering: false,
+      incrementalRendering: true,
       concurrent: true,
       alternateScreen: false,
     }

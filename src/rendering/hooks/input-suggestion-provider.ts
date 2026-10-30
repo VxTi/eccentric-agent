@@ -1,9 +1,4 @@
-import {
-  hasArrayLengthAtLeast,
-  isEmptyString,
-  isNonEmptyArray,
-  isNotNil,
-} from '@vxti/typed';
+import { isEmptyString, isNonEmptyArray, isNotNil } from '@vxti/typed';
 import { useEffect, useState } from 'react';
 import { SUPPORTED_COMMANDS } from '../../lib/commands';
 import fs from 'node:fs';
@@ -37,6 +32,7 @@ export function useInputSuggestionProvider(
     cwd,
     git: { ignored },
   } = useFileSystem();
+
   const [suggestions, setSuggestions] = useState<SuggestionSet | undefined>(
     undefined
   );
@@ -49,11 +45,10 @@ export function useInputSuggestionProvider(
 
     if (
       isNotNil((matches = FILE_SUGGESTION_PATTERN.exec(preCursorInput))) &&
-      hasArrayLengthAtLeast(matches, 2)
+      isNotNil(matches[1])
     ) {
       const filePath = matches[1];
-
-      if (isEmptyString(filePath)) return;
+      if (isEmptyString(filePath, true)) return;
 
       /* to exclude @ char*/
       setSuggestionCursorIndex(matches.index + 1);
@@ -105,7 +100,7 @@ function filterSuggestions(
   query: string
 ): Suggestion[] {
   const q = query.toLowerCase();
-  if (isEmptyString(q)) {
+  if (isEmptyString(q, true)) {
     return suggestions.slice(0, MAX_SHOWN_SUGGESTIONS);
   }
 

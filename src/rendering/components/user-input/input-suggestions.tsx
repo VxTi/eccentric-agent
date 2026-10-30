@@ -1,21 +1,24 @@
+import { isNonEmptyArray } from '@vxti/typed';
 import { type ReactNode, useMemo, useRef } from 'react';
 import { Box, type DOMElement, Text, useBoxMetrics } from 'ink';
 import { Position, ellipsize } from '../../../lib/utils/string-utils';
 import { useUserInputField } from '../../context/user-input-context';
-import { type Suggestion } from '../../hooks';
+import type { Suggestion } from '../../hooks';
 import { useTerminalSize } from '../../hooks/terminal-size';
 
-interface SuggestionsProps {
-  maxSuggestions: number;
-}
+const MIN_SUGGESTION_COUNT = 8;
 
-export function Suggestions({ maxSuggestions }: SuggestionsProps): ReactNode {
+export function Suggestions(): ReactNode {
+  const { height } = useTerminalSize();
+  const maxSuggestions = Math.ceil(
+    Math.max(height / 2.5, MIN_SUGGESTION_COUNT)
+  );
   const { suggestions, suggestionIndex } = useUserInputField();
   const containerRef = useRef<DOMElement>(null);
   const containerSize = useBoxMetrics(containerRef);
 
   const state = useMemo(() => {
-    if (!suggestions || suggestions.values.length === 0) return undefined;
+    if (!isNonEmptyArray(suggestions?.values)) return undefined;
 
     const { values } = suggestions;
 

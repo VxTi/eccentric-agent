@@ -21,6 +21,7 @@ import { DEFAULT_SYSTEM_PROMPT } from '../../lib/constants';
 import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
 import { EventName, eventOn, TokenSource } from '../../lib/events/events';
 import { Notifier } from '../../lib/events/notifier';
+import { Features } from '../../lib/feaures';
 import { FileCache } from '../../lib/file-cache';
 import { TaskList } from '../../lib/tasks';
 import type { Message, UserMessage } from '../../lib/types/messages';
@@ -92,6 +93,8 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
   const [mcpServers, setMcpServers] = useState<MCP[]>([]);
 
   useEffect(() => {
+    if (!Features.MCP) return;
+
     setStatus({
       text: basicHighlightFormatting('Connecting with MCP server...'),
       loading: true,

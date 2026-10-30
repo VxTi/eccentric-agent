@@ -1,3 +1,5 @@
+import type { PromiseResult } from '../../types/types';
+import type { mcp } from './types';
 import {
   applyMiddlewares,
   Client,
@@ -17,10 +19,9 @@ import { type z } from 'zod';
 import { acquireContextInstance } from '../../events/context-acquisition';
 import { ContextType } from '../../events/events';
 import { debug, emitMessage } from '../../events/messaging';
-import type { PromiseResult } from '../../types/types';
+import { Result } from '../../result';
 import { mcpConfigSchema, mcpServerConfigSchema } from './models';
 import { LocalFileOAuthProvider } from './oauth-provider';
-import { type mcp } from './types';
 
 config({ quiet: true });
 
@@ -84,11 +85,16 @@ export async function loadMcpConfig(signal: AbortSignal): Promise<MCP[]> {
       });
     }
 
-    return await Promise.all(
-      configs.map(
-        async ([name, config]) => await MCP.create(name, config, signal)
-      )
-    );
+    const mcpList: MCP[] = [];
+
+    for (const [name, config] of configs) {
+      const mcpResult = await MCP.create(name, config, signal);
+      if (mcpResult.ok) {
+        mcpList.push(mcpResult.data);
+      }
+    }
+
+    return mcpList;
   }
 
   return [];
@@ -137,7 +143,7 @@ export class MCP extends EventEmitter {
     name: string,
     config: mcp.Config,
     signal: AbortSignal
-  ): Promise<MCP> {
+  ): Promise<Result<MCP, unknown>> {
     try {
       const { transport, client, authProvider } = await this.makeTransport(
         name,
@@ -150,9 +156,11 @@ export class MCP extends EventEmitter {
         await client.close();
       });
 
-      return new MCP(config, name, client, transport, authProvider);
-    } catch (err) {
-      throw err;
+      const mcp = new MCP(config, name, client, transport, authProvider);
+
+      return Result.Ok(mcp);
+    } catch (err: unknown) {
+      return Result.Error(err);
     }
   }
 

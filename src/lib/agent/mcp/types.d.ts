@@ -1,7 +1,7 @@
-import {
-  type McpServerCommandConfig,
-  type mcpServerConfigSchema,
-  type McpServerHttpConfig,
+import type {
+  McpServerCommandConfig,
+  mcpServerConfigSchema,
+  McpServerHttpConfig,
 } from './models';
 import type { z } from 'zod';
 

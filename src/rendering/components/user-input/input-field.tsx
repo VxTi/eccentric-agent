@@ -1,178 +1,19 @@
-import { isEmptyString } from '@vxti/typed';
-import {
-  type JSX,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useState,
-} from 'react';
-import { Box, Text, useInput, usePaste } from 'ink';
+import { isEmptyString, isNonEmptyArray } from '@vxti/typed';
+import { type JSX, type ReactNode, useEffect, useState } from 'react';
+import { Box, Text } from 'ink';
 import { CURSOR_BLINK_INTERVAL_MS } from '../../../lib/constants';
-import { EventName, eventOn } from '../../../lib/events/events';
 import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
-import { useAgent } from '../../context';
-import { useAppContext } from '../../context/app-context';
-import { useCommandProcessor } from '../../hooks/command-processor';
 import { useUserInputField } from '../../context/user-input-context';
-import { SuggestionType } from '../../hooks';
-import { useTerminalSize } from '../../hooks/terminal-size';
 import { Suggestions } from './input-suggestions';
 import { InputRequest } from './option-request';
 
 const INPUT_PLACEHOLDER = 'Reference files with @, and type commands using /';
-const MIN_SUGGESTION_COUNT = 8;
 
 export default function InputField(): JSX.Element {
-  const { height } = useTerminalSize();
-  const maxSuggestions = Math.ceil(
-    Math.max(height / 2.5, MIN_SUGGESTION_COUNT)
-  );
-
-  const { controller } = useAppContext();
-  const { submitMessage } = useAgent();
-  const { processCommand } = useCommandProcessor();
-  const {
-    input,
-    setInput,
-    setCursorOffset,
-    cursorOffset,
-    setSuggestions,
-    suggestionCursorIndex,
-    suggestions,
-    suggestionIndex,
-    setSuggestionIndex,
-    inputRequest,
-    setInputRequest,
-  } = useUserInputField();
-
-  const handlePickSuggestion = useCallback(
-    (type: SuggestionType, suggestion: string) => {
-      setSuggestions(undefined);
-
-      switch (type) {
-        case SuggestionType.FILE: {
-          setInput(prev => {
-            const beforeCursor = prev.slice(0, suggestionCursorIndex);
-            return `${beforeCursor + suggestion} ${prev.slice(cursorOffset)}`;
-          });
-          setCursorOffset(suggestionCursorIndex + suggestion.length + 1);
-          break;
-        }
-        case SuggestionType.COMMAND: {
-          setCursorOffset(0);
-          setInput('');
-          processCommand(suggestion);
-          break;
-        }
-      }
-    },
-    [
-      cursorOffset,
-      processCommand,
-      setCursorOffset,
-      setInput,
-      setSuggestions,
-      suggestionCursorIndex,
-    ]
-  );
-
-  useEffect(() => {
-    setSuggestionIndex(0);
-  }, [setSuggestionIndex, suggestions]);
-
-  useEffect(() => {
-    return eventOn(EventName.REQUEST_INPUT, ({ detail }) =>
-      setInputRequest(detail)
-    );
-  }, [setInputRequest]);
-
-  const handleSubmitMessage = () => {
-    submitMessage(formatReferencedFiles(input));
-    setInput('');
-    setCursorOffset(0);
-  };
-
-  usePaste(text => {
-    const updatedText = input + text;
-    setInput(updatedText);
-    setCursorOffset(cursorOffset + text.length);
-  });
-
-  useInput((inputChar, key) => {
-    if (key.ctrl && inputChar === 'c') {
-      controller.abort(0);
-    }
-
-    // Handled in another component
-    if (inputRequest.options.length > 0) return;
-
-    // Suggestion handling
-    if (suggestions && suggestions.values.length > 0) {
-      const { values } = suggestions;
-      if (key.upArrow) {
-        setSuggestionIndex(prev => (prev + values.length - 1) % values.length);
-        return;
-      }
-
-      if (key.downArrow) {
-        setSuggestionIndex(prev => (prev + values.length + 1) % values.length);
-        return;
-      }
-
-      if (key.escape) {
-        setSuggestionIndex(-1);
-        return;
-      }
-
-      if (key.tab || key.return) {
-        handlePickSuggestion(
-          suggestions.type,
-          values[suggestionIndex]?.value ?? ''
-        );
-        return;
-      }
-    }
-
-    if (key.return) {
-      handleSubmitMessage();
-      return;
-    }
-
-    if (key.backspace || key.delete) {
-      if (cursorOffset === 0) return;
-
-      setInput(
-        prev => prev.slice(0, cursorOffset - 1) + prev.slice(cursorOffset)
-      );
-      setCursorOffset(prev => prev - 1);
-      return;
-    }
-
-    if (key.leftArrow) {
-      if (cursorOffset === 0) return;
-      setCursorOffset(prev => prev - 1);
-      return;
-    }
-
-    if (key.rightArrow) {
-      if (cursorOffset >= input.length) return;
-
-      setCursorOffset(prev => prev + 1);
-      return;
-    }
-
-    if (!key.ctrl && !key.meta && inputChar.length === 1 && inputChar >= ' ') {
-      setInput(
-        prev =>
-          prev.slice(0, cursorOffset) + inputChar + prev.slice(cursorOffset)
-      );
-      setCursorOffset(prev => prev + 1);
-      return;
-    }
-  });
+  const { inputRequest } = useUserInputField();
 
   if (
-    inputRequest.options.length > 0 &&
+    isNonEmptyArray(inputRequest.options) &&
     inputRequest.channelId !== CHANNEL_ID_NONE
   ) {
     return <InputRequest />;
@@ -187,7 +28,7 @@ export default function InputField(): JSX.Element {
       paddingTop={1}
       overflow="hidden"
     >
-      <Suggestions maxSuggestions={maxSuggestions} />
+      <Suggestions />
       <Box
         borderStyle="round"
         borderColor="gray"

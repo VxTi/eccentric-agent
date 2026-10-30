@@ -16,7 +16,7 @@ import { ModelInfoBar } from './model-info-bar';
 import InputField from './user-input/input-field';
 
 export function App(): ReactNode {
-  const { width, height } = useTerminalSize();
+  const { width } = useTerminalSize();
 
   const agentContext = useAgent();
   const fsContext = useFileSystem();
@@ -40,7 +40,6 @@ export function App(): ReactNode {
     <Box
       flexDirection="column"
       width={width}
-      height={height}
       borderColor="#333333"
       borderStyle="round"
       alignItems="center"
