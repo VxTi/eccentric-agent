@@ -54,7 +54,7 @@ function trustTool(props: { mcpServer: string; toolName: string }): void {
   trustedTools.add(key);
 }
 
-export default createTool({
+export const callMcpTool = createTool({
   internalName: 'call_mcp_tool',
   name: 'Call MCP tool',
   description:

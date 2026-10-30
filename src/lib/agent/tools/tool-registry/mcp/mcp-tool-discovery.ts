@@ -71,7 +71,7 @@ function findExactNameMatch(
   return candidates[0];
 }
 
-export default createTool({
+export const discoverMcpTool = createTool({
   internalName: 'discover_mcp_tool',
   name: 'Discover MCP tool',
   description:

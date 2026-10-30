@@ -54,7 +54,7 @@ const outputSchema = z.object({
   ),
 });
 
-export default createTool({
+export const promptUserOptions = createTool({
   internalName: 'prompt_user_options',
   name: 'Prompt user options',
   description:

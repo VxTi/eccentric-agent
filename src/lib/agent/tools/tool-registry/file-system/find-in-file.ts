@@ -46,7 +46,7 @@ const outputSchema = z.object({
     .describe('All locations within the file where the pattern was found'),
 });
 
-export default createTool({
+export const findInFile = createTool({
   internalName: 'find_in_file',
   name: 'Find in file',
   description:

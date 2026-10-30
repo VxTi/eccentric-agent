@@ -7,13 +7,13 @@ import { type Notifier } from '../../events/notifier';
 import { requestUserInput } from '../../events/user-input';
 import { Result } from '../../result';
 import {
-  type IToolDefinition,
+  type SomeTool,
   type ToolChannelParams,
   ToolSelectionOption,
 } from './common';
 
 export function makeToolSet(
-  tools: IToolDefinition[],
+  tools: SomeTool[],
   notifier: Notifier,
   signal: AbortSignal
 ): ToolSet {
@@ -23,7 +23,7 @@ export function makeToolSet(
 }
 
 function makeTool(
-  tool: IToolDefinition,
+  tool: SomeTool,
   notifier: Notifier,
   signal: AbortSignal
 ): Tool {
@@ -48,6 +48,7 @@ function makeTool(
       );
 
       const requiresApproval = await tool.requiresApproval(input, channel);
+
       if (requiresApproval) {
         const options = await tool.approvalOptions(input, channel);
 
@@ -102,6 +103,7 @@ function makeTool(
 
       // Exclude metadata from result to omit from model context window.
       // Metadata is only present for passing data between functions within the same tool
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const { metadata: _, ...safeResult } = result;
       return safeResult;
     },

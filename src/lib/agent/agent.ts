@@ -9,11 +9,7 @@ import {
 } from 'ai';
 import * as z from 'zod';
 import { sleepFor } from '../utils/async-util';
-import {
-  agentTools,
-  type IToolDefinition,
-  type ToolChannelParams,
-} from './tools';
+import { subAgentTools, type ToolChannelParams, type SomeTool } from './tools';
 import { emitConsumeTokenEvent } from '../events/token-usage';
 import { TokenSource } from '../events/events';
 import { type NotifierChannel } from '../events/notifier';
@@ -45,14 +41,12 @@ export class Agent<T = string> {
       { role: 'user', content: this.goal },
     ];
 
-    this.channel.addInterceptor((...[message]) => [
-      {
-        loading: true,
-        content: `Agent - \`${goal}\`
+    this.channel.addInterceptor(message => ({
+      loading: true,
+      content: `Agent - \`${goal}\`
 
 ${message.content}`,
-      },
-    ]);
+    }));
 
     this.process()
       .then((result: T) => this.callback(Result.Ok(result)))
@@ -130,7 +124,7 @@ ${message.content}`,
     return {
       [PRIMARY_GOAL_TOOL_NAME]: this.constructPrimaryGoalTool(),
       ...Object.fromEntries(
-        agentTools.map((tool: IToolDefinition) => [
+        subAgentTools.map((tool: SomeTool) => [
           tool.internalName,
           this.constructTool(tool),
         ])
@@ -138,7 +132,7 @@ ${message.content}`,
     };
   }
 
-  private constructTool(tool: IToolDefinition): Tool {
+  private constructTool(tool: SomeTool): Tool {
     const { inputSchema, description, outputSchema } = tool;
 
     return createTool({
@@ -159,7 +153,7 @@ ${message.content}`,
           return output;
         }
         this.channel.notify({
-          content: tool.outputToString(output, this.channel),
+          content: tool.outputToString(output, this.channel, undefined),
         });
 
         return output.data;

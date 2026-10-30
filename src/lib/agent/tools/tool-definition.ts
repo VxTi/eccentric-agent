@@ -22,10 +22,12 @@ export const DEFAULT_APPROVAL_OPTIONS: ApprovalOption[] = [
 
 export type ToolChannelParams = Omit<GenericMessage, 'id' | 'type'>;
 
+export type SomeTool = IToolDefinition<unknown, object, any>;
+
 export interface IToolDefinition<
   TIn = unknown,
   TOut extends object = object,
-  TOutMeta = object,
+  TOutMeta = undefined,
   TApprovalOption extends string = string,
 > {
   readonly internalName: string;
@@ -59,7 +61,7 @@ export interface IToolDefinition<
    * @returns {@link ToolSelectionOption.ALLOW} if no function is provided
    */
   onOptionSelect(
-    input: TIn,
+    input: NoInfer<TIn>,
     option: TApprovalOption,
     channel: NotifierChannel<ToolChannelParams>
   ): MaybePromise<ToolSelectionOption>;

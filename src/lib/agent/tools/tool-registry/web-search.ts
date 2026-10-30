@@ -46,7 +46,7 @@ const outputSchema = z.object({
   results: z.array(resultSchema),
 });
 
-export default createTool({
+export const webSearch = createTool({
   internalName: 'web_search',
   name: 'Web Search',
   description:

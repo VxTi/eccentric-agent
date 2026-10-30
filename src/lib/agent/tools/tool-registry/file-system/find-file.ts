@@ -32,7 +32,7 @@ const outputSchema = z.object({
   files: z.array(z.string()),
 });
 
-export default createTool({
+export const findFile = createTool({
   internalName: 'find_file',
   name: 'Find file',
   description:

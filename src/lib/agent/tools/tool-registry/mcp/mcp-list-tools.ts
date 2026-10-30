@@ -35,7 +35,7 @@ const outputSchema = z.object({
   tools: z.array(z.union([detailedToolSchema, summaryToolSchema])),
 });
 
-export default createTool({
+export const listMcpTools = createTool({
   internalName: 'list_mcp_tools',
   name: 'List MCP tools',
   description:

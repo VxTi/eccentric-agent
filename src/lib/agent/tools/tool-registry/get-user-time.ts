@@ -9,7 +9,7 @@ const outputSchema = z.object({
   iso: z.string(),
 });
 
-export default createTool({
+export const getUserTime = createTool({
   internalName: 'get_user_time',
   name: 'Get user time',
   description:

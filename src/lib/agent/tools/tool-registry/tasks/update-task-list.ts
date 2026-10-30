@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { acquireContextInstance } from '../../../../events/context-acquisition';
+import { ContextType } from '../../../../events/events';
 import { Result } from '../../../../result';
 import { type Task, TaskStatus } from '../../../../tasks';
 import { createTool } from '../../common';
@@ -10,35 +11,33 @@ const statusNameMapping: Record<TaskStatus, string> = {
   [TaskStatus.COMPLETED]: 'Completed',
 };
 
+const TaskStatusUpdateSchema = z.object({
+  id: z
+    .string()
+    .describe('The `id` of the task to update, as set in `create_task_list`.'),
+  status: z
+    .enum(TaskStatus)
+    .describe('The new status for the referenced task.'),
+});
+
+const TaskStatusSchema = z.object({
+  id: z.string(),
+  description: z.string(),
+  status: z.enum(TaskStatus),
+});
+
 const inputSchema = z.object({
   updates: z
-    .array(
-      z.object({
-        id: z
-          .string()
-          .describe(
-            'The `id` of the task to update, as set in `create_task_list`.'
-          ),
-        status: z
-          .enum(TaskStatus)
-          .describe('The new status for the referenced task.'),
-      })
-    )
+    .array(TaskStatusUpdateSchema)
     .min(1)
     .describe('The set of task status updates to apply.'),
 });
 
 const outputSchema = z.object({
-  tasks: z.array(
-    z.object({
-      id: z.string(),
-      description: z.string(),
-      status: z.enum(TaskStatus),
-    })
-  ),
+  tasks: z.array(TaskStatusSchema),
 });
 
-export default createTool({
+export const updateTaskList = createTool({
   internalName: 'update_task_list',
   name: 'Update Task List',
   description:
@@ -50,21 +49,21 @@ export default createTool({
   inputSchema,
   outputSchema,
 
-  async handle(input) {
-    const context = await acquireContextInstance();
-    if (!context.taskList.hasTasks) {
+  async handle({ updates }) {
+    const { taskList } = await acquireContextInstance(ContextType.AGENT);
+    if (!taskList.hasTasks) {
       return Result.Error(
         'No task list exists. Call `create_task_list` before updating tasks.'
       );
     }
 
-    const tasks: Task[] = context.taskList.updateTasks(input.updates);
+    const tasks: Task[] = taskList.updateTasks(updates);
 
     return Result.Ok({ tasks });
   },
 
-  inputToString(input) {
-    const lines = input.updates
+  inputToString({ updates }) {
+    const lines = updates
       .map(({ id, status }) => `  - [${id}] → ${statusNameMapping[status]}`)
       .join('\n');
     return `Update task list:\n${lines}`;

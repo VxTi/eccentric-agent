@@ -1,25 +1,30 @@
 import * as z from 'zod';
 import { acquireContextInstance } from '../../../../events/context-acquisition';
+import { ContextType } from '../../../../events/events';
 import { Result } from '../../../../result';
 import { type Task, TaskStatus } from '../../../../tasks';
 import { createTool } from '../../common';
 
+const CreateTaskSchema = z.object({
+  id: z
+    .string()
+    .describe(
+      'A short stable identifier for the task. Used later by `update_task_list` to reference it.'
+    ),
+  description: z
+    .string()
+    .describe('A concise description of what completing the task entails.'),
+});
+
+const TaskSchema = z.object({
+  id: z.string(),
+  description: z.string(),
+  status: z.enum(TaskStatus),
+});
+
 const inputSchema = z.object({
   tasks: z
-    .array(
-      z.object({
-        id: z
-          .string()
-          .describe(
-            'A short stable identifier for the task. Used later by `update_task_list` to reference it.'
-          ),
-        description: z
-          .string()
-          .describe(
-            'A concise description of what completing the task entails.'
-          ),
-      })
-    )
+    .array(CreateTaskSchema)
     .min(1)
     .describe(
       'The ordered list of tasks to track. Decompose the user request into discrete, verifiable steps.'
@@ -27,16 +32,10 @@ const inputSchema = z.object({
 });
 
 const outputSchema = z.object({
-  tasks: z.array(
-    z.object({
-      id: z.string(),
-      description: z.string(),
-      status: z.enum(['pending', 'in_progress', 'completed']),
-    })
-  ),
+  tasks: z.array(TaskSchema),
 });
 
-export default createTool({
+export const createTaskList = createTool({
   internalName: 'create_task_list',
   name: 'Create Task List',
   description:
@@ -51,17 +50,17 @@ export default createTool({
   inputSchema,
   outputSchema,
 
-  async handle(input) {
-    const context = await acquireContextInstance();
-    const tasks: Task[] = input.tasks.map(task => ({
+  async handle({ tasks }) {
+    const { taskList } = await acquireContextInstance(ContextType.AGENT);
+    const newList: Task[] = tasks.map(task => ({
       id: task.id,
       description: task.description,
       status: TaskStatus.PENDING,
     }));
 
-    context.taskList.set(tasks);
+    taskList.set(newList);
 
-    return Result.Ok({ tasks });
+    return Result.Ok({ tasks: newList });
   },
 
   inputToString({ tasks }) {

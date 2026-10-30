@@ -73,7 +73,7 @@ async function makeRequest(
   };
 }
 
-export default createTool({
+export const webFetch = createTool({
   internalName: 'web_fetch',
   name: 'Web Fetch',
   description:

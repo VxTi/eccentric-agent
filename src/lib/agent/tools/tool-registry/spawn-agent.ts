@@ -54,7 +54,7 @@ async function runSubAgent(
   });
 }
 
-export default createTool({
+export const spawnSubAgents = createTool({
   internalName: 'spawn_agents',
   name: 'Spawn Agents',
   description:

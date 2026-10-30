@@ -46,7 +46,7 @@ async function safeExists(path: string): Promise<boolean> {
   }
 }
 
-export default createTool({
+export const createFile = createTool({
   internalName: 'create_file',
   name: 'Create File',
   description:

@@ -67,7 +67,7 @@ export function isAllowedCommand(command: string): boolean {
 
 type Metadata = { command: string };
 
-export default createTool({
+export const shell = createTool({
   internalName: 'shell',
   name: 'Shell',
   description:

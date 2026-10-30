@@ -81,7 +81,7 @@ function httpsGetJson(
   });
 }
 
-export default createTool({
+export const getUserLocation = createTool({
   internalName: 'get_user_location',
   name: 'Get user location',
   description:
@@ -111,6 +111,8 @@ export default createTool({
   inputToString() {
     return 'Looking up user location';
   },
+
+  requiresApproval: () => true,
 
   outputToString({ city, region, country }) {
     const parts = [city, region, country].filter(part => part.length > 0);

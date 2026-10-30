@@ -36,7 +36,7 @@ function prefixWithLineNumbers(lines: string[], newline: string): string {
     .join(newline);
 }
 
-export default createTool({
+export const readFile = createTool({
   internalName: 'read_file',
   name: 'Read file',
   description:

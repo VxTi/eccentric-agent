@@ -4,9 +4,10 @@ import {
   isNonEmptyArray,
   isNotNil,
 } from '@vxti/typed';
-import { glob } from 'glob';
 import { useEffect, useState } from 'react';
 import { SUPPORTED_COMMANDS } from '../../lib/commands';
+import fs from 'node:fs';
+import { useFileSystem } from '../context/file-system-context';
 
 const FILE_SUGGESTION_PATTERN = /(?:\s|^)@([\w_.-]+)$/;
 const COMMAND_PATTERN = /^\/(\w*)$/;
@@ -32,6 +33,10 @@ export function useInputSuggestionProvider(
   input: string,
   cursorOffset: number
 ) {
+  const {
+    cwd,
+    git: { ignored },
+  } = useFileSystem();
   const [suggestions, setSuggestions] = useState<SuggestionSet | undefined>(
     undefined
   );
@@ -48,25 +53,27 @@ export function useInputSuggestionProvider(
     ) {
       const filePath = matches[1];
 
-      if (filePath.length === 0) return;
+      if (isEmptyString(filePath)) return;
 
       /* to exclude @ char*/
       setSuggestionCursorIndex(matches.index + 1);
 
-      void glob('**/*', {
-        nodir: true,
-        ignore: ['node_modules/**', 'dist/**', '.git/**'],
-        dot: false,
-        cwd: process.cwd(),
-      }).then(files =>
-        setSuggestions({
-          type: SuggestionType.FILE,
-          values: filterSuggestions(
-            files.map(f => ({ value: f })),
-            filePath
-          ),
+      Array.fromAsync(
+        fs.promises.glob('**/*', {
+          exclude: Array.from(ignored),
+          cwd,
         })
-      );
+      )
+        .then(files => {
+          setSuggestions({
+            type: SuggestionType.FILE,
+            values: filterSuggestions(
+              files.map(f => ({ value: f })),
+              filePath
+            ),
+          });
+        })
+        .catch(() => {});
       return;
     }
 
@@ -84,7 +91,7 @@ export function useInputSuggestionProvider(
       setSuggestions(undefined);
       setSuggestionCursorIndex(0);
     }
-  }, [cursorOffset, input, suggestions?.values]);
+  }, [cursorOffset, cwd, ignored, input, suggestions?.values]);
 
   return {
     suggestions,

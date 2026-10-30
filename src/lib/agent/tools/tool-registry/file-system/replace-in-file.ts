@@ -44,7 +44,7 @@ const outputSchema = z.object({
   filePath: z.string(),
 });
 
-export default createTool({
+export const replaceInFile = createTool({
   internalName: 'replace_in_file',
   name: 'Replace in file',
   description:
