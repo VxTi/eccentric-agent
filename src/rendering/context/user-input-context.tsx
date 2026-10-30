@@ -12,7 +12,7 @@ import {
   eventOn,
   type UserInputRequest,
 } from '../../lib/events/events';
-import { useAppDispatch, useAppSelector, store } from '../../lib/state/store';
+import { useAppDispatch, useAppSelector, store } from '../../lib/state';
 import {
   setInput as setInputAction,
   setCursorOffset as setCursorOffsetAction,

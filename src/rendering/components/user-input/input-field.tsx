@@ -3,7 +3,7 @@ import { type JSX, type ReactNode, useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import { CURSOR_BLINK_INTERVAL_MS } from '../../../lib/constants';
 import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
-import { useUserInputField } from '../../context/user-input-context';
+import { useUserInputField } from '../../context';
 import { Suggestions } from './input-suggestions';
 import { InputRequest } from './option-request';
 

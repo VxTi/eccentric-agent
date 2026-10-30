@@ -3,12 +3,13 @@ import { exec } from 'child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { type ReactNode, useEffect, useTransition } from 'react';
-import { useAppDispatch, useAppSelector } from '../../lib/state/store';
 import {
+  useAppDispatch,
+  useAppSelector,
   setGitInfo,
   setLoading,
   type GitInfo,
-} from '../../lib/state/file-system';
+} from '../../lib/state';
 
 const execute = promisify(exec);
 

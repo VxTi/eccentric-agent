@@ -6,12 +6,10 @@ import { marked } from 'marked';
 import { stdin, stdout } from 'node:process';
 import { render } from 'ink';
 import { Provider } from 'react-redux';
-import { store } from './lib/state/store';
-import { AgentProvider } from './rendering/context';
+import { store } from './lib/state';
+import { AgentProvider, FileSystemProvider } from './rendering/context';
 import { App } from './rendering/components/App';
-import { AppProvider } from './rendering/context/app-context';
-import { FileSystemProvider } from './rendering/context/file-system-context';
-import { UserInputProvider } from './rendering/context/user-input-context';
+import { UserInputProvider } from './rendering/context';
 import { terminalRenderer } from './rendering/terminal-markdown-renderer/markdown-renderer';
 
 // const ANSI_ALT_SCREEN_ENTER = '\x1b[?1049h\x1b[H\x1b[2J';
@@ -47,15 +45,13 @@ async function main(): Promise<void> {
 
   const { waitUntilExit } = render(
     <Provider store={store}>
-      <AppProvider controller={controller} stdin={stdin} stdout={stdout}>
-        <FileSystemProvider>
-          <AgentProvider>
-            <UserInputProvider>
-              <App />
-            </UserInputProvider>
-          </AgentProvider>
-        </FileSystemProvider>
-      </AppProvider>
+      <FileSystemProvider>
+        <AgentProvider>
+          <UserInputProvider>
+            <App />
+          </UserInputProvider>
+        </AgentProvider>
+      </FileSystemProvider>
     </Provider>,
     {
       stdout,

@@ -9,7 +9,6 @@ export interface AppState {
 }
 
 const defaultController = new AbortController();
-
 const initialState: AppState = {
   controller: defaultController,
   io: {

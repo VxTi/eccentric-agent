@@ -1,6 +1,6 @@
-import { type ReactNode, useCallback, useEffect } from 'react';
-import { useAppDispatch, useAppSelector } from '../../lib/state/store';
-import { setController, setIO, exit as exitAction } from '../../lib/state/app';
+import { useCallback } from 'react';
+import { useAppDispatch, useAppSelector } from '../../lib/state';
+import { exit as exitAction } from '../../lib/state/app';
 
 export interface AppContextType {
   controller: AbortController;
@@ -24,27 +24,4 @@ export function useAppContext(): AppContextType {
     io,
     exit,
   };
-}
-
-interface AppProviderProps {
-  children: ReactNode;
-  controller: AbortController;
-  stdin: NodeJS.ReadStream;
-  stdout: NodeJS.WriteStream;
-}
-
-export function AppProvider({
-  controller,
-  children,
-  stdin,
-  stdout,
-}: AppProviderProps) {
-  const dispatch = useAppDispatch();
-
-  useEffect(() => {
-    dispatch(setController(controller));
-    dispatch(setIO({ stdin, stdout }));
-  }, [controller, stdin, stdout, dispatch]);
-
-  return <>{children}</>;
 }
