@@ -1,35 +1,34 @@
-type NotifierFn<T extends any[]> = (...parameters: T) => any;
+type NotifierFn<T> = (arg: T) => any;
+type InterceptorFn<T> = (args: T) => T;
 
-export class NotifierChannel<T extends any[]> {
+export class NotifierChannel<T> {
   constructor(
     public readonly channelId: string,
     private readonly notifier: NotifierFn<T>,
-    private readonly interceptors: ((...args: T) => T)[] = []
+    private readonly interceptors: InterceptorFn<T>[] = []
   ) {
     notifier.bind(this);
   }
 
-  public addInterceptor(interceptor: (...args: T) => T) {
+  public addInterceptor(interceptor: InterceptorFn<T>) {
     this.interceptors.push(interceptor);
   }
 
-  public notify(...parameters: T): void {
+  public notify(arg: T): void {
     const args: T = this.interceptors.reduce<T>(
-      (preInterceptedArgs, interceptor) => interceptor(...preInterceptedArgs),
-      parameters
+      (preInterceptedArgs, interceptor) => interceptor(preInterceptedArgs),
+      arg
     );
-    this.notifier(...args);
+    this.notifier(args);
   }
 }
-
-export type MessageNotifier = NotifierChannel<[string]>;
 
 export class Notifier {
   constructor(
     private readonly channels: Map<string, NotifierChannel<any>> = new Map()
   ) {}
 
-  public subscribe<T extends any[]>(
+  public subscribe<T>(
     channelId: string,
     notifier: NotifierFn<T>
   ): NotifierChannel<T> {

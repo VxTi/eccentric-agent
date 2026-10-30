@@ -1,7 +1,7 @@
 import { type ExecException } from 'node:child_process';
 import * as z from 'zod';
-import { Result } from '../../result';
-import { createTool, ToolSelectionOption } from './common';
+import { Result } from '../../../result';
+import { createTool, ToolSelectionOption } from '../common';
 import { exec } from 'child_process';
 
 const inputSchema = z.object({

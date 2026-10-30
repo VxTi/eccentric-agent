@@ -1,7 +1,7 @@
 import * as z from 'zod';
-import { requestUserInput } from '../../events/user-input';
-import { Result } from '../../result';
-import { createTool } from './common';
+import { requestUserInput } from '../../../events/user-input';
+import { Result } from '../../../result';
+import { createTool } from '../common';
 
 const optionSchema = z.object({
   id: z

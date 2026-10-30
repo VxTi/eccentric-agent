@@ -1,10 +1,11 @@
 import { readFile, writeFile } from 'fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
-import { acquireContextInstance } from '../../../events/context-acquisition';
-import { Result } from '../../../result';
-import { formatDiffMd } from '../../../utils/diff-utils';
-import { createTool } from '../common';
+import { acquireContextInstance } from '../../../../events/context-acquisition';
+import { ContextType } from '../../../../events/events';
+import { Result } from '../../../../result';
+import { formatDiffMd } from '../../../../utils/diff-utils';
+import { createTool } from '../../common';
 
 const inputSchema = z.object({
   filePath: z
@@ -64,8 +65,8 @@ export default createTool({
   outputSchema,
 
   async handle({ filePath, line, count, replacement }) {
-    const context = await acquireContextInstance();
-    const absolutePath = await context.fileCache.getCachedFilePath(filePath);
+    const { fileCache } = await acquireContextInstance(ContextType.AGENT);
+    const absolutePath = await fileCache.getCachedFilePath(filePath);
 
     const original = await readFile(absolutePath, 'utf-8');
     const lines = original.length === 0 ? [] : original.split('\n');
@@ -104,7 +105,7 @@ export default createTool({
       updated += '\n';
 
     await writeFile(absolutePath, updated, 'utf-8');
-    await context.fileCache.update(absolutePath);
+    await fileCache.update(absolutePath);
 
     return Result.Ok(
       {

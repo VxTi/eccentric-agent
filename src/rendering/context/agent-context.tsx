@@ -1,3 +1,4 @@
+import { isNonEmptyString } from '@vxti/typed';
 import { type ModelMessage, stepCountIs, streamText, type ToolSet } from 'ai';
 import chalk from 'chalk';
 import {
@@ -23,10 +24,11 @@ import { Notifier } from '../../lib/events/notifier';
 import { FileCache } from '../../lib/file-cache';
 import { TaskList } from '../../lib/tasks';
 import type { Message, UserMessage } from '../../lib/types/messages';
-import { registry } from '../../lib/agent/tools';
-import { constructToolset } from '../../lib/agent/tools/core';
-import { appSignal } from '../../signal';
+import { toolRegistry } from '../../lib/agent/tools';
+import { makeToolSet } from '../../lib/agent/tools/core';
 import { basicHighlightFormatting } from '../terminal-markdown-renderer/markdown-renderer';
+import { useAppContext } from './app-context';
+import { useFileSystem } from './file-system-context';
 
 interface AgentStatus {
   loading: boolean;
@@ -34,8 +36,6 @@ interface AgentStatus {
 }
 
 export interface AgentContext {
-  cwd: string;
-  setCwd: Dispatch<SetStateAction<string>>;
   submitMessage: (input: string) => void;
   taskList: TaskList;
   fileCache: FileCache;
@@ -51,13 +51,17 @@ export interface AgentContext {
 
 const PrimaryAgentContext = createContext<AgentContext | null>(null);
 
-export function AgentProvider({
-  children,
-}: {
+interface AgentProviderProps {
   children: ReactNode;
-}): ReactNode {
+}
+
+export function AgentProvider({ children }: AgentProviderProps): ReactNode {
+  const { controller } = useAppContext();
+  const {
+    cwd,
+    git: { ignored },
+  } = useFileSystem();
   const [messageQueue, setMessageQueue] = useState<string[]>([]);
-  const [cwd, setCwd] = useState<string>(process.cwd());
 
   const [modelMessages, setModelMessages] = useState<ModelMessage[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -68,16 +72,18 @@ export function AgentProvider({
   });
 
   const { taskList, notifier, model, fileCache } = useMemo(() => {
+    const model = geminiProvider('gemini-2.5-flash');
+
     return {
       taskList: new TaskList(),
       notifier: new Notifier(),
       fileCache: new FileCache(),
-      model: geminiProvider('gemini-2.5-flash'),
+      model,
     };
   }, []);
   const tools = useMemo<ToolSet>(
-    () => constructToolset(registry, notifier),
-    [notifier]
+    () => makeToolSet(toolRegistry, notifier, controller.signal),
+    [notifier, controller]
   );
   const [systemPrompt, setSystemPrompt] = useState<string>(
     DEFAULT_SYSTEM_PROMPT
@@ -90,7 +96,8 @@ export function AgentProvider({
       text: basicHighlightFormatting('Connecting with MCP server...'),
       loading: true,
     });
-    void loadMcpConfig(appSignal)
+
+    void loadMcpConfig(controller.signal)
       .then(setMcpServers)
       .then(() => setStatus({ text: '', loading: false }))
       .catch((error): MCP[] => {
@@ -102,21 +109,23 @@ export function AgentProvider({
         setTimeout(() => setStatus({ text: '', loading: false }), 5000);
         return [];
       });
-  }, []);
+  }, [controller.signal]);
 
   /**
    * System prompt construction
    */
   useEffect(() => {
     let cancelled = false;
-    void constructSystemPrompt(taskList, mcpServers, cwd).then(prompt => {
-      if (!cancelled) setSystemPrompt(prompt);
-    });
+    void constructSystemPrompt(taskList, mcpServers, { cwd, ignored }).then(
+      prompt => {
+        if (!cancelled) setSystemPrompt(prompt);
+      }
+    );
 
     return () => {
       cancelled = true;
     };
-  }, [taskList, cwd, mcpServers]);
+  }, [taskList, mcpServers, cwd, ignored]);
 
   /**
    * Message addition / updates
@@ -162,7 +171,7 @@ export function AgentProvider({
       }
       const result = streamText({
         allowSystemInMessages: true,
-        abortSignal: appSignal,
+        abortSignal: controller.signal,
         model,
         messages: [
           { content: systemPrompt, role: 'system' },
@@ -203,7 +212,7 @@ export function AgentProvider({
             buffer = '';
           } else if (part.type === 'text-delta') {
             buffer += part.text;
-            if (currentTextId) {
+            if (isNonEmptyString(currentTextId)) {
               setMessage({
                 type: 'assistant',
                 id: currentTextId,
@@ -238,7 +247,7 @@ export function AgentProvider({
       }*/
 
       const firstQueuedMessage = messageQueue.shift();
-      if (firstQueuedMessage) {
+      if (isNonEmptyString(firstQueuedMessage)) {
         await processRequest(firstQueuedMessage, false);
       }
     },
@@ -247,8 +256,8 @@ export function AgentProvider({
       model,
       modelMessages,
       setMessage,
+      controller,
       systemPrompt,
-      taskList,
       tools,
     ]
   );
@@ -273,8 +282,6 @@ export function AgentProvider({
         messages,
         setMessages,
         mcpServers,
-        cwd,
-        setCwd,
         submitMessage,
         taskList,
         fileCache,

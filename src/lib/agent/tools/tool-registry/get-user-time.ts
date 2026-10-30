@@ -1,6 +1,6 @@
 import * as z from 'zod';
-import { Result } from '../../result';
-import { createTool } from './common';
+import { Result } from '../../../result';
+import { createTool } from '../common';
 
 const inputSchema = z.object();
 const outputSchema = z.object({
@@ -22,7 +22,7 @@ export default createTool({
 
   handle() {
     const now = new Date();
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     const formatted = new Intl.DateTimeFormat(undefined, {
       dateStyle: 'full',

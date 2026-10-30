@@ -1,3 +1,4 @@
+import { isEmptyString, isNonEmptyString } from '@vxti/typed';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Box, Text } from 'ink';
 import { useAgent } from '../context';
@@ -20,12 +21,12 @@ export function LoadingStatusLine(): ReactNode {
     return () => clearInterval(id);
   }, [loading]);
 
-  if (!loading && !text.length) return null;
+  if (!loading && isEmptyString(text)) return null;
 
   return (
     <Box paddingTop={1}>
       {loading && <Text color="cyan">{SPINNER_FRAMES[frame]}</Text>}
-      {text && <Text> {text}</Text>}
+      {isNonEmptyString(text) && <Text> {text}</Text>}
     </Box>
   );
 }

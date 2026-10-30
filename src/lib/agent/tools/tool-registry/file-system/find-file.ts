@@ -1,9 +1,9 @@
-import { glob } from 'glob';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import * as z from 'zod';
-import { Result } from '../../../result';
-import { Ellipsize, ellipsize } from '../../../utils/string-utils';
-import { createTool } from '../common';
+import { Result } from '../../../../result';
+import { Position, ellipsize } from '../../../../utils/string-utils';
+import { createTool } from '../../common';
 
 const inputSchema = z.object({
   directoryPath: z
@@ -65,9 +65,9 @@ export default createTool({
   async handle({ filePattern, directoryPath, maxResults }) {
     const cwd = path.resolve(process.cwd(), directoryPath);
 
-    const results: string[] = await glob(filePattern, { cwd }).then(
-      (files: string[]): string[] =>
-        files.map(file => ellipsize(path.join(cwd, file), 30, Ellipsize.START))
+    const files = await Array.fromAsync(fs.promises.glob(filePattern, { cwd }));
+    const results: string[] = files.map(file =>
+      ellipsize(path.join(cwd, file), 30, Position.START)
     );
 
     return Result.Ok({

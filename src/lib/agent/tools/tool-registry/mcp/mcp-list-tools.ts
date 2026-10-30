@@ -1,8 +1,8 @@
-import compact from 'lodash/compact';
+import { compact, isNonEmptyString, isNotNil } from '@vxti/typed';
 import * as z from 'zod';
-import { Result } from '../../../result';
-import { getMCPServer, type McpTool } from '../../mcp/mcp';
-import { createTool } from '../common';
+import { Result } from '../../../../result';
+import { getMCPServer, type McpTool } from '../../../mcp/mcp';
+import { createTool } from '../../common';
 
 const inputSchema = z.object({
   mcpServer: z
@@ -54,9 +54,9 @@ export default createTool({
       );
       tools.forEach(t => allTools.set(t.name, t));
       cursor = nextCursor;
-    } while (cursor);
+    } while (isNotNil(cursor));
 
-    if (toolName) {
+    if (isNotNil(toolName)) {
       const tool = allTools.get(toolName);
       return Result.Ok({
         mcpServer,
@@ -83,7 +83,7 @@ export default createTool({
   },
 
   inputToString({ mcpServer, toolName }) {
-    return toolName
+    return isNonEmptyString(toolName)
       ? `Retrieving schema for MCP tool \`${toolName}\` in \`${mcpServer}\``
       : `Viewing available MCP tools in \`${mcpServer}\``;
   },

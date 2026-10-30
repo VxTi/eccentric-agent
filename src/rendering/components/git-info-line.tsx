@@ -1,14 +1,19 @@
+import { isNil } from '@vxti/typed';
 import { Box, Text } from 'ink';
-import { useGitInfo } from '../context/git-info';
+import { useFileSystem } from '../context/file-system-context';
 
 export function GitInfoLine() {
-  const { gitInfo, loading } = useGitInfo();
+  const {
+    git: { currentBranch, repoName },
+    loading,
+  } = useFileSystem();
 
-  if (loading || !gitInfo) return;
+  if (loading || isNil(currentBranch) || isNil(repoName)) return;
+
   return (
     <Box alignSelf="flex-start">
       <Text>
-        {gitInfo.repoName} * {gitInfo.currentBranch}
+        {repoName} * {currentBranch}
       </Text>
     </Box>
   );

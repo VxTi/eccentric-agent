@@ -53,7 +53,16 @@ export default defineConfig([
       '@typescript-eslint/no-explicit-any': 0,
       '@typescript-eslint/no-empty-object-type': 0,
       '@typescript-eslint/no-misused-promises': 0,
-      "@typescript-eslint/no-unnecessary-condition": 2,
+      '@typescript-eslint/no-unnecessary-type-conversion': 'error',
+      '@typescript-eslint/no-unnecessary-condition': 'error',
+      '@typescript-eslint/strict-boolean-expressions': [
+        'error',
+        {
+          allowNullableBoolean: true, // We do allow this
+          allowNumber: false, // Prevents accidental `!0` checks
+          allowString: false, // Prevents not handling empty strings correctly
+        },
+      ],
 
       'no-duplicate-imports': 2,
 

@@ -9,7 +9,11 @@ import {
 } from 'ai';
 import * as z from 'zod';
 import { sleepFor } from '../utils/async-util';
-import { agentTools, type IToolBase, type ToolChannelParams } from './tools';
+import {
+  agentTools,
+  type IToolDefinition,
+  type ToolChannelParams,
+} from './tools';
 import { emitConsumeTokenEvent } from '../events/token-usage';
 import { TokenSource } from '../events/events';
 import { type NotifierChannel } from '../events/notifier';
@@ -126,7 +130,7 @@ ${message.content}`,
     return {
       [PRIMARY_GOAL_TOOL_NAME]: this.constructPrimaryGoalTool(),
       ...Object.fromEntries(
-        agentTools.map((tool: IToolBase) => [
+        agentTools.map((tool: IToolDefinition) => [
           tool.internalName,
           this.constructTool(tool),
         ])
@@ -134,7 +138,7 @@ ${message.content}`,
     };
   }
 
-  private constructTool(tool: IToolBase): Tool {
+  private constructTool(tool: IToolDefinition): Tool {
     const { inputSchema, description, outputSchema } = tool;
 
     return createTool({

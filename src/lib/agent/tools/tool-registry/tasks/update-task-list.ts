@@ -1,8 +1,8 @@
 import * as z from 'zod';
-import { acquireContextInstance } from '../../../events/context-acquisition';
-import { Result } from '../../../result';
-import { type Task, TaskStatus } from '../../../tasks';
-import { createTool } from '../common';
+import { acquireContextInstance } from '../../../../events/context-acquisition';
+import { Result } from '../../../../result';
+import { type Task, TaskStatus } from '../../../../tasks';
+import { createTool } from '../../common';
 
 const statusNameMapping: Record<TaskStatus, string> = {
   [TaskStatus.PENDING]: 'Pending',

@@ -1,5 +1,12 @@
 'use strict';
 
+import {
+  isEmptyString,
+  isNonEmptyArray,
+  isNonEmptyString,
+  isNotNil,
+  toNonEmptyString,
+} from '@vxti/typed';
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import { type MarkedOptions, Renderer, type Tokens } from 'marked';
@@ -8,6 +15,7 @@ import ansiEscapes from 'ansi-escapes';
 import supportsHyperlinks from 'supports-hyperlinks';
 import ansiRegex from 'ansi-regex';
 import { generateSideBySideDiff } from '../../lib/utils/diff-utils';
+import { ellipsize, Position } from '../../lib/utils/string-utils';
 import { type TerminalMarked } from './types';
 
 const TABLE_CELL_SPLIT = '^*||*^';
@@ -103,7 +111,7 @@ export class TerminalRenderer extends Renderer {
 
   public text(token: Tokens.Text | Tokens.Escape): string {
     const parsed =
-      token.type === 'text' && token.tokens?.length
+      token.type === 'text' && isNonEmptyArray(token.tokens)
         ? this.parser.parseInline(token.tokens)
         : token.text;
 
@@ -128,9 +136,8 @@ export class TerminalRenderer extends Renderer {
         if (tokens.length > 0 && tokens[0]?.type === 'paragraph') {
           tokens[0].text = `${checkbox} ${tokens[0].text}`;
           if (
-            tokens[0].tokens &&
-            tokens[0].tokens.length > 0 &&
-            tokens[0].tokens[0]?.type === 'text'
+            isNonEmptyArray(tokens[0].tokens) &&
+            tokens[0].tokens[0].type === 'text'
           ) {
             tokens[0].tokens[0].text = `${checkbox} ${tokens[0].tokens[0].text}`;
           }
@@ -160,7 +167,7 @@ export class TerminalRenderer extends Renderer {
   }
 
   public override blockquote({ tokens, text }: Tokens.Blockquote): string {
-    const content = this.parser.parse(tokens) || text;
+    const content = toNonEmptyString(this.parser.parse(tokens)) ?? text;
     const formatted = this.indent(
       this.config.indentation ?? DEFAULT_INDENTATION,
       content.trim()
@@ -199,10 +206,10 @@ export class TerminalRenderer extends Renderer {
         return;
       }
 
-      const leftLineNumber = left.lineNumberOriginal
+      const leftLineNumber = isNotNil(left.lineNumberOriginal)
         ? String(left.lineNumberOriginal).padStart(lineNumberWidth, ' ')
         : ' '.repeat(lineNumberWidth);
-      const rightLineNumber = right.lineNumberModified
+      const rightLineNumber = isNotNil(right.lineNumberModified)
         ? String(right.lineNumberModified).padStart(lineNumberWidth, ' ')
         : ' '.repeat(lineNumberWidth);
 
@@ -212,14 +219,17 @@ export class TerminalRenderer extends Renderer {
       // Reserve 2 chars for the prefix; truncate plain text BEFORE highlighting
       // so the ANSI escapes stay intact.
       const contentMax = colWidth - leftPrefix.length;
-      let leftContent = this.truncatePlain(left.value, contentMax);
-      let rightContent = this.truncatePlain(right.value, contentMax);
+      let leftContent = ellipsize(left.value, contentMax, Position.END);
+      let rightContent = ellipsize(right.value, contentMax, Position.START);
 
-      if (lang && this.isFormattingEnabled) {
+      if (isNonEmptyString(lang) && this.isFormattingEnabled) {
         try {
-          if (leftContent) leftContent = this.highlightCode(leftContent, lang);
-          if (rightContent)
+          if (isNonEmptyString(leftContent)) {
+            leftContent = this.highlightCode(leftContent, lang);
+          }
+          if (isNonEmptyString(rightContent)) {
             rightContent = this.highlightCode(rightContent, lang);
+          }
         } catch (error) {
           console.error(`Highlighting error for language ${lang}:`, error);
         }
@@ -245,15 +255,8 @@ export class TerminalRenderer extends Renderer {
     return result.join('\n');
   }
 
-  private truncatePlain(input: string, maxLength: number): string {
-    if (maxLength <= 0) return '';
-    if (input.length <= maxLength) return input;
-    if (maxLength === 1) return '…';
-    return `${input.substring(0, maxLength - 2)}…`;
-  }
-
   public override heading({ tokens, depth, text }: Tokens.Heading): string {
-    const content = this.parser.parseInline(tokens) || text;
+    const content = toNonEmptyString(this.parser.parseInline(tokens)) ?? text;
     const formatted = this.config.reflowText
       ? this.reflowText(content)
       : content;
@@ -312,7 +315,7 @@ export class TerminalRenderer extends Renderer {
   }
 
   public override strong({ tokens, text }: Tokens.Strong): string {
-    const parsed = this.parser.parseInline(tokens) || text;
+    const parsed = toNonEmptyString(this.parser.parseInline(tokens)) ?? text;
     return this.config.strong?.(parsed) ?? parsed;
   }
 
@@ -355,7 +358,7 @@ export class TerminalRenderer extends Renderer {
       }
     }
 
-    const hasText: boolean = !!parsed && parsed !== href;
+    const hasText: boolean = isNonEmptyString(parsed) && parsed !== href;
 
     let out = '';
 
@@ -378,7 +381,7 @@ export class TerminalRenderer extends Renderer {
   public override image({ href, title, text }: Tokens.Image): string {
     return (
       this.config.image?.(title ?? '', href) ??
-      `![${text}${title ? ` - ${title}` : ''}](${href})`
+      `![${text}${isNonEmptyString(title) ? ` - ${title}` : ''}](${href})`
     );
   }
 
@@ -398,12 +401,10 @@ export class TerminalRenderer extends Renderer {
 
   private highlightCode(code: string, language: string): string {
     if (!this.isFormattingEnabled) return code;
-
     const reflowed: string = this.fixHardReturn(
       code,
       this.config.reflowText ?? false
     );
-
     try {
       return highlightCli(reflowed, {
         language,
@@ -419,7 +420,7 @@ export class TerminalRenderer extends Renderer {
   }
 
   private indent(indent: number, text: string): string {
-    if (!text) return text;
+    if (isEmptyString(text)) return text;
     const pad = ' '.repeat(indent);
     return pad + text.split('\n').join(`\n${pad}`);
   }
@@ -441,8 +442,8 @@ export class TerminalRenderer extends Renderer {
       let currentLine = '';
       let lastWasEscapeChar = false;
 
-      while (fragments.length) {
-        const fragment = fragments[0] ?? '';
+      while (isNonEmptyArray(fragments)) {
+        const fragment = fragments[0];
 
         if (fragment === '') {
           fragments.splice(0, 1);
@@ -452,7 +453,7 @@ export class TerminalRenderer extends Renderer {
 
         // This is an escape code - leave it whole and
         // move to the next fragment.
-        if (!this.textLength(fragment)) {
+        if (this.textLength(fragment) === 0) {
           currentLine += fragment;
           fragments.splice(0, 1);
           lastWasEscapeChar = true;
@@ -477,17 +478,17 @@ export class TerminalRenderer extends Renderer {
                 0,
                 this.width - column - additionalSpaces
               );
-              if (additionalSpaces) currentLine += ' ';
+              if (additionalSpaces > 0) currentLine += ' ';
               currentLine += w;
               reflowed.push(currentLine);
               currentLine = '';
               column = 0;
 
               word = word.substring(w.length);
-              while (word.length) {
+              while (isNonEmptyString(word)) {
                 const w = word.substring(0, this.width);
 
-                if (!w.length) break;
+                if (isEmptyString(w)) break;
 
                 if (w.length < this.width) {
                   currentLine = w;
@@ -500,7 +501,7 @@ export class TerminalRenderer extends Renderer {
               }
             }
           } else {
-            if (additionalSpaces) {
+            if (additionalSpaces > 0) {
               currentLine += ' ';
               column++;
             }
@@ -515,7 +516,7 @@ export class TerminalRenderer extends Renderer {
         fragments.splice(0, 1);
       }
 
-      if (this.textLength(currentLine)) reflowed.push(currentLine);
+      if (this.textLength(currentLine) > 0) reflowed.push(currentLine);
     });
 
     return reflowed.join('\n');
@@ -534,12 +535,12 @@ export class TerminalRenderer extends Renderer {
 }
 
 function generateTableRow(text: string): string[] {
-  if (!text) return [];
+  if (isEmptyString(text)) return [];
   const lines = text.split('\n');
 
   const data: string[] = [];
   lines.forEach(line => {
-    if (!line) return;
+    if (isEmptyString(line)) return;
     const parsed: string[] = line
       .replace(TABLE_ROW_WRAP_REGEXP, '')
       .split(TABLE_CELL_SPLIT);

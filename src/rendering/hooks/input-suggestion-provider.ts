@@ -1,3 +1,9 @@
+import {
+  hasArrayLengthAtLeast,
+  isEmptyString,
+  isNonEmptyArray,
+  isNotNil,
+} from '@vxti/typed';
 import { glob } from 'glob';
 import { useEffect, useState } from 'react';
 import { SUPPORTED_COMMANDS } from '../../lib/commands';
@@ -36,7 +42,10 @@ export function useInputSuggestionProvider(
 
     let matches: RegExpExecArray | null;
 
-    if ((matches = FILE_SUGGESTION_PATTERN.exec(preCursorInput))?.[1]) {
+    if (
+      isNotNil((matches = FILE_SUGGESTION_PATTERN.exec(preCursorInput))) &&
+      hasArrayLengthAtLeast(matches, 2)
+    ) {
       const filePath = matches[1];
 
       if (filePath.length === 0) return;
@@ -58,22 +67,24 @@ export function useInputSuggestionProvider(
           ),
         })
       );
+      return;
+    }
 
-      // MARK: Fails silently
-    } else if ((matches = COMMAND_PATTERN.exec(preCursorInput)) !== null) {
+    if ((matches = COMMAND_PATTERN.exec(preCursorInput)) !== null) {
       const command = matches[1];
 
       setSuggestions({
         type: SuggestionType.COMMAND,
         values: filterSuggestions(SUPPORTED_COMMANDS, command),
       });
-    } else {
-      if (suggestions?.values.length) {
-        setSuggestions(undefined);
-        setSuggestionCursorIndex(0);
-      }
+      return;
     }
-  }, [cursorOffset, input, suggestions?.values.length]);
+
+    if (isNonEmptyArray(suggestions?.values)) {
+      setSuggestions(undefined);
+      setSuggestionCursorIndex(0);
+    }
+  }, [cursorOffset, input, suggestions?.values]);
 
   return {
     suggestions,
@@ -87,7 +98,9 @@ function filterSuggestions(
   query: string
 ): Suggestion[] {
   const q = query.toLowerCase();
-  if (!q.length) return suggestions.slice(0, MAX_SHOWN_SUGGESTIONS);
+  if (isEmptyString(q)) {
+    return suggestions.slice(0, MAX_SHOWN_SUGGESTIONS);
+  }
 
   return suggestions
     .filter(({ value }) => value.toLowerCase().includes(q))

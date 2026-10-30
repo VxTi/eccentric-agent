@@ -1,6 +1,6 @@
 import { type ReactNode, useMemo, useRef } from 'react';
 import { Box, type DOMElement, Text, useBoxMetrics } from 'ink';
-import { Ellipsize, ellipsize } from '../../../lib/utils/string-utils';
+import { Position, ellipsize } from '../../../lib/utils/string-utils';
 import { useUserInputField } from '../../context/user-input-context';
 import { type Suggestion } from '../../hooks';
 import { useTerminalSize } from '../../hooks/terminal-size';
@@ -91,7 +91,7 @@ function SuggestionText({
   const text = ellipsize(
     children.value,
     containerWidth - edgeMargin,
-    Ellipsize.START
+    Position.START
   );
 
   return (

@@ -1,9 +1,10 @@
+import { isEmptyArray, isEmptyString, isNonEmptyString } from '@vxti/typed';
 import { Box, Text, useInput } from 'ink';
 import { type ReactNode, useMemo, useState } from 'react';
 import { emitEvent, EventName } from '../../../lib/events/events';
 import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
 import { useUserInputField } from '../../context/user-input-context';
-import { parseMarkdown }     from '../../terminal-markdown-renderer/markdown-renderer';
+import { parseMarkdown } from '../../terminal-markdown-renderer/markdown-renderer';
 
 export function InputRequest(): ReactNode {
   const { inputRequest, setInputRequest } = useUserInputField();
@@ -14,7 +15,7 @@ export function InputRequest(): ReactNode {
   const { allowMultiple, options, title } = inputRequest;
 
   useInput((char, key) => {
-    if (!inputRequest.options.length) return;
+    if (isEmptyArray(inputRequest.options)) return;
 
     if (char === ' ') {
       setActiveIndices(indices => {
@@ -39,11 +40,15 @@ export function InputRequest(): ReactNode {
       setUserSelectedInputIndex(
         prev => (prev + options.length - 1) % options.length
       );
-    } else if (key.downArrow) {
+      return;
+    }
+    if (key.downArrow) {
       setUserSelectedInputIndex(
         prev => (prev + options.length + 1) % options.length
       );
-    } else if (key.return || key.tab) {
+      return;
+    }
+    if (key.return || key.tab) {
       const indices =
         activeIndices.length === 0 ? [userSelectedInputIndex] : activeIndices;
 
@@ -59,7 +64,7 @@ export function InputRequest(): ReactNode {
   });
 
   const description = useMemo(() => {
-    if (!inputRequest.description) return;
+    if (isEmptyString(inputRequest.description)) return;
 
     const md = parseMarkdown(inputRequest.description);
 
@@ -79,12 +84,14 @@ export function InputRequest(): ReactNode {
       borderDimColor
     >
       <Box flexDirection="column" alignItems="center">
-        {title?.length && (
+        {isNonEmptyString(title) && (
           <Text bold color="whiteBright">
             {title}
           </Text>
         )}
-        {description?.length && <Text color="white">{description}</Text>}
+        {isNonEmptyString(description) && (
+          <Text color="white">{description}</Text>
+        )}
       </Box>
       <Box marginTop={1} marginLeft={2} flexDirection="column">
         <Text italic color="gray">

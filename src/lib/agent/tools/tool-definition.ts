@@ -1,29 +1,31 @@
 import type * as z from 'zod';
-import { type Result } from '../../../result';
-import { type GenericMessage } from '../../../types/messages';
-import { type NotifierChannel } from '../../../events/notifier';
+import { type Result } from '../../result';
+import { type GenericMessage } from '../../types/messages';
+import { type NotifierChannel } from '../../events/notifier';
 import {
   type ApprovalOption,
   type MakeOptional,
   type MaybePromise,
-} from '../../../types/types';
+} from '../../types/types';
 
 export const enum ToolSelectionOption {
   ALLOW = 'allow',
+  ALWAYS_ALLOW = 'always-allow',
   DENY = 'deny',
 }
 
 export const DEFAULT_APPROVAL_OPTIONS: ApprovalOption[] = [
   { option: ToolSelectionOption.ALLOW, text: 'Approve' },
+  { option: ToolSelectionOption.ALWAYS_ALLOW, text: 'Always approve' },
   { option: ToolSelectionOption.DENY, text: 'Deny' },
 ];
 
-export type ToolChannelParams = [Omit<GenericMessage, 'id' | 'type'>];
+export type ToolChannelParams = Omit<GenericMessage, 'id' | 'type'>;
 
-export interface IToolBase<
+export interface IToolDefinition<
   TIn = unknown,
   TOut extends object = object,
-  TOutMeta = never,
+  TOutMeta = object,
   TApprovalOption extends string = string,
 > {
   readonly internalName: string;
@@ -86,7 +88,7 @@ type ToolProps<
   TOutMeta = never,
   TApprovalOption extends string = string,
 > = MakeOptional<
-  IToolBase<TIn, TOut, TOutMeta, TApprovalOption>,
+  IToolDefinition<TIn, TOut, TOutMeta, TApprovalOption>,
   'approvalOptions' | 'requiresApproval' | 'onOptionSelect'
 > & {};
 
@@ -97,7 +99,7 @@ export function createTool<
   TApprovalOption extends string = string,
 >(
   props: ToolProps<TIn, TOut, TOutMeta, TApprovalOption>
-): IToolBase<TIn, TOut, TOutMeta, TApprovalOption> {
+): IToolDefinition<TIn, TOut, TOutMeta, TApprovalOption> {
   return {
     ...props,
     approvalOptions:

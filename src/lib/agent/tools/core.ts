@@ -2,27 +2,31 @@ import { tool as createTool, type Tool, type ToolSet } from 'ai';
 import chalk from 'chalk';
 import { v7 as uuid } from 'uuid';
 import { basicHighlightFormatting } from '../../../rendering/terminal-markdown-renderer/markdown-renderer';
-import { appSignal } from '../../../signal';
 import { emitMessage } from '../../events/messaging';
 import { type Notifier } from '../../events/notifier';
 import { requestUserInput } from '../../events/user-input';
 import { Result } from '../../result';
 import {
-  type IToolBase,
+  type IToolDefinition,
   type ToolChannelParams,
   ToolSelectionOption,
 } from './common';
 
-export function constructToolset(
-  tools: IToolBase[],
-  notifier: Notifier
+export function makeToolSet(
+  tools: IToolDefinition[],
+  notifier: Notifier,
+  signal: AbortSignal
 ): ToolSet {
   return Object.fromEntries(
-    tools.map(tool => [tool.internalName, constructTool(tool, notifier)])
+    tools.map(tool => [tool.internalName, makeTool(tool, notifier, signal)])
   );
 }
 
-function constructTool(tool: IToolBase, notifier: Notifier): Tool {
+function makeTool(
+  tool: IToolDefinition,
+  notifier: Notifier,
+  signal: AbortSignal
+): Tool {
   const { description, inputSchema, outputSchema, name } = tool;
   return createTool({
     title: name,
@@ -34,7 +38,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
 
       const channel = notifier.subscribe(
         toolCallId,
-        (...[message]: ToolChannelParams) =>
+        (message: ToolChannelParams) =>
           emitMessage({
             ...message,
             content: message.content.trim(),
@@ -55,11 +59,11 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         });
         const selectionOption = await tool.onOptionSelect(
           input,
-          chosen?.id ?? '',
+          chosen.id,
           channel
         );
 
-        if (selectionOption !== ToolSelectionOption.ALLOW) {
+        if (selectionOption === ToolSelectionOption.DENY) {
           channel.notify({
             content: chalk.red(
               `User denied tool execution for ${chalk.underline(tool.name)}`
@@ -71,6 +75,9 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
             `User denied permission to run tool "${tool.internalName}".`
           );
         }
+
+        if (selectionOption === ToolSelectionOption.ALWAYS_ALLOW) {
+        }
       }
 
       channel.notify({
@@ -78,7 +85,7 @@ function constructTool(tool: IToolBase, notifier: Notifier): Tool {
         content: tool.inputToString(input, channel),
       });
       const result = await Result.trySafe(() =>
-        tool.handle(input, channel, appSignal)
+        tool.handle(input, channel, signal)
       );
       if (result.ok) {
         channel.notify({

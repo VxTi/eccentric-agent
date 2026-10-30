@@ -1,8 +1,9 @@
 import * as z from 'zod';
-import { acquireContextInstance } from '../../../events/context-acquisition';
-import { Result } from '../../../result';
-import { createTool } from '../common';
-import { formatDiffMd } from '../../../utils/diff-utils';
+import { acquireContextInstance } from '../../../../events/context-acquisition';
+import { ContextType } from '../../../../events/events';
+import { Result } from '../../../../result';
+import { createTool } from '../../common';
+import { formatDiffMd } from '../../../../utils/diff-utils';
 import { mkdir, writeFile, access } from 'fs/promises';
 import { dirname } from 'path';
 
@@ -58,7 +59,7 @@ export default createTool({
   outputSchema,
 
   async handle({ overwrite, createDirectories, filePath, content }) {
-    const context = await acquireContextInstance();
+    const context = await acquireContextInstance(ContextType.AGENT);
     const override = overwrite ?? false;
     const createDirs = createDirectories ?? true;
 

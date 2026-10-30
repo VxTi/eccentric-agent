@@ -1,3 +1,4 @@
+import { isEmptyString } from '@vxti/typed';
 import {
   type JSX,
   type ReactNode,
@@ -9,8 +10,8 @@ import { Box, Text, useInput, usePaste } from 'ink';
 import { CURSOR_BLINK_INTERVAL_MS } from '../../../lib/constants';
 import { EventName, eventOn } from '../../../lib/events/events';
 import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
-import { appController } from '../../../signal';
 import { useAgent } from '../../context';
+import { useAppContext } from '../../context/app-context';
 import { useCommandProcessor } from '../../hooks/command-processor';
 import { useUserInputField } from '../../context/user-input-context';
 import { SuggestionType } from '../../hooks';
@@ -27,8 +28,9 @@ export default function InputField(): JSX.Element {
     Math.max(height / 2.5, MIN_SUGGESTION_COUNT)
   );
 
+  const { controller } = useAppContext();
+  const { submitMessage } = useAgent();
   const { processCommand } = useCommandProcessor();
-
   const {
     input,
     setInput,
@@ -42,8 +44,6 @@ export default function InputField(): JSX.Element {
     inputRequest,
     setInputRequest,
   } = useUserInputField();
-
-  const agent = useAgent();
 
   const handlePickSuggestion = useCallback(
     (type: SuggestionType, suggestion: string) => {
@@ -86,8 +86,8 @@ export default function InputField(): JSX.Element {
     );
   }, [setInputRequest]);
 
-  const submitMessage = () => {
-    agent.submitMessage(formatReferencedFiles(input));
+  const handleSubmitMessage = () => {
+    submitMessage(formatReferencedFiles(input));
     setInput('');
     setCursorOffset(0);
   };
@@ -100,7 +100,7 @@ export default function InputField(): JSX.Element {
 
   useInput((inputChar, key) => {
     if (key.ctrl && inputChar === 'c') {
-      appController.abort(0);
+      controller.abort(0);
     }
 
     // Handled in another component
@@ -134,7 +134,7 @@ export default function InputField(): JSX.Element {
     }
 
     if (key.return) {
-      submitMessage();
+      handleSubmitMessage();
       return;
     }
 
@@ -161,13 +161,7 @@ export default function InputField(): JSX.Element {
       return;
     }
 
-    if (
-      inputChar &&
-      !key.ctrl &&
-      !key.meta &&
-      inputChar.length === 1 &&
-      inputChar >= ' '
-    ) {
+    if (!key.ctrl && !key.meta && inputChar.length === 1 && inputChar >= ' ') {
       setInput(
         prev =>
           prev.slice(0, cursorOffset) + inputChar + prev.slice(cursorOffset)
@@ -220,7 +214,7 @@ function InputText(): ReactNode {
     return () => clearInterval(id);
   }, []);
 
-  if (input.length === 0) {
+  if (isEmptyString(input)) {
     return (
       <Box flexDirection="row">
         <Text inverse={blinkState}> </Text>
@@ -253,7 +247,7 @@ export function formatReferencedFiles(input: string): string {
   let match: RegExpExecArray | null;
   let sanitized = input;
   while ((match = re.exec(input)) !== null) {
-    const path = match[1]?.replace(/[.,;:!?)\]]+$/, '');
+    const path = match[1].replace(/[.,;:!?)\]]+$/, '');
     sanitized = sanitized.replace(match[0], `\`${path}\``);
   }
   return sanitized;

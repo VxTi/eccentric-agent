@@ -1,7 +1,8 @@
+import { isNonEmptyArray } from '@vxti/typed';
+import { Result } from '../../../../result';
+import { getMCPServer } from '../../../mcp/mcp';
+import { createTool, ToolSelectionOption } from '../../common';
 import * as z from 'zod';
-import { Result } from '../../../result';
-import { getMCPServer } from '../../mcp/mcp';
-import { createTool, ToolSelectionOption } from '../common';
 
 const inputSchema = z.object({
   mcpServer: z
@@ -86,7 +87,7 @@ export default createTool({
     if (isTrusted({ mcpServer, toolName })) return false;
 
     // If no auto-approve options are present, we require approval (always)
-    if (!mcp.config.autoApprove?.length) return true;
+    if (!isNonEmptyArray(mcp.config.autoApprove)) return true;
 
     // Same here
     return mcp.config.autoApprove.includes(toolName);

@@ -1,9 +1,10 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as z from 'zod';
-import { acquireContextInstance } from '../../../events/context-acquisition';
-import { Result } from '../../../result';
-import { createTool } from '../common';
+import { acquireContextInstance } from '../../../../events/context-acquisition';
+import { ContextType } from '../../../../events/events';
+import { Result } from '../../../../result';
+import { createTool } from '../../common';
 
 const inputSchema = z.object({
   filePath: z
@@ -52,16 +53,17 @@ export default createTool({
   outputSchema,
 
   async handle({ filePath, fromLine, lineCount }) {
-    const context = await acquireContextInstance();
+    const { fileCache } = await acquireContextInstance(ContextType.AGENT);
+    const { cwd } = await acquireContextInstance(ContextType.FS);
 
     const absolutePath = path.isAbsolute(filePath)
       ? filePath
-      : path.join(context.cwd, filePath);
+      : path.join(cwd, filePath);
 
     const stats = await fs.stat(absolutePath);
     const raw = await fs.readFile(absolutePath, 'utf8');
 
-    context.fileCache.set(absolutePath, stats.mtimeMs);
+    fileCache.set(absolutePath, stats.mtimeMs);
 
     const newline = raw.match(/\r?\n/)?.[0] ?? '\n';
     const lines = raw.split(/\r?\n/);

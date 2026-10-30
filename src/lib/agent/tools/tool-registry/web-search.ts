@@ -1,7 +1,8 @@
+import { isNonEmptyString } from '@vxti/typed';
 import * as z from 'zod';
-import { Result } from '../../result';
-import { getTavilyClient } from '../tavily';
-import { createTool } from './common';
+import { Result } from '../../../result';
+import { getTavilyClient } from '../../tavily';
+import { createTool } from '../common';
 
 const inputSchema = z.object({
   query: z
@@ -82,7 +83,7 @@ export default createTool({
   },
 
   inputToString({ query, country }) {
-    const regionSuffix = country ? ` in \`${country}\`` : '';
+    const regionSuffix = isNonEmptyString(country) ? ` in \`${country}\`` : '';
     return `Searching the web for \`${query}\`${regionSuffix}`;
   },
 

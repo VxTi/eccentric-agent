@@ -1,9 +1,10 @@
+import { isNil, isNonEmptyString, isNotNil } from '@vxti/typed';
 import { generateText, Output } from 'ai';
 import * as z from 'zod';
-import { Result } from '../../../result';
-import { getMCPServer, type McpTool } from '../../mcp/mcp';
-import { geminiProvider } from '../../provider';
-import { createTool } from '../common';
+import { Result } from '../../../../result';
+import { getMCPServer, type McpTool } from '../../../mcp/mcp';
+import { geminiProvider } from '../../../provider';
+import { createTool } from '../../common';
 
 const inputSchema = z.object({
   mcpServer: z
@@ -19,17 +20,17 @@ const inputSchema = z.object({
 const outputSchema = z.object({
   mcpServer: z.string(),
   toolName: z
-    .string()
-    .nullable()
+    .optional(z.string())
     .describe(
       'The name of the best-matching MCP tool, or null when no tool on this server is a plausible match for the task.'
     ),
-  description: z.string().nullable(),
+  description: z.optional(z.string()),
   reasoning: z
     .string()
     .describe('Short explanation of why this tool was selected.'),
   resolvedBy: z.enum(['only-tool', 'exact-name', 'llm', 'none']),
 });
+type McpDiscoveryResult = z.infer<typeof outputSchema>;
 
 const selectionSchema = z.object({
   toolName: z
@@ -54,7 +55,7 @@ async function listAllTools(mcpServer: string): Promise<McpTool[]> {
     );
     tools.forEach(t => all.set(t.name, t));
     cursor = nextCursor;
-  } while (cursor);
+  } while (isNotNil(cursor));
 
   return Array.from(all.values());
 }
@@ -83,10 +84,8 @@ export default createTool({
     const tools = await listAllTools(mcpServer);
 
     if (tools.length === 0) {
-      return Result.Ok({
+      return Result.Ok<McpDiscoveryResult>({
         mcpServer,
-        toolName: null,
-        description: null,
         reasoning: `MCP server "${mcpServer}" exposes no tools.`,
         resolvedBy: 'none' as const,
       });
@@ -94,10 +93,10 @@ export default createTool({
 
     if (tools.length === 1) {
       const tool = tools[0];
-      return Result.Ok({
+      return Result.Ok<McpDiscoveryResult>({
         mcpServer,
         toolName: tool.name,
-        description: tool.description ?? null,
+        description: tool.description,
         reasoning: 'Only one tool is available on this server.',
         resolvedBy: 'only-tool' as const,
       });
@@ -105,10 +104,10 @@ export default createTool({
 
     const exact = findExactNameMatch(task, tools);
     if (exact) {
-      return Result.Ok({
+      return Result.Ok<McpDiscoveryResult>({
         mcpServer,
         toolName: exact.name,
-        description: exact.description ?? null,
+        description: exact.description,
         reasoning: `Task references tool name "${exact.name}" verbatim.`,
         resolvedBy: 'exact-name' as const,
       });
@@ -134,27 +133,26 @@ export default createTool({
       prompt: `MCP server: ${mcpServer}\nTask: ${task}\n\nAvailable tools:${catalog}`,
     });
 
-    const selected = toolName
+    const selected = isNonEmptyString(toolName)
       ? tools.find(t => t.name === toolName)
       : undefined;
 
     if (!selected) {
-      return Result.Ok({
+      return Result.Ok<McpDiscoveryResult>({
         mcpServer,
-        toolName: null,
-        description: null,
-        reasoning:
-          reasoning || 'No tool on this server plausibly matches the task.',
-        resolvedBy: 'none' as const,
+        reasoning: isNonEmptyString(reasoning)
+          ? reasoning
+          : 'No tool on this server plausibly matches the task.',
+        resolvedBy: 'none',
       });
     }
 
-    return Result.Ok({
+    return Result.Ok<McpDiscoveryResult>({
       mcpServer,
       toolName: selected.name,
-      description: selected.description ?? null,
+      description: selected.description,
       reasoning,
-      resolvedBy: 'llm' as const,
+      resolvedBy: 'llm',
     });
   },
 
@@ -163,7 +161,7 @@ export default createTool({
   },
 
   outputToString({ mcpServer, toolName, resolvedBy }) {
-    if (!toolName) {
+    if (isNil(toolName)) {
       return `No matching tool found in \`${mcpServer}\``;
     }
     const suffix =

@@ -7,18 +7,20 @@ import { stdin, stdout } from 'node:process';
 import { render } from 'ink';
 import { AgentProvider } from './rendering/context';
 import { App } from './rendering/components/App';
-import { GitInfoProvider } from './rendering/context/git-info';
+import { AppProvider } from './rendering/context/app-context';
+import { FileSystemProvider } from './rendering/context/file-system-context';
 import { UserInputProvider } from './rendering/context/user-input-context';
 import { terminalRenderer } from './rendering/terminal-markdown-renderer/markdown-renderer';
-import { appController } from './signal';
 
-const ANSI_ALT_SCREEN_ENTER = '\x1b[?1049h\x1b[H\x1b[2J';
-const ANSI_ALT_SCREEN_EXIT = '\x1b[3J\x1b[?1049l';
+// const ANSI_ALT_SCREEN_ENTER = '\x1b[?1049h\x1b[H\x1b[2J';
+// const ANSI_ALT_SCREEN_EXIT = '\x1b[3J\x1b[?1049l';
 
 // SGR mouse tracking (button events + SGR encoding) so the terminal reports
 // wheel scrolls; Ink surfaces the resulting sequences through `useInput`.
 const ANSI_MOUSE_ENABLE = '\x1b[?1000h\x1b[?1006h';
 const ANSI_MOUSE_DISABLE = '\x1b[?1006l\x1b[?1000l';
+
+const controller = new AbortController();
 
 marked.setOptions({
   // eslint-disable-next-line
@@ -28,7 +30,7 @@ marked.setOptions({
 
 function restoreScreen(): void {
   stdout.write(ANSI_MOUSE_DISABLE);
-  stdout.write(ANSI_ALT_SCREEN_EXIT);
+  // stdout.write(ANSI_ALT_SCREEN_EXIT);
 }
 
 async function main(): Promise<void> {
@@ -36,19 +38,21 @@ async function main(): Promise<void> {
     throw new Error('stdin not a TTY. CLI need interactive terminal.\n');
   }
 
-  stdout.write(ANSI_ALT_SCREEN_ENTER);
+  // stdout.write(ANSI_ALT_SCREEN_ENTER);
   stdout.write(ANSI_MOUSE_ENABLE);
 
-  appController.signal.addEventListener('abort', () => handleExit());
+  controller.signal.addEventListener('abort', () => handleExit());
 
   const { waitUntilExit } = render(
-    <GitInfoProvider>
-      <UserInputProvider>
-        <AgentProvider>
-          <App />
-        </AgentProvider>
-      </UserInputProvider>
-    </GitInfoProvider>,
+    <AppProvider controller={controller} stdin={stdin} stdout={stdout}>
+      <FileSystemProvider>
+        <UserInputProvider>
+          <AgentProvider>
+            <App />
+          </AgentProvider>
+        </UserInputProvider>
+      </FileSystemProvider>
+    </AppProvider>,
     {
       stdout,
       stdin,
@@ -64,8 +68,12 @@ async function main(): Promise<void> {
   await waitUntilExit();
 }
 
-process.on('SIGINT', appController.abort.bind(appController));
-process.on('SIGTERM', appController.abort.bind(appController));
+process.on('SIGINT', () => {
+  controller.abort();
+});
+process.on('SIGTERM', () => {
+  controller.abort();
+});
 
 main()
   .then(() => {

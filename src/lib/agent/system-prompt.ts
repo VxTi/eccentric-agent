@@ -1,7 +1,7 @@
+import { isNil, type Nullable } from '@vxti/typed';
 import compact from 'lodash/compact';
 import first from 'lodash/first';
-import { readFileSync } from 'node:fs';
-import { glob } from 'node:fs/promises';
+import fs from 'node:fs';
 import { CONSTANT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT } from '../constants';
 import { type TaskList, TaskStatus } from '../tasks';
 import type { MCP } from './mcp/mcp';
@@ -9,9 +9,9 @@ import type { MCP } from './mcp/mcp';
 export async function constructSystemPrompt(
   taskList: TaskList,
   mcps: MCP[],
-  cwd: string
+  globOptions: { cwd: string; ignored: Set<string> }
 ): Promise<string> {
-  const systemPrompt = await loadSystemPrompt(cwd);
+  const systemPrompt = await loadSystemPrompt(globOptions);
 
   const mcpServerNames = (
     await Promise.all(
@@ -32,7 +32,7 @@ export async function constructSystemPrompt(
 
 function constructTaskListSystemPromptFragment(
   taskList: TaskList
-): string | null {
+): Nullable<string> {
   if (!taskList.hasTasks) return null;
 
   const lines = taskList.tasks.map(task => {
@@ -53,7 +53,10 @@ function constructTaskListSystemPromptFragment(
   ].join('\n');
 }
 
-async function loadSystemPrompt(cwd: string): Promise<string> {
+async function loadSystemPrompt(globOptions: {
+  cwd: string;
+  ignored: Set<string>;
+}): Promise<string> {
   const supportedFileNames: string[] = [
     'AGENTS',
     'AGENT',
@@ -63,10 +66,13 @@ async function loadSystemPrompt(cwd: string): Promise<string> {
     'copilot-instructions',
   ];
   const agentFile = await Array.fromAsync(
-    glob(`**/{${supportedFileNames.join(',')}}.md`, { cwd })
+    fs.promises.glob(`**/{${supportedFileNames.join(',')}}.md`, {
+      cwd: globOptions.cwd,
+      exclude: Array.from(globOptions.ignored),
+    })
   );
   const firstFile = first(agentFile);
-  if (!firstFile) return DEFAULT_SYSTEM_PROMPT;
+  if (isNil(firstFile)) return DEFAULT_SYSTEM_PROMPT;
 
-  return readFileSync(firstFile, 'utf-8');
+  return fs.readFileSync(firstFile, 'utf-8');
 }

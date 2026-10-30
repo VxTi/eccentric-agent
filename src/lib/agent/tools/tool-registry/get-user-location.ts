@@ -1,7 +1,7 @@
 import * as https from 'node:https';
 import * as z from 'zod';
-import { Result } from '../../result';
-import { createTool } from './common';
+import { Result } from '../../../result';
+import { createTool } from '../common';
 
 const geoSuccessResponseDecoder = z.object({
   success: z.literal(true),

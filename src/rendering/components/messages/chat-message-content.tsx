@@ -1,3 +1,4 @@
+import { isEmptyString } from '@vxti/typed';
 import { Box, Text } from 'ink';
 import { parseMarkdown } from '../../terminal-markdown-renderer/markdown-renderer';
 
@@ -7,12 +8,13 @@ interface MarkdownViewProps {
 
 export function ChatMessageContent({ content }: MarkdownViewProps) {
   const parsedContent = parseMarkdown(content.trim()).trim();
-  if (!parsedContent) {
+  if (isEmptyString(parsedContent)) {
     return;
   }
-  const lines: string[] = parsedContent
-    .split('\n')
-    .map(line => line.trim() || ' ');
+  const lines: string[] = parsedContent.split('\n').map(line => {
+    const trimmed = line.trim();
+    return trimmed.length === 0 ? ' ' : trimmed;
+  });
 
   return (
     <Box flexDirection="column" width="100%">

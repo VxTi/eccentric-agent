@@ -1,4 +1,5 @@
-import { type AgentContext } from '../../rendering/context';
+import type { AgentContext } from '../../rendering/context';
+import type { FileSystemContext } from '../../rendering/context/file-system-context';
 import { type Message } from '../types/messages';
 
 export const eventTarget = new EventTarget();
@@ -7,8 +8,8 @@ export const enum EventName {
   REQUEST_INPUT = 'request-user-input',
   INPUT_RESPONSE = 'user-input-response',
   AGENT_MESSAGE = 'agent-message',
-  CONTEXT_SYNC_REQUEST = 'sync-agent-context-context',
-  CONTEXT_SYNC_RESULT = 'agent-context-sync-result',
+  CONTEXT_SYNC_REQUEST = 'sync-context-context',
+  CONTEXT_SYNC_RESULT = 'context-sync-result',
   CONSUME_TOKENS = 'consume-tokens',
 }
 
@@ -45,15 +46,29 @@ export class AgentMessageEvent extends CustomEvent<Message> {
   }
 }
 
-export class SyncAgentContextEvent extends CustomEvent<never> {
-  constructor() {
-    super(EventName.CONTEXT_SYNC_REQUEST);
+export enum ContextType {
+  AGENT = 'agent',
+  FS = 'fs',
+}
+export type SyncResultRegistry = {
+  [ContextType.AGENT]: AgentContext;
+  [ContextType.FS]: FileSystemContext;
+};
+
+export class SyncContextEvent extends CustomEvent<ContextType> {
+  constructor(type: ContextType) {
+    super(EventName.CONTEXT_SYNC_REQUEST, { detail: type });
   }
 }
 
-export class AgentContextSyncResult extends CustomEvent<AgentContext> {
-  constructor(context: AgentContext) {
-    super(EventName.CONTEXT_SYNC_RESULT, { detail: context });
+export class ContextSyncResult<
+  T extends ContextType = any,
+> extends CustomEvent<{
+  type: T;
+  context: SyncResultRegistry[T];
+}> {
+  constructor(type: T, context: SyncResultRegistry[T]) {
+    super(EventName.CONTEXT_SYNC_RESULT, { detail: { type, context } });
   }
 }
 export const enum TokenSource {
@@ -76,8 +91,8 @@ const EventConstructorRegistry = {
   [EventName.REQUEST_INPUT]: UserInputRequestEvent,
   [EventName.INPUT_RESPONSE]: UserInputResponseEvent,
   [EventName.AGENT_MESSAGE]: AgentMessageEvent,
-  [EventName.CONTEXT_SYNC_REQUEST]: SyncAgentContextEvent,
-  [EventName.CONTEXT_SYNC_RESULT]: AgentContextSyncResult,
+  [EventName.CONTEXT_SYNC_REQUEST]: SyncContextEvent,
+  [EventName.CONTEXT_SYNC_RESULT]: ContextSyncResult,
   [EventName.CONSUME_TOKENS]: ConsumeTokenEvent,
 } as const satisfies Record<EventName, any>;
 
@@ -85,8 +100,8 @@ type EventRegistry = {
   [EventName.REQUEST_INPUT]: UserInputRequestEvent;
   [EventName.INPUT_RESPONSE]: UserInputResponseEvent;
   [EventName.AGENT_MESSAGE]: AgentMessageEvent;
-  [EventName.CONTEXT_SYNC_REQUEST]: SyncAgentContextEvent;
-  [EventName.CONTEXT_SYNC_RESULT]: AgentContextSyncResult;
+  [EventName.CONTEXT_SYNC_REQUEST]: SyncContextEvent;
+  [EventName.CONTEXT_SYNC_RESULT]: ContextSyncResult;
   [EventName.CONSUME_TOKENS]: ConsumeTokenEvent;
 };
 

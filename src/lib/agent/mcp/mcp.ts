@@ -1,25 +1,26 @@
 import {
+  applyMiddlewares,
   Client,
+  createMiddleware,
   StdioClientTransport,
   StreamableHTTPClientTransport,
-  UnauthorizedError,
   type Transport,
-  createMiddleware,
-  applyMiddlewares,
+  UnauthorizedError,
 } from '@modelcontextprotocol/client';
-import { type z } from 'zod';
-import { debug, emitMessage } from '../../events/messaging';
-import { LocalFileOAuthProvider } from './oauth-provider';
+import { config } from 'dotenv';
 import first from 'lodash/first';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import path from 'node:path';
+import { type z } from 'zod';
 import { acquireContextInstance } from '../../events/context-acquisition';
+import { ContextType } from '../../events/events';
+import { debug, emitMessage } from '../../events/messaging';
 import type { PromiseResult } from '../../types/types';
 import { mcpConfigSchema, mcpServerConfigSchema } from './models';
+import { LocalFileOAuthProvider } from './oauth-provider';
 import { type mcp } from './types';
-import { config } from 'dotenv';
 
 config({ quiet: true });
 
@@ -269,7 +270,7 @@ function resolveOAuthConfig(
 }
 
 export async function getMCPServer(name: string): Promise<MCP> {
-  const context = await acquireContextInstance();
+  const context = await acquireContextInstance(ContextType.AGENT);
 
   const mcp = first(context.mcpServers.filter(server => server.name === name));
 

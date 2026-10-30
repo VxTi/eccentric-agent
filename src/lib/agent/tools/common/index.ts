@@ -1,2 +1,2 @@
-export * from './tool-base';
-export * from './registry';
+export * from '../tool-definition';
+export * from '../registry';

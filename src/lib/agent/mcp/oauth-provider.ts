@@ -1,9 +1,10 @@
-import {
-  type OAuthClientInformation,
-  type OAuthClientMetadata,
-  type OAuthClientProvider,
-  type OAuthTokens,
+import type {
+  OAuthClientInformation,
+  OAuthClientMetadata,
+  OAuthClientProvider,
+  OAuthTokens,
 } from '@modelcontextprotocol/client';
+import { isNonEmptyString, isNotNil } from '@vxti/typed';
 import { spawn } from 'node:child_process';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
@@ -108,7 +109,7 @@ export class LocalFileOAuthProvider implements OAuthClientProvider {
   }
 
   public codeVerifier(): string {
-    if (!this._codeVerifier) {
+    if (!isNonEmptyString(this._codeVerifier)) {
       throw new Error('PKCE code verifier not set');
     }
     return this._codeVerifier;
@@ -143,7 +144,7 @@ export class LocalFileOAuthProvider implements OAuthClientProvider {
   private listenForCode(): Promise<string> {
     return new Promise((resolve, reject) => {
       const server = http.createServer((req, res) => {
-        if (!req.url) return;
+        if (!isNonEmptyString(req.url)) return;
         const reqUrl = new URL(req.url, CALLBACK_URL);
         if (reqUrl.pathname !== CALLBACK_PATH) {
           res.statusCode = 404;
@@ -156,7 +157,7 @@ export class LocalFileOAuthProvider implements OAuthClientProvider {
 
         res.statusCode = StatusCode.OK;
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        if (code) {
+        if (isNotNil(code)) {
           res.end(
             `<html><head><script>window.addEventListener('DOMContentLoaded', () => window.close())</script></head><body><h2>Authorization complete</h2><p>You can close this tab and return to the terminal.</p></body></html>`
           );
