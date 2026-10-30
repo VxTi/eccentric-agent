@@ -1,8 +1,9 @@
+import { isEmptyArray } from '@vxti/typed';
 import * as z from 'zod';
 import { Result } from '../../../result';
 import { Agent } from '../../agent';
 import { type NotifierChannel } from '../../../events/notifier';
-import { createTool, type ToolChannelParams } from '../common';
+import { createTool, type ToolChannelParams } from '../tool-definition';
 
 const agentSpecSchema = z.object({
   name: z
@@ -100,11 +101,11 @@ export const spawnSubAgents = createTool({
   },
 
   outputToString({ results }) {
-    if (results.length === 0) return `No tasks were performed`;
+    if (isEmptyArray(results)) return `No tasks were performed`;
 
     const failedTasks = results.filter(res => !res.success);
 
-    if (failedTasks.length === 0) {
+    if (isEmptyArray(failedTasks)) {
       return `All side tasks finished`;
     }
 

@@ -3,12 +3,12 @@ import { isCommand } from '../../lib/commands';
 import { emitMessage } from '../../lib/events/messaging';
 import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
 import { TokenSource } from '../../lib/events/events';
+import { app, useAppDispatch } from '../../lib/state';
 import { useAgent } from '../context';
-import { useAppContext } from '../context/app-context';
 
 export function useCommandProcessor() {
   const { setMessages, setModelMessages, systemPrompt } = useAgent();
-  const { exit } = useAppContext();
+  const dispatch = useAppDispatch();
 
   const processCommand = useCallback(
     (command: string) => {
@@ -28,7 +28,7 @@ export function useCommandProcessor() {
         }
         case 'exit':
         case 'quit': {
-          exit();
+          dispatch(app.exit());
           break;
         }
         case 'system-prompt':
@@ -41,7 +41,7 @@ ${systemPrompt}`,
           break;
       }
     },
-    [exit, setMessages, setModelMessages, systemPrompt]
+    [dispatch, setMessages, setModelMessages, systemPrompt]
   );
 
   return { processCommand };

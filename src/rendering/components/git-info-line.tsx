@@ -1,12 +1,11 @@
 import { isNil } from '@vxti/typed';
 import { Box, Text } from 'ink';
-import { useFileSystem } from '../context/file-system-context';
+import { useAppSelector } from '../../lib/state';
 
 export function GitInfoLine() {
-  const {
-    git: { currentBranch, repoName },
-    loading,
-  } = useFileSystem();
+  const { currentBranch, repoName, loading } = useAppSelector(
+    ({ fileSystem: { git, loading } }) => ({ ...git, loading })
+  );
 
   if (loading || isNil(currentBranch) || isNil(repoName)) return;
 

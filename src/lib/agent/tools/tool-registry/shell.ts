@@ -1,8 +1,8 @@
 import { type ExecException } from 'node:child_process';
 import * as z from 'zod';
 import { Result } from '../../../result';
-import { createTool, ToolSelectionOption } from '../common';
 import { exec } from 'child_process';
+import { createTool, ToolSelectionOption } from '../tool-definition';
 
 const inputSchema = z.object({
   command: z
@@ -129,7 +129,6 @@ export const shell = createTool({
   },
 
   inputToString: ({ command }) => `Shell \`${command}\``,
-
   outputToString({ exitCode, stderr, stdout }, _, { command }) {
     if (exitCode === 0) {
       const lines = stdout.split('\n');

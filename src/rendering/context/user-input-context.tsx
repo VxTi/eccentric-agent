@@ -29,7 +29,6 @@ import {
 } from '../hooks';
 import { useCommandProcessor } from '../hooks/command-processor';
 import { useAgent } from './agent-context';
-import { useAppContext } from './app-context';
 
 export interface UserInputContextType {
   input: string;
@@ -141,7 +140,9 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
     setSuggestions,
   } = useInputSuggestionProvider(input, cursorOffset);
 
-  const { controller } = useAppContext();
+  const { controller } = useAppSelector(({ app }) => ({
+    controller: app.controller,
+  }));
   const { submitMessage } = useAgent();
   const { processCommand } = useCommandProcessor();
 

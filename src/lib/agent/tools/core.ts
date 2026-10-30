@@ -10,7 +10,7 @@ import {
   type SomeTool,
   type ToolChannelParams,
   ToolSelectionOption,
-} from './common';
+} from './tool-definition';
 
 export function makeToolSet(
   tools: SomeTool[],

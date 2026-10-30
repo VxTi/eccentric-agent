@@ -1,9 +1,8 @@
 import * as z from 'zod';
-import { acquireContextInstance } from '../../../../events/context-acquisition';
-import { ContextType } from '../../../../events/events';
 import { Result } from '../../../../result';
+import { store } from '../../../../state';
 import { type Task, TaskStatus } from '../../../../tasks';
-import { createTool } from '../../common';
+import { createTool } from '../../tool-definition';
 
 const CreateTaskSchema = z.object({
   id: z
@@ -50,8 +49,10 @@ export const createTaskList = createTool({
   inputSchema,
   outputSchema,
 
-  async handle({ tasks }) {
-    const { taskList } = await acquireContextInstance(ContextType.AGENT);
+  handle({ tasks }) {
+    const {
+      agent: { taskList },
+    } = store.getState();
     const newList: Task[] = tasks.map(task => ({
       id: task.id,
       description: task.description,

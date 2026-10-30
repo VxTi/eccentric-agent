@@ -1,10 +1,10 @@
 import { isNil, isNonEmptyString, isNotNil } from '@vxti/typed';
 import { generateText, Output } from 'ai';
-import * as z from 'zod';
 import { Result } from '../../../../result';
 import { getMCPServer, type McpTool } from '../../../mcp/mcp';
 import { getModelForTask, ModelTaskType } from '../../../models';
-import { createTool } from '../../common';
+import { createTool } from '../../tool-definition';
+import * as z from 'zod';
 
 const inputSchema = z.object({
   mcpServer: z
@@ -45,7 +45,7 @@ const selectionSchema = z.object({
 });
 
 async function listAllTools(mcpServer: string): Promise<McpTool[]> {
-  const mcp = await getMCPServer(mcpServer);
+  const mcp = getMCPServer(mcpServer);
   const all = new Map<string, McpTool>();
 
   let cursor: string | undefined;
@@ -156,9 +156,8 @@ export const discoverMcpTool = createTool({
     });
   },
 
-  inputToString({ mcpServer, task }) {
-    return `Finding the best MCP tool in \`${mcpServer}\` for: ${task}`;
-  },
+  inputToString: ({ mcpServer, task }) =>
+    `Finding the best MCP tool in \`${mcpServer}\` for: ${task}`,
 
   outputToString({ mcpServer, toolName, resolvedBy }) {
     if (isNil(toolName)) {

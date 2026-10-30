@@ -1,6 +1,7 @@
+import { hasArrayLength, isEmptyArray } from '@vxti/typed';
 import * as z from 'zod';
 import { Result } from '../../../result';
-import { createTool } from '../common';
+import { createTool } from '../tool-definition';
 
 const inputSchema = z.object({
   urls: z
@@ -38,41 +39,6 @@ const outputSchema = z.object({
     .describe('A list of websites that were requested, and their content'),
 });
 
-async function makeRequest(
-  url: string,
-  maxBytes: number | undefined
-): Promise<z.infer<typeof websiteSchema>> {
-  const parsed = new URL(url);
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error(
-      `Unsupported protocol: ${parsed.protocol}. Only http and https are allowed.`
-    );
-  }
-
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
-        '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    },
-    redirect: 'follow',
-  });
-
-  const body = await response.text();
-  const content =
-    typeof maxBytes === 'number' && body.length > maxBytes
-      ? body.slice(0, maxBytes)
-      : body;
-
-  return {
-    url: response.url,
-    status: response.status,
-    contentType: response.headers.get('content-type') ?? '',
-    content,
-  };
-}
-
 export const webFetch = createTool({
   internalName: 'web_fetch',
   name: 'Web Fetch',
@@ -91,7 +57,7 @@ export const webFetch = createTool({
   async handle(input) {
     const { urls, maxBytes } = input;
 
-    if (urls.length === 0) {
+    if (isEmptyArray(urls)) {
       return Result.Error('List of URLs must be greater than 0 ');
     }
 
@@ -103,7 +69,7 @@ export const webFetch = createTool({
   },
 
   inputToString(input): string {
-    if (input.urls.length === 1) {
+    if (hasArrayLength(input.urls, 1)) {
       return `Inspecting \`${input.urls[0]}\``;
     }
 
@@ -139,3 +105,38 @@ export const webFetch = createTool({
     return `\`${count - errStatuses}\` / \`${count}\` requests were made successfully`;
   },
 });
+
+async function makeRequest(
+  url: string,
+  maxBytes: number | undefined
+): Promise<z.infer<typeof websiteSchema>> {
+  const parsed = new URL(url);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(
+      `Unsupported protocol: ${parsed.protocol}. Only http and https are allowed.`
+    );
+  }
+
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
+        '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    },
+    redirect: 'follow',
+  });
+
+  const body = await response.text();
+  const content =
+    typeof maxBytes === 'number' && body.length > maxBytes
+      ? body.slice(0, maxBytes)
+      : body;
+
+  return {
+    url: response.url,
+    status: response.status,
+    contentType: response.headers.get('content-type') ?? '',
+    content,
+  };
+}

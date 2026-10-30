@@ -1,7 +1,7 @@
 import * as https from 'node:https';
 import * as z from 'zod';
 import { Result } from '../../../result';
-import { createTool } from '../common';
+import { createTool } from '../tool-definition';
 
 const geoSuccessResponseDecoder = z.object({
   success: z.literal(true),
@@ -27,6 +27,45 @@ type GeoData = z.infer<typeof geoResponseDecoder>;
 
 const inputSchema = z.object();
 const outputSchema = geoSuccessResponseDecoder;
+
+export const getUserLocation = createTool({
+  internalName: 'get_user_location',
+  name: 'Get user location',
+  description:
+    "Returns the user's approximate geographic location, derived from their public IP address via" +
+    ' a free IP-geolocation service. The result includes city, region, country, the resolved' +
+    ' latitude/longitude, and the IANA time zone. Accuracy is at city level at best — do NOT use' +
+    ' this for navigation or anything safety-critical. Use this tool when you need rough locale' +
+    ' context, e.g. to localize a recommendation, infer business hours, or interpret a relative' +
+    " reference like 'nearby'. Takes no arguments.",
+  inputSchema,
+  outputSchema,
+
+  async handle() {
+    const result = await httpsGetJson(GEO_ENDPOINT);
+
+    if (!result.ok) return result;
+
+    if (!result.data.body.success) {
+      return Result.Error(
+        `Geolocation lookup failed: HTTP ${result.data.status} - ${result.data.body.message}`
+      );
+    }
+
+    return Result.Ok(result.data.body);
+  },
+
+  inputToString: () => 'Looking up user location',
+  requiresApproval: () => true,
+
+  outputToString({ city, region, country }) {
+    const parts = [city, region, country].filter(part => part.length > 0);
+
+    if (parts.length === 0) return 'Location unavailable';
+
+    return `User location: ${parts.map(p => `\`${p}\``).join(', ')}`;
+  },
+});
 
 const GEO_ENDPOINT = 'https://ipwho.is/';
 
@@ -80,45 +119,3 @@ function httpsGetJson(
     req.end();
   });
 }
-
-export const getUserLocation = createTool({
-  internalName: 'get_user_location',
-  name: 'Get user location',
-  description:
-    "Returns the user's approximate geographic location, derived from their public IP address via" +
-    ' a free IP-geolocation service. The result includes city, region, country, the resolved' +
-    ' latitude/longitude, and the IANA time zone. Accuracy is at city level at best — do NOT use' +
-    ' this for navigation or anything safety-critical. Use this tool when you need rough locale' +
-    ' context, e.g. to localize a recommendation, infer business hours, or interpret a relative' +
-    " reference like 'nearby'. Takes no arguments.",
-  inputSchema,
-  outputSchema,
-
-  async handle() {
-    const result = await httpsGetJson(GEO_ENDPOINT);
-
-    if (!result.ok) return result;
-
-    if (!result.data.body.success) {
-      return Result.Error(
-        `Geolocation lookup failed: HTTP ${result.data.status} - ${result.data.body.message}`
-      );
-    }
-
-    return Result.Ok(result.data.body);
-  },
-
-  inputToString() {
-    return 'Looking up user location';
-  },
-
-  requiresApproval: () => true,
-
-  outputToString({ city, region, country }) {
-    const parts = [city, region, country].filter(part => part.length > 0);
-
-    if (parts.length === 0) return 'Location unavailable';
-
-    return `User location: ${parts.map(p => `\`${p}\``).join(', ')}`;
-  },
-});

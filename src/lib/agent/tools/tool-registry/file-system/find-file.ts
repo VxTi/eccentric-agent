@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as z from 'zod';
 import { Result } from '../../../../result';
 import { Position, ellipsize } from '../../../../utils/string-utils';
-import { createTool } from '../../common';
+import { createTool } from '../../tool-definition';
 
 const inputSchema = z.object({
   directoryPath: z
@@ -75,9 +75,8 @@ export const findFile = createTool({
     });
   },
 
-  inputToString({ filePattern, directoryPath }): string {
-    return `Looking for file pattern \`${filePattern}\` in \`${directoryPath}\``;
-  },
+  inputToString: ({ filePattern, directoryPath }) =>
+    `Looking for file pattern \`${filePattern}\` in \`${directoryPath}\``,
 
   outputToString({ files }): string {
     if (files.length === 0) {

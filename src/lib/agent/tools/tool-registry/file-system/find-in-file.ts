@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { Result } from '../../../../result';
-import { createTool } from '../../common';
 import { readFile } from 'fs/promises';
+import { createTool } from '../../tool-definition';
 
 const inputSchema = z.object({
   filePath: z.string().describe('The absolute path of the file to search in'),

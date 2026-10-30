@@ -1,5 +1,3 @@
-import type { AgentState } from '../state/agent';
-import type { FileSystemState } from '../state/file-system';
 import { type Message } from '../types/messages';
 
 export const eventTarget = new EventTarget();
@@ -8,8 +6,6 @@ export const enum EventName {
   REQUEST_INPUT = 'request-user-input',
   INPUT_RESPONSE = 'user-input-response',
   AGENT_MESSAGE = 'agent-message',
-  CONTEXT_SYNC_REQUEST = 'sync-context-context',
-  CONTEXT_SYNC_RESULT = 'context-sync-result',
   CONSUME_TOKENS = 'consume-tokens',
 }
 
@@ -46,31 +42,6 @@ export class AgentMessageEvent extends CustomEvent<Message> {
   }
 }
 
-export enum ContextType {
-  AGENT = 'agent',
-  FS = 'fs',
-}
-export type SyncResultRegistry = {
-  [ContextType.AGENT]: AgentState;
-  [ContextType.FS]: FileSystemState;
-};
-
-export class SyncContextEvent extends CustomEvent<ContextType> {
-  constructor(type: ContextType) {
-    super(EventName.CONTEXT_SYNC_REQUEST, { detail: type });
-  }
-}
-
-export class ContextSyncResult<
-  T extends ContextType = any,
-> extends CustomEvent<{
-  type: T;
-  context: SyncResultRegistry[T];
-}> {
-  constructor(type: T, context: SyncResultRegistry[T]) {
-    super(EventName.CONTEXT_SYNC_RESULT, { detail: { type, context } });
-  }
-}
 export const enum TokenSource {
   PRIMARY = 'primary',
   SUB_TASK = 'sub-task',
@@ -91,8 +62,6 @@ const EventConstructorRegistry = {
   [EventName.REQUEST_INPUT]: UserInputRequestEvent,
   [EventName.INPUT_RESPONSE]: UserInputResponseEvent,
   [EventName.AGENT_MESSAGE]: AgentMessageEvent,
-  [EventName.CONTEXT_SYNC_REQUEST]: SyncContextEvent,
-  [EventName.CONTEXT_SYNC_RESULT]: ContextSyncResult,
   [EventName.CONSUME_TOKENS]: ConsumeTokenEvent,
 } as const satisfies Record<EventName, any>;
 
@@ -100,8 +69,6 @@ type EventRegistry = {
   [EventName.REQUEST_INPUT]: UserInputRequestEvent;
   [EventName.INPUT_RESPONSE]: UserInputResponseEvent;
   [EventName.AGENT_MESSAGE]: AgentMessageEvent;
-  [EventName.CONTEXT_SYNC_REQUEST]: SyncContextEvent;
-  [EventName.CONTEXT_SYNC_RESULT]: ContextSyncResult;
   [EventName.CONSUME_TOKENS]: ConsumeTokenEvent;
 };
 

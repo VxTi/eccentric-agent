@@ -2,7 +2,7 @@ import { isEmptyString, isNonEmptyArray, isNotNil } from '@vxti/typed';
 import { useEffect, useState } from 'react';
 import { SUPPORTED_COMMANDS } from '../../lib/commands';
 import fs from 'node:fs';
-import { useFileSystem } from '../context/file-system-context';
+import { useAppSelector } from '../../lib/state';
 
 const FILE_SUGGESTION_PATTERN = /(?:\s|^)@([\w_.-]+)$/;
 const COMMAND_PATTERN = /^\/(\w*)$/;
@@ -31,7 +31,7 @@ export function useInputSuggestionProvider(
   const {
     cwd,
     git: { ignored },
-  } = useFileSystem();
+  } = useAppSelector(state => state.fileSystem);
 
   const [suggestions, setSuggestions] = useState<SuggestionSet | undefined>(
     undefined

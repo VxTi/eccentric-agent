@@ -1,10 +1,10 @@
+import { isNil } from '@vxti/typed';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as z from 'zod';
-import { acquireContextInstance } from '../../../../events/context-acquisition';
-import { ContextType } from '../../../../events/events';
 import { Result } from '../../../../result';
-import { createTool } from '../../common';
+import { store } from '../../../../state';
+import { createTool } from '../../tool-definition';
 
 const inputSchema = z.object({
   filePath: z
@@ -12,16 +12,16 @@ const inputSchema = z.object({
     .describe(
       'The path to the file to read. May be absolute or relative to the working directory.'
     ),
-  fromLine: z
-    .number()
-    .describe('The starting line position of which frame to read')
-    .default(0),
-  lineCount: z
-    .number()
-    .describe(
-      "The amount of lines to read. If it's clear that you require all content, this can be skipped"
-    )
-    .optional(),
+  selection: z.object({
+    fromLineNumber: z
+      .number()
+      .describe('The starting line position of which frame to read'),
+    lineCount: z
+      .optional(z.number())
+      .describe(
+        "The amount of lines to read. If it's clear that you require all content, this can be skipped"
+      ),
+  }),
 });
 
 const outputSchema = z.object({
@@ -52,9 +52,11 @@ export const readFile = createTool({
   inputSchema,
   outputSchema,
 
-  async handle({ filePath, fromLine, lineCount }) {
-    const { fileCache } = await acquireContextInstance(ContextType.AGENT);
-    const { cwd } = await acquireContextInstance(ContextType.FS);
+  async handle({ filePath, selection: { fromLineNumber, lineCount } }) {
+    const {
+      agent: { fileCache },
+      fileSystem: { cwd },
+    } = store.getState();
 
     const absolutePath = path.isAbsolute(filePath)
       ? filePath
@@ -68,9 +70,9 @@ export const readFile = createTool({
     const newline = raw.match(/\r?\n/)?.[0] ?? '\n';
     const lines = raw.split(/\r?\n/);
 
-    if (lineCount === undefined) {
+    if (isNil(lineCount)) {
       // Returns all the file's contents
-      if (fromLine === 0) {
+      if (fromLineNumber === 0) {
         return Result.Ok({
           filePath,
           content: prefixWithLineNumbers(lines, newline),
@@ -80,14 +82,14 @@ export const readFile = createTool({
       // Returns file content starting from line
       return Result.Ok({
         filePath,
-        content: prefixWithLineNumbers(lines.slice(fromLine), newline),
+        content: prefixWithLineNumbers(lines.slice(fromLineNumber), newline),
       });
     }
 
     // Returns file content frame from a -> b
     return Result.Ok({
       content: prefixWithLineNumbers(
-        lines.slice(fromLine, fromLine + lineCount),
+        lines.slice(fromLineNumber, fromLineNumber + lineCount),
         newline
       ),
       filePath,

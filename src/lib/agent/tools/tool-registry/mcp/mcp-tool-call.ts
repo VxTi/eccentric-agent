@@ -1,8 +1,8 @@
 import { isNonEmptyArray } from '@vxti/typed';
 import { Result } from '../../../../result';
 import { getMCPServer } from '../../../mcp/mcp';
-import { createTool, ToolSelectionOption } from '../../common';
 import * as z from 'zod';
+import { createTool, ToolSelectionOption } from '../../tool-definition';
 
 const inputSchema = z.object({
   mcpServer: z
@@ -63,7 +63,7 @@ export const callMcpTool = createTool({
   outputSchema,
 
   async handle({ mcpServer, toolName, arguments: args }, _, signal) {
-    const mcp = await getMCPServer(mcpServer);
+    const mcp = getMCPServer(mcpServer);
 
     const result = await mcp.withAuth(() =>
       mcp.client.callTool({ name: toolName, arguments: args }, { signal })
@@ -80,8 +80,8 @@ export const callMcpTool = createTool({
     });
   },
 
-  async requiresApproval({ mcpServer, toolName }) {
-    const mcp = await getMCPServer(mcpServer);
+  requiresApproval({ mcpServer, toolName }) {
+    const mcp = getMCPServer(mcpServer);
 
     // If trusted, no approval needed
     if (isTrusted({ mcpServer, toolName })) return false;

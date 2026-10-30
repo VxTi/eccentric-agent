@@ -1,8 +1,8 @@
-import { isNonEmptyString } from '@vxti/typed';
+import { isEmptyArray, isNonEmptyString } from '@vxti/typed';
 import * as z from 'zod';
 import { Result } from '../../../result';
 import { getTavilyClient } from '../../tavily';
-import { createTool } from '../common';
+import { createTool } from '../tool-definition';
 
 const inputSchema = z.object({
   query: z
@@ -88,7 +88,7 @@ export const webSearch = createTool({
   },
 
   outputToString({ query, results }) {
-    if (results.length === 0) {
+    if (isEmptyArray(results)) {
       return `\`${query}\` returned no results`;
     }
     return `\`${query}\` returned \`${results.length} result${results.length === 1 ? '' : 's'}\``;

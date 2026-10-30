@@ -1,7 +1,8 @@
+import { isEmptyArray } from '@vxti/typed';
 import * as z from 'zod';
 import { requestUserInput } from '../../../events/user-input';
 import { Result } from '../../../result';
-import { createTool } from '../common';
+import { createTool } from '../tool-definition';
 
 const optionSchema = z.object({
   id: z
@@ -95,7 +96,7 @@ export const promptUserOptions = createTool({
       allowMultiple: selectMultiple,
     });
 
-    if (chosen.length === 0) {
+    if (isEmptyArray(chosen)) {
       return Result.Error(
         `User selected an unrecognised option(s) id "${chosen.map(({ id }) => id).join(', ')}". Expected one of:` +
           ` ${options.map(option => option.id).join(', ')}.`
@@ -110,10 +111,7 @@ export const promptUserOptions = createTool({
     });
   },
 
-  inputToString({ question }) {
-    return `Asking user \`${question}\``;
-  },
-
+  inputToString: ({ question }) => `Asking user \`${question}\``,
   outputToString({ selectedOptions }) {
     const selected = selectedOptions
       .map(opt => `${opt.selectedLabel}`)

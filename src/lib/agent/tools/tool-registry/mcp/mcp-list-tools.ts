@@ -2,7 +2,7 @@ import { compact, isNonEmptyString, isNotNil } from '@vxti/typed';
 import * as z from 'zod';
 import { Result } from '../../../../result';
 import { getMCPServer, type McpTool } from '../../../mcp/mcp';
-import { createTool } from '../../common';
+import { createTool } from '../../tool-definition';
 
 const inputSchema = z.object({
   mcpServer: z
@@ -44,7 +44,7 @@ export const listMcpTools = createTool({
   outputSchema,
 
   async handle({ mcpServer, toolName }) {
-    const mcp = await getMCPServer(mcpServer);
+    const mcp = getMCPServer(mcpServer);
     const allTools = new Map<string, McpTool>();
 
     let cursor: string | undefined;

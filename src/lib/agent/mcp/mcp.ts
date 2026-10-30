@@ -1,4 +1,5 @@
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { store } from '../../state';
 import type { PromiseResult } from '../../types/types';
 import type { mcp } from './types';
 import {
@@ -16,8 +17,6 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import path from 'node:path';
 import { type z } from 'zod';
-import { acquireContextInstance } from '../../events/context-acquisition';
-import { ContextType } from '../../events/events';
 import { debug, emitMessage } from '../../events/messaging';
 import { Result } from '../../result';
 import { mcpConfigSchema, mcpServerConfigSchema } from './models';
@@ -277,12 +276,12 @@ function resolveOAuthConfig(
   );
 }
 
-export async function getMCPServer(name: string): Promise<MCP> {
-  const context = await acquireContextInstance(ContextType.AGENT);
+export function getMCPServer(name: string): MCP {
+  const {
+    agent: { mcpServers },
+  } = store.getState();
 
-  const mcp = first(
-    context.mcpServers.filter((server: MCP) => server.name === name)
-  );
+  const mcp = first(mcpServers.filter((server: MCP) => server.name === name));
 
   if (!mcp) {
     throw new Error(`MCP "${name}" was not found`);

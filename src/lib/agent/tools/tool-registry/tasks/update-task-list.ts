@@ -1,9 +1,8 @@
 import * as z from 'zod';
-import { acquireContextInstance } from '../../../../events/context-acquisition';
-import { ContextType } from '../../../../events/events';
 import { Result } from '../../../../result';
+import { store } from '../../../../state';
 import { type Task, TaskStatus } from '../../../../tasks';
-import { createTool } from '../../common';
+import { createTool } from '../../tool-definition';
 
 const statusNameMapping: Record<TaskStatus, string> = {
   [TaskStatus.PENDING]: 'Pending',
@@ -49,8 +48,11 @@ export const updateTaskList = createTool({
   inputSchema,
   outputSchema,
 
-  async handle({ updates }) {
-    const { taskList } = await acquireContextInstance(ContextType.AGENT);
+  handle({ updates }) {
+    const {
+      agent: { taskList },
+    } = store.getState();
+
     if (!taskList.hasTasks) {
       return Result.Error(
         'No task list exists. Call `create_task_list` before updating tasks.'

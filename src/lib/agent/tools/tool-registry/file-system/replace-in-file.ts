@@ -1,11 +1,11 @@
+import { isEmptyString, isNonEmptyArray } from '@vxti/typed';
 import { readFile, writeFile } from 'fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
-import { acquireContextInstance } from '../../../../events/context-acquisition';
-import { ContextType } from '../../../../events/events';
 import { Result } from '../../../../result';
+import { store } from '../../../../state';
 import { formatDiffMd } from '../../../../utils/diff-utils';
-import { createTool } from '../../common';
+import { createTool } from '../../tool-definition';
 
 const inputSchema = z.object({
   filePath: z
@@ -65,11 +65,13 @@ export const replaceInFile = createTool({
   outputSchema,
 
   async handle({ filePath, line, count, replacement }) {
-    const { fileCache } = await acquireContextInstance(ContextType.AGENT);
+    const {
+      agent: { fileCache },
+    } = store.getState();
     const absolutePath = await fileCache.getCachedFilePath(filePath);
 
     const original = await readFile(absolutePath, 'utf-8');
-    const lines = original.length === 0 ? [] : original.split('\n');
+    const lines = isEmptyString(original, true) ? [] : original.split('\n');
 
     const hadTrailingNewline = original.endsWith('\n');
     if (hadTrailingNewline) lines.pop();
@@ -89,8 +91,9 @@ export const replaceInFile = createTool({
       );
     }
 
-    const replacementLines =
-      replacement.length === 0 ? [] : replacement.split('\n');
+    const replacementLines = isEmptyString(replacement)
+      ? []
+      : replacement.split('\n');
     if (
       replacementLines.length > 1 &&
       replacementLines[replacementLines.length - 1] === ''
@@ -101,9 +104,12 @@ export const replaceInFile = createTool({
     lines.splice(line - 1, count, ...replacementLines);
 
     let updated = lines.join('\n');
-    if ((hadTrailingNewline || original.length === 0) && lines.length > 0)
+    if (
+      (hadTrailingNewline || isEmptyString(original)) &&
+      isNonEmptyArray(lines)
+    ) {
       updated += '\n';
-
+    }
     await writeFile(absolutePath, updated, 'utf-8');
     await fileCache.update(absolutePath);
 

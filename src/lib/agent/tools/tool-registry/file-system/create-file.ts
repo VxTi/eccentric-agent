@@ -1,11 +1,10 @@
 import * as z from 'zod';
-import { acquireContextInstance } from '../../../../events/context-acquisition';
-import { ContextType } from '../../../../events/events';
 import { Result } from '../../../../result';
-import { createTool } from '../../common';
+import { store } from '../../../../state';
 import { formatDiffMd } from '../../../../utils/diff-utils';
 import { mkdir, writeFile, access } from 'fs/promises';
 import { dirname } from 'path';
+import { createTool } from '../../tool-definition';
 
 const inputSchema = z.object({
   filePath: z.string().describe('The absolute path of the file to create'),
@@ -59,7 +58,9 @@ export const createFile = createTool({
   outputSchema,
 
   async handle({ overwrite, createDirectories, filePath, content }) {
-    const context = await acquireContextInstance(ContextType.AGENT);
+    const {
+      agent: { fileCache },
+    } = store.getState();
     const override = overwrite ?? false;
     const createDirs = createDirectories ?? true;
 
@@ -74,7 +75,7 @@ export const createFile = createTool({
       await mkdir(dirname(filePath), { recursive: true });
     }
 
-    await context.fileCache.update(filePath);
+    await fileCache.update(filePath);
     await writeFile(filePath, content, 'utf-8');
     return Result.Ok(
       {
@@ -85,9 +86,7 @@ export const createFile = createTool({
       { current: content }
     );
   },
-  inputToString({ filePath }) {
-    return `Create file \`${filePath}\``;
-  },
+  inputToString: ({ filePath }) => `Create file \`${filePath}\``,
   outputToString({ filePath, created }, _, { current }) {
     const previous = created ? '' : 'File existed prior to write.';
     return `Updated \`${filePath}\`\\n${formatDiffMd(previous, current)}`;

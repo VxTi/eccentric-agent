@@ -37,8 +37,6 @@ import {
   dequeueMessage,
 } from '../../lib/state/agent';
 import { basicHighlightFormatting } from '../terminal-markdown-renderer/markdown-renderer';
-import { useAppContext } from './app-context';
-import { useFileSystem } from './file-system-context';
 
 export type { AgentStatus };
 
@@ -65,11 +63,13 @@ interface AgentProviderProps {
 
 export function AgentProvider({ children }: AgentProviderProps): ReactNode {
   const dispatch = useAppDispatch();
-  const { controller } = useAppContext();
-  const {
-    cwd,
-    git: { ignored },
-  } = useFileSystem();
+  const { controller, cwd, gitIgnored } = useAppSelector(
+    ({ fileSystem, app }) => ({
+      controller: app.controller,
+      cwd: fileSystem.cwd,
+      gitIgnored: fileSystem.git.ignored,
+    })
+  );
 
   const { taskList, model, mcpServers } = useAppSelector(state => state.agent);
 
@@ -115,16 +115,17 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
    */
   useEffect(() => {
     let cancelled = false;
-    void constructSystemPrompt(taskList, mcpServers, { cwd, ignored }).then(
-      prompt => {
-        if (!cancelled) dispatch(setSystemPromptAction(prompt));
-      }
-    );
+    void constructSystemPrompt(taskList, mcpServers, {
+      cwd,
+      ignored: gitIgnored,
+    }).then(prompt => {
+      if (!cancelled) dispatch(setSystemPromptAction(prompt));
+    });
 
     return () => {
       cancelled = true;
     };
-  }, [taskList, mcpServers, cwd, ignored, dispatch]);
+  }, [taskList, mcpServers, cwd, gitIgnored, dispatch]);
 
   /**
    * Handling incoming messages from non-react world, and token consumption

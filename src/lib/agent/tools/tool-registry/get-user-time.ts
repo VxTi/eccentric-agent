@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { Result } from '../../../result';
-import { createTool } from '../common';
+import { createTool } from '../tool-definition';
 
 const inputSchema = z.object();
 const outputSchema = z.object({
@@ -37,11 +37,6 @@ export const getUserTime = createTool({
     });
   },
 
-  inputToString(): string {
-    return 'Getting current user time';
-  },
-
-  outputToString({ formatted }) {
-    return `Current user time is \`${formatted}\``;
-  },
+  inputToString: () => 'Getting current user time',
+  outputToString: ({ formatted }) => `Current user time is \`${formatted}\``,
 });
