@@ -5,6 +5,8 @@ import chalk from 'chalk';
 import { marked } from 'marked';
 import { stdin, stdout } from 'node:process';
 import { render } from 'ink';
+import { Provider } from 'react-redux';
+import { store } from './lib/state/store';
 import { AgentProvider } from './rendering/context';
 import { App } from './rendering/components/App';
 import { AppProvider } from './rendering/context/app-context';
@@ -44,15 +46,17 @@ async function main(): Promise<void> {
   controller.signal.addEventListener('abort', () => handleExit());
 
   const { waitUntilExit } = render(
-    <AppProvider controller={controller} stdin={stdin} stdout={stdout}>
-      <FileSystemProvider>
-        <AgentProvider>
-          <UserInputProvider>
-            <App />
-          </UserInputProvider>
-        </AgentProvider>
-      </FileSystemProvider>
-    </AppProvider>,
+    <Provider store={store}>
+      <AppProvider controller={controller} stdin={stdin} stdout={stdout}>
+        <FileSystemProvider>
+          <AgentProvider>
+            <UserInputProvider>
+              <App />
+            </UserInputProvider>
+          </AgentProvider>
+        </FileSystemProvider>
+      </AppProvider>
+    </Provider>,
     {
       stdout,
       stdin,

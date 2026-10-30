@@ -1,21 +1,26 @@
 import { isNonEmptyArray } from '@vxti/typed';
 import { useInput, usePaste } from 'ink';
 import {
-  createContext,
   type Dispatch,
   type ReactNode,
   type SetStateAction,
   useCallback,
-  useContext,
   useEffect,
-  useState,
 } from 'react';
 import {
   EventName,
   eventOn,
   type UserInputRequest,
 } from '../../lib/events/events';
-import { CHANNEL_ID_NONE } from '../../lib/events/user-input';
+import { useAppDispatch, useAppSelector, store } from '../../lib/state/store';
+import {
+  setInput as setInputAction,
+  setCursorOffset as setCursorOffsetAction,
+  setSuggestions as setSuggestionsAction,
+  setSuggestionCursorIndex as setSuggestionCursorIndexAction,
+  setSuggestionIndex as setSuggestionIndexAction,
+  setInputRequest as setInputRequestAction,
+} from '../../lib/state/user-input';
 import { formatReferencedFiles } from '../components/user-input/input-field';
 import {
   type SuggestionSet,
@@ -26,7 +31,7 @@ import { useCommandProcessor } from '../hooks/command-processor';
 import { useAgent } from './agent-context';
 import { useAppContext } from './app-context';
 
-interface UserInputContextType {
+export interface UserInputContextType {
   input: string;
   setInput: Dispatch<SetStateAction<string>>;
   suggestions: SuggestionSet | undefined;
@@ -40,35 +45,113 @@ interface UserInputContextType {
   setInputRequest: Dispatch<SetStateAction<UserInputRequest>>;
 }
 
-const UserInputContext = createContext<UserInputContextType | undefined>(
-  undefined
-);
+export function useUserInputField(): UserInputContextType {
+  const dispatch = useAppDispatch();
+  const {
+    input,
+    cursorOffset,
+    suggestions,
+    suggestionCursorIndex,
+    suggestionIndex,
+    inputRequest,
+  } = useAppSelector(state => state.userInput);
 
-export function useUserInputField() {
-  const context = useContext(UserInputContext);
-  if (!context) {
-    throw new Error('useInputField() must be used within useInputField()');
-  }
+  const setInput = useCallback<Dispatch<SetStateAction<string>>>(
+    action => {
+      const value =
+        typeof action === 'function'
+          ? action(store.getState().userInput.input)
+          : action;
+      dispatch(setInputAction(value));
+    },
+    [dispatch]
+  );
 
-  return context;
+  const setCursorOffset = useCallback<Dispatch<SetStateAction<number>>>(
+    action => {
+      const value =
+        typeof action === 'function'
+          ? action(store.getState().userInput.cursorOffset)
+          : action;
+      dispatch(setCursorOffsetAction(value));
+    },
+    [dispatch]
+  );
+
+  const setSuggestions = useCallback<
+    Dispatch<SetStateAction<SuggestionSet | undefined>>
+  >(
+    action => {
+      const value =
+        typeof action === 'function'
+          ? action(store.getState().userInput.suggestions)
+          : action;
+      dispatch(setSuggestionsAction(value));
+    },
+    [dispatch]
+  );
+
+  const setSuggestionIndex = useCallback<Dispatch<SetStateAction<number>>>(
+    action => {
+      const value =
+        typeof action === 'function'
+          ? action(store.getState().userInput.suggestionIndex)
+          : action;
+      dispatch(setSuggestionIndexAction(value));
+    },
+    [dispatch]
+  );
+
+  const setInputRequest = useCallback<
+    Dispatch<SetStateAction<UserInputRequest>>
+  >(
+    action => {
+      const value =
+        typeof action === 'function'
+          ? action(store.getState().userInput.inputRequest)
+          : action;
+      dispatch(setInputRequestAction(value));
+    },
+    [dispatch]
+  );
+
+  return {
+    input,
+    setInput,
+    suggestions,
+    setSuggestions,
+    suggestionCursorIndex,
+    suggestionIndex,
+    setSuggestionIndex,
+    cursorOffset,
+    setCursorOffset,
+    inputRequest,
+    setInputRequest,
+  };
 }
 
 export function UserInputProvider({ children }: { children: ReactNode }) {
-  const [cursorOffset, setCursorOffset] = useState<number>(0);
-  const [input, setInput] = useState<string>('');
+  const dispatch = useAppDispatch();
+  const { input, cursorOffset, suggestions, suggestionIndex, inputRequest } =
+    useUserInputField();
 
-  const { suggestions, suggestionCursorIndex, setSuggestions } =
-    useInputSuggestionProvider(input, cursorOffset);
-
-  const [inputRequest, setInputRequest] = useState<UserInputRequest>({
-    channelId: CHANNEL_ID_NONE,
-    options: [],
-  });
+  const {
+    suggestions: providerSuggestions,
+    suggestionCursorIndex: providerSuggestionCursorIndex,
+    setSuggestions,
+  } = useInputSuggestionProvider(input, cursorOffset);
 
   const { controller } = useAppContext();
   const { submitMessage } = useAgent();
   const { processCommand } = useCommandProcessor();
-  const [suggestionIndex, setSuggestionIndex] = useState<number>(0);
+
+  useEffect(() => {
+    dispatch(setSuggestionsAction(providerSuggestions));
+  }, [providerSuggestions, dispatch]);
+
+  useEffect(() => {
+    dispatch(setSuggestionCursorIndexAction(providerSuggestionCursorIndex));
+  }, [providerSuggestionCursorIndex, dispatch]);
 
   const handlePickSuggestion = useCallback(
     (type: SuggestionType, suggestion: string) => {
@@ -76,56 +159,55 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
 
       switch (type) {
         case SuggestionType.FILE: {
-          setInput(prev => {
-            const beforeCursor = prev.slice(0, suggestionCursorIndex);
-            return `${beforeCursor + suggestion} ${prev.slice(cursorOffset)}`;
-          });
-          setCursorOffset(suggestionCursorIndex + suggestion.length + 1);
+          const currentInput = store.getState().userInput.input;
+          const currentCursorIndex =
+            store.getState().userInput.suggestionCursorIndex;
+          const beforeCursor = currentInput.slice(0, currentCursorIndex);
+          const afterCursor = currentInput.slice(cursorOffset);
+          dispatch(
+            setInputAction(`${beforeCursor + suggestion} ${afterCursor}`)
+          );
+          dispatch(
+            setCursorOffsetAction(currentCursorIndex + suggestion.length + 1)
+          );
           break;
         }
         case SuggestionType.COMMAND: {
-          setCursorOffset(0);
-          setInput('');
+          dispatch(setCursorOffsetAction(0));
+          dispatch(setInputAction(''));
           processCommand(suggestion);
           break;
         }
       }
     },
-    [
-      cursorOffset,
-      processCommand,
-      setCursorOffset,
-      setInput,
-      setSuggestions,
-      suggestionCursorIndex,
-    ]
+    [cursorOffset, dispatch, processCommand, setSuggestions]
   );
 
   useEffect(() => {
-    setSuggestionIndex(0);
-  }, [setSuggestionIndex, suggestions]);
+    dispatch(setSuggestionIndexAction(0));
+  }, [dispatch, suggestions]);
 
   useEffect(() => {
     return eventOn(EventName.REQUEST_INPUT, ({ detail }) =>
-      setInputRequest(detail)
+      dispatch(setInputRequestAction(detail))
     );
-  }, [setInputRequest]);
+  }, [dispatch]);
 
   const handleSubmitMessage = () => {
     submitMessage(formatReferencedFiles(input));
-    setInput('');
-    setCursorOffset(0);
+    dispatch(setInputAction(''));
+    dispatch(setCursorOffsetAction(0));
   };
 
   usePaste(text => {
     const updatedText = input + text;
-    setInput(updatedText);
-    setCursorOffset(cursorOffset + text.length);
+    dispatch(setInputAction(updatedText));
+    dispatch(setCursorOffsetAction(cursorOffset + text.length));
   });
 
   useInput((inputChar, key) => {
     if (key.ctrl && inputChar === 'c') {
-      controller.abort(0);
+      controller.abort();
     }
 
     // Handled in another component
@@ -135,17 +217,23 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
     if (suggestions && suggestions.values.length > 0) {
       const { values } = suggestions;
       if (key.upArrow) {
-        setSuggestionIndex(prev => (prev + values.length - 1) % values.length);
+        dispatch(
+          setSuggestionIndexAction(
+            (suggestionIndex + values.length - 1) % values.length
+          )
+        );
         return;
       }
 
       if (key.downArrow) {
-        setSuggestionIndex(prev => (prev + values.length + 1) % values.length);
+        dispatch(
+          setSuggestionIndexAction((suggestionIndex + 1) % values.length)
+        );
         return;
       }
 
       if (key.escape) {
-        setSuggestionIndex(-1);
+        dispatch(setSuggestionIndexAction(-1));
         return;
       }
 
@@ -166,53 +254,37 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
     if (key.backspace || key.delete) {
       if (cursorOffset === 0) return;
 
-      setInput(
-        prev => prev.slice(0, cursorOffset - 1) + prev.slice(cursorOffset)
+      dispatch(
+        setInputAction(
+          input.slice(0, cursorOffset - 1) + input.slice(cursorOffset)
+        )
       );
-      setCursorOffset(prev => prev - 1);
+      dispatch(setCursorOffsetAction(cursorOffset - 1));
       return;
     }
 
     if (key.leftArrow) {
       if (cursorOffset === 0) return;
-      setCursorOffset(prev => prev - 1);
+      dispatch(setCursorOffsetAction(cursorOffset - 1));
       return;
     }
 
     if (key.rightArrow) {
       if (cursorOffset >= input.length) return;
-
-      setCursorOffset(prev => prev + 1);
+      dispatch(setCursorOffsetAction(cursorOffset + 1));
       return;
     }
 
     if (!key.ctrl && !key.meta && inputChar.length === 1 && inputChar >= ' ') {
-      setInput(
-        prev =>
-          prev.slice(0, cursorOffset) + inputChar + prev.slice(cursorOffset)
+      dispatch(
+        setInputAction(
+          input.slice(0, cursorOffset) + inputChar + input.slice(cursorOffset)
+        )
       );
-      setCursorOffset(prev => prev + 1);
+      dispatch(setCursorOffsetAction(cursorOffset + 1));
       return;
     }
   });
 
-  return (
-    <UserInputContext.Provider
-      value={{
-        input,
-        setInput,
-        suggestions,
-        setSuggestions,
-        suggestionIndex,
-        setSuggestionIndex,
-        suggestionCursorIndex,
-        setCursorOffset,
-        cursorOffset,
-        inputRequest,
-        setInputRequest,
-      }}
-    >
-      {children}
-    </UserInputContext.Provider>
-  );
+  return <>{children}</>;
 }

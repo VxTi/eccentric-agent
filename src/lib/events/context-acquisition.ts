@@ -1,24 +1,16 @@
-import {
-  type ContextSyncResult,
-  type ContextType,
-  emitEvent,
-  EventName,
-  subscribeEvent,
-  type SyncResultRegistry,
-  unsubscribeEvent,
-} from './events';
+import { ContextType, type SyncResultRegistry } from './events';
+import { store } from '../state/store';
 
 export async function acquireContextInstance<T extends ContextType>(
   type: T
 ): Promise<SyncResultRegistry[T]> {
-  return new Promise(resolve => {
-    const handler = (event: ContextSyncResult<T>) => {
-      if (event.detail.type !== type) return;
-      unsubscribeEvent(EventName.CONTEXT_SYNC_RESULT, handler);
-      resolve(event.detail.context);
-    };
-
-    subscribeEvent(EventName.CONTEXT_SYNC_RESULT, handler);
-    emitEvent(EventName.CONTEXT_SYNC_REQUEST, type);
-  });
+  await Promise.resolve();
+  const state = store.getState();
+  if (type === ContextType.AGENT) {
+    return state.agent as unknown as SyncResultRegistry[T];
+  }
+  if (type === ContextType.FS) {
+    return state.fileSystem as unknown as SyncResultRegistry[T];
+  }
+  throw new Error(`Unknown context type: ${type}`);
 }

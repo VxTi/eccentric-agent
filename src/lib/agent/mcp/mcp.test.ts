@@ -32,7 +32,9 @@ describe('MCP server', () => {
       },
       controller.signal
     );
-    const tools = await server.client.listTools();
-    console.log(tools);
+    if (server.ok) {
+      const tools = await server.data.client.listTools();
+      console.log(tools);
+    }
   });
 });

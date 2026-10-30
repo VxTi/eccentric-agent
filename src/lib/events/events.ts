@@ -1,5 +1,5 @@
-import type { AgentContext } from '../../rendering/context';
-import type { FileSystemContext } from '../../rendering/context/file-system-context';
+import type { AgentState } from '../state/agent';
+import type { FileSystemState } from '../state/file-system';
 import { type Message } from '../types/messages';
 
 export const eventTarget = new EventTarget();
@@ -51,8 +51,8 @@ export enum ContextType {
   FS = 'fs',
 }
 export type SyncResultRegistry = {
-  [ContextType.AGENT]: AgentContext;
-  [ContextType.FS]: FileSystemContext;
+  [ContextType.AGENT]: AgentState;
+  [ContextType.FS]: FileSystemState;
 };
 
 export class SyncContextEvent extends CustomEvent<ContextType> {

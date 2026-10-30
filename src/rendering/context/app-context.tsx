@@ -1,4 +1,6 @@
-import { createContext, type ReactNode, useCallback, useContext } from 'react';
+import { type ReactNode, useCallback, useEffect } from 'react';
+import { useAppDispatch, useAppSelector } from '../../lib/state/store';
+import { setController, setIO, exit as exitAction } from '../../lib/state/app';
 
 export interface AppContextType {
   controller: AbortController;
@@ -8,14 +10,20 @@ export interface AppContextType {
   };
   exit: () => void;
 }
-const AppContext = createContext<AppContextType | undefined>(undefined);
 
-export function useAppContext() {
-  const app = useContext(AppContext);
-  if (!app) {
-    throw new Error('useApp must be used within an AppProvider');
-  }
-  return app;
+export function useAppContext(): AppContextType {
+  const dispatch = useAppDispatch();
+  const { controller, io } = useAppSelector(state => state.app);
+
+  const exit = useCallback(() => {
+    dispatch(exitAction());
+  }, [dispatch]);
+
+  return {
+    controller,
+    io,
+    exit,
+  };
 }
 
 interface AppProviderProps {
@@ -31,13 +39,12 @@ export function AppProvider({
   stdin,
   stdout,
 }: AppProviderProps) {
-  const exit = useCallback(() => {
-    controller.abort();
-  }, [controller]);
+  const dispatch = useAppDispatch();
 
-  return (
-    <AppContext.Provider value={{ controller, io: { stdin, stdout }, exit }}>
-      {children}
-    </AppContext.Provider>
-  );
+  useEffect(() => {
+    dispatch(setController(controller));
+    dispatch(setIO({ stdin, stdout }));
+  }, [controller, stdin, stdout, dispatch]);
+
+  return <>{children}</>;
 }

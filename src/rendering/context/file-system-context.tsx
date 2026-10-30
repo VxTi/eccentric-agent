@@ -1,54 +1,33 @@
-import {
-  isNonEmptyString,
-  type NonEmptyString,
-  type Nullable,
-  toNonEmptyString,
-} from '@vxti/typed';
+import { isNonEmptyString, toNonEmptyString } from '@vxti/typed';
 import { exec } from 'child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { type ReactNode, useEffect, useTransition } from 'react';
+import { useAppDispatch, useAppSelector } from '../../lib/state/store';
 import {
-  createContext,
-  type ReactNode,
-  useContext,
-  useEffect,
-  useState,
-  useTransition,
-} from 'react';
+  setGitInfo,
+  setLoading,
+  type GitInfo,
+} from '../../lib/state/file-system';
 
 const execute = promisify(exec);
 
 export interface FileSystemContext {
-  git: {
-    currentBranch?: Nullable<NonEmptyString>;
-    repoName?: Nullable<NonEmptyString>;
-    ignored: Set<string>;
-  };
+  git: GitInfo;
   loading: boolean;
   cwd: string;
 }
 
-const FileSystemContext = createContext<FileSystemContext | undefined>(
-  undefined
-);
-
-export function useFileSystem() {
-  const context = useContext(FileSystemContext);
-
-  if (!context) {
-    throw new Error('useGitInfo must be used within GitInfo');
-  }
-  return context;
+export function useFileSystem(): FileSystemContext {
+  return useAppSelector(state => state.fileSystem);
 }
 
 export function FileSystemProvider({ children }: { children: ReactNode }) {
-  const [loading, startRetrieval] = useTransition();
-  const [gitInfo, setGitInfo] = useState<FileSystemContext['git']>({
-    ignored: new Set<string>(),
-  });
-  const [cwd] = useState<string>(process.cwd());
+  const dispatch = useAppDispatch();
+  const [, startRetrieval] = useTransition();
 
   useEffect(() => {
+    dispatch(setLoading(true));
     startRetrieval(async () => {
       const [currentBranch, repoName, gitIgnored] = await Promise.all([
         execute('git branch --show-current', { timeout: 2000 })
@@ -75,13 +54,10 @@ export function FileSystemProvider({ children }: { children: ReactNode }) {
           .catch(() => new Set<string>()),
       ]);
 
-      setGitInfo({ currentBranch, repoName, ignored: gitIgnored });
+      dispatch(setGitInfo({ currentBranch, repoName, ignored: gitIgnored }));
+      dispatch(setLoading(false));
     });
-  }, []);
+  }, [dispatch]);
 
-  return (
-    <FileSystemContext.Provider value={{ git: gitInfo, cwd, loading }}>
-      {children}
-    </FileSystemContext.Provider>
-  );
+  return <>{children}</>;
 }

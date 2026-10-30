@@ -33,6 +33,9 @@
     "vitest": "^4.1.7"
   },
   "dependencies": {
+    "redux": "^5.0.1",
+    "@reduxjs/toolkit": "^2.13.0",
+    "react-redux": "^9.3.1",
     "@vxti/typed": "^1.1.0",
     "@ai-sdk/google-vertex": "^4.0.142",
     "@ai-sdk/openai": "^3.0.60",

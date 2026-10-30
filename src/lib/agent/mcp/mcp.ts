@@ -280,7 +280,9 @@ function resolveOAuthConfig(
 export async function getMCPServer(name: string): Promise<MCP> {
   const context = await acquireContextInstance(ContextType.AGENT);
 
-  const mcp = first(context.mcpServers.filter(server => server.name === name));
+  const mcp = first(
+    context.mcpServers.filter((server: MCP) => server.name === name)
+  );
 
   if (!mcp) {
     throw new Error(`MCP "${name}" was not found`);
