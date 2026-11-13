@@ -21,6 +21,7 @@ export function ChatMessageContent({ content }: MarkdownViewProps) {
       {lines.map((line, i) => (
         <Text key={i} wrap="wrap">
           {line}
+          {'\n'}
         </Text>
       ))}
     </>

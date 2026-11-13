@@ -141,29 +141,60 @@ function handleInput(
   key: Key
 ): Optional<{ value?: string; offset: number }> {
   return wrapOptional(() => {
-    const direction = key.leftArrow ? -1 : key.rightArrow ? 1 : 0;
+    const skipWord = key.ctrl || key.meta || key.super;
+
+    // macOS terminals with "Option as Meta" send Option+Left/Right as
+    // Meta+b / Meta+f (ESC b / ESC f) rather than as arrow escape sequences,
+    // so the arrow flags are not set. Treat those as word-wise movement too.
+    const metaWord =
+      key.meta && !key.leftArrow && !key.rightArrow
+        ? inputChar === 'b'
+          ? -1
+          : inputChar === 'f'
+            ? 1
+            : 0
+        : 0;
+
+    // Word deletion: Option+Delete (meta+backspace) removes the word before
+    // the cursor; Option+fn+Delete (meta+delete) removes the word after it.
+    const deleteWord = skipWord ? (key.backspace ? -1 : key.delete ? 1 : 0) : 0;
+
+    const direction = key.leftArrow
+      ? -1
+      : key.rightArrow
+        ? 1
+        : metaWord !== 0
+          ? metaWord
+          : deleteWord;
+
+    if (direction !== 0 && !skipWord) {
+      // If ctrl is not pressed we just move the cursor by one
+      return {
+        offset: Math.max(0, Math.min(cursorOffset + direction, input.length)),
+      };
+    }
 
     // No change if already at the start and going left
     if (direction === -1 && cursorOffset === 0) return undefined;
 
-    // If ctrl is not pressed we just move the cursor by one
-    if (!key.ctrl) {
-      return { offset: cursorOffset + direction };
-    }
+    if (skipWord && direction !== 0) {
+      const nextIndex = findWordBoundary(input, cursorOffset, direction);
+      const isDelete = key.backspace || key.delete;
 
-    if (direction === -1) {
-      const start = input.slice(0, cursorOffset).trim();
-      const nextIndex = Math.max(0, start.lastIndexOf(' '));
+      if (direction === -1) {
+        return {
+          offset: nextIndex,
+          ...(isDelete
+            ? { value: input.slice(0, nextIndex) + input.slice(cursorOffset) }
+            : {}),
+        };
+      }
+
       return {
-        offset: nextIndex,
-        ...(key.backspace ? { value: input.slice(0, nextIndex) } : {}),
-      };
-    } else if (direction === 1) {
-      const end = input.slice(cursorOffset);
-      const nextIndex = cursorOffset + Math.max(end.indexOf(' '), 0);
-      return {
-        offset: nextIndex,
-        ...(key.backspace ? { value: input.slice(nextIndex) } : {}),
+        offset: isDelete ? cursorOffset : nextIndex,
+        ...(isDelete
+          ? { value: input.slice(0, cursorOffset) + input.slice(nextIndex) }
+          : {}),
       };
     }
 
@@ -177,6 +208,8 @@ function handleInput(
       };
     }
 
+    if (inputChar.length !== 1) return;
+
     // Handle regular input
     const newValue =
       input.slice(0, cursorOffset) + inputChar + input.slice(cursorOffset);
@@ -185,6 +218,29 @@ function handleInput(
       offset: cursorOffset + 1,
     };
   });
+}
+
+/**
+ * Finds the cursor position one word away from `cursorOffset`. Going left skips
+ * any spaces immediately before the cursor, then the word before those; going
+ * right skips any spaces at the cursor, then the word after them.
+ */
+function findWordBoundary(
+  input: string,
+  cursorOffset: number,
+  direction: number
+): number {
+  let index = cursorOffset;
+
+  if (direction < 0) {
+    while (index > 0 && input[index - 1] === ' ') index--;
+    while (index > 0 && input[index - 1] !== ' ') index--;
+  } else {
+    while (index < input.length && input[index] === ' ') index++;
+    while (index < input.length && input[index] !== ' ') index++;
+  }
+
+  return index;
 }
 
 export function useUserInputField(): UserInputContextType {

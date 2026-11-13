@@ -2,8 +2,10 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as z from 'zod';
 import { Result } from '../../../../result';
-import { Position, ellipsize } from '../../../../utils/string-utils';
+import { ellipsize, Position } from '../../../../utils/string-utils';
 import { createTool } from '../../tool-definition';
+
+const MAX_SHOWN_FILE_COUNT = 5;
 
 const inputSchema = z.object({
   directoryPath: z
@@ -29,7 +31,7 @@ const inputSchema = z.object({
 });
 
 const outputSchema = z.object({
-  files: z.array(z.string()),
+  files: z.array(z.string().describe('An absolute file path')),
 });
 
 export const findFile = createTool({
@@ -66,13 +68,9 @@ export const findFile = createTool({
     const cwd = path.resolve(process.cwd(), directoryPath);
 
     const files = await Array.fromAsync(fs.promises.glob(filePattern, { cwd }));
-    const results: string[] = files.map(file =>
-      ellipsize(path.join(cwd, file), 30, Position.START)
-    );
+    const results: string[] = files.slice(0, maxResults);
 
-    return Result.Ok({
-      files: results.slice(0, maxResults),
-    });
+    return Result.Ok({ files: results });
   },
 
   inputToString: ({ filePattern, directoryPath }) =>
@@ -82,7 +80,21 @@ export const findFile = createTool({
     if (files.length === 0) {
       return `Unable to find any files`;
     }
-    const formattedFiles = files.map(file => `- ${file}`).join('\n');
-    return `Found ${files.length} file(s):\n${formattedFiles}`;
+
+    const limitVisibleFiles = files.length > MAX_SHOWN_FILE_COUNT;
+
+    const shownFiles = limitVisibleFiles
+      ? files.slice(0, MAX_SHOWN_FILE_COUNT)
+      : files;
+
+    const formattedFiles = shownFiles
+      .map(file => `- **${ellipsize(file, 30, Position.START)}**`)
+      .join('\n');
+    return `Found ${files.length} file(s):\n\n${formattedFiles}${
+      limitVisibleFiles
+        ? `
+... and ${files.length - MAX_SHOWN_FILE_COUNT} more`
+        : ''
+    }`;
   },
 });

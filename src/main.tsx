@@ -11,28 +11,16 @@ import { App } from './rendering/components/App';
 import { terminalRenderer } from './rendering/terminal-markdown-renderer/markdown-renderer';
 import chalk from 'chalk';
 
-// SGR mouse tracking (button events + SGR encoding) so the terminal reports
-// wheel scrolls; Ink surfaces the resulting sequences through `useInput`.
-const ANSI_MOUSE_ENABLE = '\x1b[?1000h\x1b[?1006h';
-const ANSI_MOUSE_DISABLE = '\x1b[?1006l\x1b[?1000l';
-
 const controller = new AbortController();
 
 marked.setOptions({
   renderer: terminalRenderer,
 });
 
-function restoreScreen(): void {
-  stdout.write(ANSI_MOUSE_DISABLE);
-}
-
 async function main(): Promise<void> {
   if (!stdin.isTTY) {
     throw new Error('stdin not a TTY. CLI need interactive terminal.\n');
   }
-
-  stdout.write(ANSI_MOUSE_ENABLE);
-
   controller.signal.addEventListener('abort', () => handleExit());
 
   const { waitUntilExit } = render(
@@ -44,6 +32,7 @@ async function main(): Promise<void> {
       </AgentProvider>
     </Provider>,
     {
+      kittyKeyboard: { mode: 'enabled' },
       stdout,
       stdin,
       exitOnCtrlC: true,
@@ -67,11 +56,9 @@ process.on('SIGTERM', () => {
 
 main()
   .then(() => {
-    restoreScreen();
     process.exit(0);
   })
   .catch(err => {
-    restoreScreen();
     if (err instanceof Error && err.name === 'ExitPromptError') {
       stdout.write(chalk.yellow('Goodbye.'));
     } else {
@@ -82,6 +69,5 @@ main()
   });
 
 function handleExit(statusCode = 0): void {
-  restoreScreen();
   process.exit(statusCode);
 }

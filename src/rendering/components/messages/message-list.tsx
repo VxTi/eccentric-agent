@@ -13,8 +13,8 @@ export function MessageList(): JSX.Element {
       overflow="visible"
       flexShrink={0}
     >
-      {messages.map((message, idx) => (
-        <MemoizedChatMessage key={idx} message={message} />
+      {messages.map(message => (
+        <MemoizedChatMessage key={message.id} message={message} />
       ))}
     </Box>
   );

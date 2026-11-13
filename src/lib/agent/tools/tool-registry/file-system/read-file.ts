@@ -1,4 +1,4 @@
-import { isNil } from '@vxti/typed';
+import { isNil, isNotNil } from '@vxti/typed';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as z from 'zod';
@@ -12,16 +12,24 @@ const inputSchema = z.object({
     .describe(
       'The path to the file to read. May be absolute or relative to the working directory.'
     ),
-  selection: z.object({
-    fromLineNumber: z
-      .number()
-      .describe('The starting line position of which frame to read'),
-    lineCount: z
-      .optional(z.number())
-      .describe(
-        "The amount of lines to read. If it's clear that you require all content, this can be skipped"
-      ),
-  }),
+  selection: z
+    .optional(
+      z.object({
+        fromLineNumber: z
+          .number()
+          .describe('The starting line position of which frame to read'),
+        lineCount: z
+          .number()
+          .optional()
+          .describe(
+            "The amount of lines to read. If it's clear that you require all lines after the starting one, " +
+              ' this can be omitted'
+          ),
+      })
+    )
+    .describe(
+      "An optional selection to provide, if you don\'t need to read the entire file."
+    ),
 });
 
 const outputSchema = z.object({
@@ -52,7 +60,7 @@ export const readFile = createTool({
   inputSchema,
   outputSchema,
 
-  async handle({ filePath, selection: { fromLineNumber, lineCount } }) {
+  async handle({ filePath, selection }) {
     const {
       agent: { fileCache },
       fileSystem: { cwd },
@@ -70,30 +78,27 @@ export const readFile = createTool({
     const newline = raw.match(/\r?\n/)?.[0] ?? '\n';
     const lines = raw.split(/\r?\n/);
 
-    if (isNil(lineCount)) {
-      // Returns all the file's contents
-      if (fromLineNumber === 0) {
-        return Result.Ok({
-          filePath,
-          content: prefixWithLineNumbers(lines, newline),
-        });
-      }
-
-      // Returns file content starting from line
-      return Result.Ok({
-        filePath,
-        content: prefixWithLineNumbers(lines.slice(fromLineNumber), newline),
-      });
+    if (
+      isNotNil(selection) &&
+      (selection.fromLineNumber < 0 ||
+        selection.fromLineNumber + (selection.lineCount ?? 0) > lines.length)
+    ) {
+      return Result.Error(`Invalid selection, line count: ${lines.length}`);
     }
 
-    // Returns file content frame from a -> b
-    return Result.Ok({
-      content: prefixWithLineNumbers(
-        lines.slice(fromLineNumber, fromLineNumber + lineCount),
-        newline
-      ),
-      filePath,
-    });
+    const content = prefixWithLineNumbers(
+      isNil(selection)
+        ? lines
+        : lines.slice(
+            selection.fromLineNumber,
+            isNotNil(selection.lineCount)
+              ? selection.fromLineNumber + selection.lineCount
+              : undefined
+          ),
+      newline
+    );
+
+    return Result.Ok({ content, filePath });
   },
 
   inputToString({ filePath }) {
