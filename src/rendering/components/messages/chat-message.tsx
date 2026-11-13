@@ -5,7 +5,7 @@ import { type BaseProps } from './common';
 import { GenericChatMessage } from './generic-chat-message';
 import { UserChatMessage } from './user-chat-message';
 
-export function ChatMessage({ message }: BaseProps<Message>) {
+export function ChatMessage({ message, maxLines }: BaseProps<Message>) {
   return (
     <Box
       alignSelf="flex-start"
@@ -14,18 +14,18 @@ export function ChatMessage({ message }: BaseProps<Message>) {
       flexShrink={0}
       paddingBottom={1}
     >
-      <ModelMessageText message={message} />
+      <ModelMessageText message={message} maxLines={maxLines} />
     </Box>
   );
 }
 
-function ModelMessageText(props: BaseProps<Message>) {
-  switch (props.message.type) {
+function ModelMessageText({ message, maxLines }: BaseProps<Message>) {
+  switch (message.type) {
     case 'user':
-      return <UserChatMessage message={props.message} />;
+      return <UserChatMessage message={message} maxLines={maxLines} />;
     case 'assistant':
-      return <AssistantChatMessage message={props.message} />;
+      return <AssistantChatMessage message={message} maxLines={maxLines} />;
     case 'generic':
-      return <GenericChatMessage message={props.message} />;
+      return <GenericChatMessage message={message} maxLines={maxLines} />;
   }
 }

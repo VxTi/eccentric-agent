@@ -2,9 +2,18 @@ import { type JSX } from 'react';
 import { Box, Static, Text, useStdout } from 'ink';
 import { useAgent } from '../../context';
 import { type Message } from '../../../lib/types/messages';
+import { ChatMessage } from './chat-message';
 import { MemoizedChatMessage } from './memoized-chat-message';
 
 type StaticItem = { kind: 'header' } | { kind: 'message'; message: Message };
+
+// Rows reserved below the streaming message for the status line, git line,
+// input field and model bar, plus the message's own role prefix and padding.
+// The streaming message is capped to the remaining rows so the dynamic region
+// never exceeds the viewport (see the comment in MessageList).
+const RESERVED_ROWS = 10;
+const MIN_STREAM_LINES = 3;
+const DEFAULT_ROWS = 24;
 
 export function MessageList(): JSX.Element {
   const { messages, status } = useAgent();
@@ -38,9 +47,17 @@ export function MessageList(): JSX.Element {
   // <Static> renders at full terminal width, outside the centered 80% column
   // the rest of the UI uses, so mirror that column here to keep finalized
   // messages aligned with the streaming one and the input field.
-  const columns = (stdout as { columns?: number } | undefined)?.columns ?? 80;
+  const size = stdout as { columns?: number; rows?: number } | undefined;
+  const columns = size?.columns ?? 80;
+  const rows = size?.rows ?? DEFAULT_ROWS;
   const contentWidth = Math.floor(columns * 0.8);
   const marginLeft = Math.floor(columns * 0.1);
+
+  // Cap the streaming message so the dynamic (non-erasable) region stays within
+  // the viewport. Logical lines can still wrap, so this is a conservative bound
+  // rather than an exact row count — enough to prevent the runaway duplication
+  // that occurs when the redraw region is taller than the terminal.
+  const streamMaxLines = Math.max(MIN_STREAM_LINES, rows - RESERVED_ROWS);
 
   return (
     <>
@@ -72,7 +89,7 @@ export function MessageList(): JSX.Element {
           overflow="visible"
           flexShrink={0}
         >
-          <MemoizedChatMessage message={last} />
+          <ChatMessage message={last} maxLines={streamMaxLines} />
         </Box>
       )}
     </>

@@ -3,7 +3,7 @@ import type { UserMessage } from '../../../lib/types/messages';
 import { ChatMessageContent } from './chat-message-content';
 import { type BaseProps } from './common';
 
-export function UserChatMessage({ message }: BaseProps<UserMessage>) {
+export function UserChatMessage({ message, maxLines }: BaseProps<UserMessage>) {
   return (
     <Box
       flexDirection="row"
@@ -23,7 +23,7 @@ export function UserChatMessage({ message }: BaseProps<UserMessage>) {
     >
       <Text>Me</Text>
       <Text color="#777777"> ▶ </Text>
-      <ChatMessageContent content={message.content} />
+      <ChatMessageContent content={message.content} maxLines={maxLines} />
     </Box>
   );
 }

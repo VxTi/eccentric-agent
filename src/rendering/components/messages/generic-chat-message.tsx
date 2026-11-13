@@ -4,7 +4,10 @@ import { Spinner } from '../spinner';
 import { ChatMessageContent } from './chat-message-content';
 import { type BaseProps } from './common';
 
-export function GenericChatMessage({ message }: BaseProps<GenericMessage>) {
+export function GenericChatMessage({
+  message,
+  maxLines,
+}: BaseProps<GenericMessage>) {
   return (
     <Box flexShrink={0} flexDirection="row">
       {message.failure ? (
@@ -14,7 +17,7 @@ export function GenericChatMessage({ message }: BaseProps<GenericMessage>) {
       ) : (
         <Spinner loading={message.loading ?? false} />
       )}
-      <ChatMessageContent content={message.content} />
+      <ChatMessageContent content={message.content} maxLines={maxLines} />
     </Box>
   );
 }
