@@ -1,4 +1,4 @@
-import { compact, isNil, isNonEmptyString, isNotNil } from '@vxti/typed';
+import { compact, isNonEmptyString, isNotNil } from '@vxti/typed';
 import * as z from 'zod';
 import { Result } from '../../../../result';
 import { getMCPServer, type McpTool } from '../../../mcp/mcp';
@@ -48,23 +48,12 @@ export const listMcpTools = createTool({
     const allTools = new Map<string, McpTool>();
 
     let cursor: string | undefined;
-    let foundTool: McpTool | undefined;
 
     do {
       const { tools, nextCursor } = await mcp.withAuth(() =>
         mcp.params.client.listTools({ cursor })
       );
       tools.forEach(t => allTools.set(t.name, t));
-
-      if (
-        !isNil(toolName) &&
-        (foundTool = allTools.get(toolName)) !== undefined
-      ) {
-        return Result.Ok({
-          mcpServer,
-          tools: [foundTool],
-        });
-      }
 
       cursor = nextCursor;
     } while (isNotNil(cursor));

@@ -1,16 +1,80 @@
-import { isNonEmptyArray, isNonEmptyString } from '@vxti/typed';
-import { type ReactNode, useMemo, useRef } from 'react';
-import { Box, type DOMElement, Text, useBoxMetrics } from 'ink';
+import { isNonEmptyArray, isNonEmptyString, isNotNil } from '@vxti/typed';
+import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import { Box, type DOMElement, Text, useBoxMetrics, useInput } from 'ink';
+import {
+  type Suggestion,
+  SuggestionType,
+} from '../../../lib/input-suggestions';
 import { Position, ellipsize } from '../../../lib/utils/string-utils';
 import { useUserInputField } from '../../context';
-import { type Suggestion } from '../../hooks';
+import { useCommandProcessor } from '../../hooks';
 
 const MAX_SUGGESTION_COUNT = 14;
 
 export function Suggestions(): ReactNode {
-  const { suggestions, suggestionIndex } = useUserInputField();
+  const {
+    input: { value, cursorOffset },
+    setInput,
+    suggestions,
+    inputRequest,
+  } = useUserInputField();
   const containerRef = useRef<DOMElement>(null);
   const containerSize = useBoxMetrics(containerRef);
+
+  const [suggestionIndex, setSuggestionIndex] = useState<number>(0);
+  const { processCommand } = useCommandProcessor();
+
+  const handlePickSuggestion = useCallback(
+    (type: SuggestionType, suggestion: string) => {
+      switch (type) {
+        case SuggestionType.FILE: {
+          const beforeCursor = value.slice(0, cursorOffset);
+          const afterCursor = value.slice(cursorOffset);
+          setInput(() => ({
+            value: beforeCursor + suggestion + afterCursor,
+            cursorOffset: cursorOffset + suggestion.length + 1,
+          }));
+          break;
+        }
+        case SuggestionType.COMMAND: {
+          setInput({ value: '', cursorOffset: 0 });
+          processCommand(suggestion);
+          break;
+        }
+      }
+    },
+    [cursorOffset, processCommand, setInput, value]
+  );
+
+  useInput(
+    (_, key) => {
+      if (!isNonEmptyArray(suggestions?.values)) return;
+      const { values } = suggestions;
+      const direction = key.upArrow ? -1 : key.downArrow ? 1 : 0;
+
+      if (direction !== 0) {
+        setSuggestionIndex(
+          prev => (prev + values.length + direction) % values.length
+        );
+
+        return;
+      }
+
+      if (key.escape) {
+        // Do something??
+        return;
+      }
+
+      if (key.tab || key.return) {
+        handlePickSuggestion(
+          suggestions.type,
+          values[suggestionIndex]?.value ?? ''
+        );
+        return;
+      }
+    },
+    { isActive: isNotNil(inputRequest) }
+  );
 
   const state = useMemo(() => {
     if (!isNonEmptyArray(suggestions?.values)) return undefined;

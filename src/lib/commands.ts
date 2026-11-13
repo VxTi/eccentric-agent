@@ -1,4 +1,4 @@
-import type { Suggestion } from '../rendering/hooks';
+import type { Suggestion } from './input-suggestions';
 
 export const SUPPORTED_COMMANDS = [
   { value: 'clear', description: 'Clears the context window' },

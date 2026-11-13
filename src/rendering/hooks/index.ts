@@ -1,1 +1,1 @@
-export * from './input-suggestion-provider';
+export * from './command-processor';

@@ -74,7 +74,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
     cwd,
     git: { ignored: gitIgnored },
   } = useAppSelector(state => state.fileSystem);
-  const { taskList, mcpServers } = useAppSelector(state => state.agent);
+  const { taskList, mcpServers, skills } = useAppSelector(state => state.agent);
   const { controller } = useAppSelector(state => state.app);
 
   const notifier = useMemo(() => new Notifier(), []);
@@ -142,7 +142,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
    */
   useEffect(() => {
     let cancelled = false;
-    void constructSystemPrompt(taskList, mcpServers, {
+    void constructSystemPrompt(taskList, mcpServers, skills, {
       cwd,
       ignored: gitIgnored,
     }).then(prompt => {
@@ -152,7 +152,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
     return () => {
       cancelled = true;
     };
-  }, [taskList, mcpServers, cwd, gitIgnored, dispatch]);
+  }, [taskList, mcpServers, cwd, gitIgnored, dispatch, skills]);
 
   /**
    * Handling incoming messages from non-react world, and token consumption
@@ -191,6 +191,9 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
           ])
         );
       }
+
+      let currentTextId: string | null = null;
+      let buffer = '';
       const currentSystemPrompt = store.getState().agent.systemPrompt;
       const result = streamText({
         allowSystemInMessages: true,
@@ -201,7 +204,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
           ...updatedMessages,
         ],
         tools,
-        onStepFinish: step => {
+        onStepEnd: step => {
           emitConsumeTokenEvent({
             input: step.usage.inputTokens ?? 0,
             output: step.usage.outputTokens ?? 0,
@@ -215,6 +218,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
             },
           },
         },
+        onStepStart: () => {},
         stopWhen: isLoopFinished(),
         onError: ({ error }) => {
           dispatch(
@@ -227,9 +231,6 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
           clearInterval(interval);
         },
       });
-
-      let currentTextId: string | null = null;
-      let buffer = '';
 
       try {
         for await (const part of result.stream) {

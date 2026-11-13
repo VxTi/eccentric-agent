@@ -13,10 +13,10 @@ export default function InputField(): JSX.Element {
   const { inputRequest } = useUserInputField();
 
   if (
-    isNonEmptyArray(inputRequest?.options) &&
-    inputRequest.channelId !== CHANNEL_ID_NONE
+    isNonEmptyArray(inputRequest?.request.options) &&
+    inputRequest.request.channelId !== CHANNEL_ID_NONE
   ) {
-    return <InputRequest request={inputRequest}/>;
+    return <InputRequest request={inputRequest.request} />;
   }
 
   return (
@@ -42,8 +42,10 @@ export default function InputField(): JSX.Element {
 }
 
 function InputText(): ReactNode {
-  const { input, cursorOffset } = useUserInputField();
-  const safeCursor = Math.max(0, Math.min(cursorOffset, input.length));
+  const {
+    input: { value, cursorOffset },
+  } = useUserInputField();
+  const safeCursor = Math.max(0, Math.min(cursorOffset, value.length));
 
   const [blinkState, setBlinkState] = useState<boolean>(false);
 
@@ -55,7 +57,7 @@ function InputText(): ReactNode {
     return () => clearInterval(id);
   }, []);
 
-  if (isEmptyString(input)) {
+  if (isEmptyString(value)) {
     return (
       <Box flexDirection="row">
         <Text inverse={blinkState}> </Text>
@@ -67,7 +69,7 @@ function InputText(): ReactNode {
     );
   }
 
-  const characters = input.split('');
+  const characters = value.split('');
 
   return (
     <Box flexDirection="row" flexWrap="wrap" flexShrink={1}>
@@ -76,7 +78,7 @@ function InputText(): ReactNode {
           {char}
         </Text>
       ))}
-      {safeCursor === input.length && blinkState && (
+      {safeCursor === value.length && blinkState && (
         <Text inverse={true}> </Text>
       )}
     </Box>

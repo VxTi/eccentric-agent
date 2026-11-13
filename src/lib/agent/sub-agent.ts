@@ -19,7 +19,7 @@ const AGENT_MAX_LOOP_ITERATIONS = 200;
 
 const PRIMARY_GOAL_TOOL_NAME = 'complete_goal';
 
-export class Agent {
+export class SubAgent {
   private readonly toolset: ToolSet;
   private readonly messages: ModelMessage[] = [];
 

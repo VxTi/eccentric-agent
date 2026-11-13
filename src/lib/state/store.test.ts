@@ -11,7 +11,6 @@ import {
   updateTasks,
 } from './agent';
 import { setGitInfo, setLoading, setCwd } from './file-system';
-import { setInput, setCursorOffset, setInputRequest } from './user-input';
 import { setController, exit } from './app';
 import { TaskStatus } from '../tasks';
 import type { Message } from '../types/messages';
@@ -88,25 +87,6 @@ describe('Redux Store and Slices', () => {
 
       store.dispatch(setCwd('/tmp/test'));
       expect(store.getState().fileSystem.cwd).toBe('/tmp/test');
-    });
-  });
-
-  describe('UserInput Slice', () => {
-    it('should update input and cursor', () => {
-      store.dispatch(setInput('my command'));
-      store.dispatch(setCursorOffset(5));
-
-      expect(store.getState().userInput.input).toBe('my command');
-      expect(store.getState().userInput.cursorOffset).toBe(5);
-
-      store.dispatch(
-        setInputRequest({
-          channelId: 'ch-1',
-          options: [{ id: 'opt1', label: 'Option 1' }],
-        })
-      );
-      expect(store.getState().userInput.inputRequest?.channelId).toBe('ch-1');
-      expect(store.getState().userInput.inputRequest?.options).toHaveLength(1);
     });
   });
 

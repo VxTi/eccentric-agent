@@ -5,10 +5,12 @@ import fs from 'node:fs';
 import { CONSTANT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT } from '../constants';
 import { type TaskList, TaskStatus } from '../tasks';
 import type { MCP } from './mcp/mcp';
+import { type AgentSkill } from './skills/common';
 
 export async function constructSystemPrompt(
   taskList: TaskList,
   mcps: MCP[],
+  skills: AgentSkill[],
   globOptions: { cwd: string; ignored: Set<string> }
 ): Promise<string> {
   const systemPrompt = await loadSystemPrompt(globOptions);
@@ -23,10 +25,17 @@ export async function constructSystemPrompt(
       })
     )
   ).join('\n');
+
+  const skillsSummary = skills
+    .map(skill => `- ${skill.name}:    ${skill.description}`)
+    .join('\n');
+
   const taskFragment = constructTaskListSystemPromptFragment(taskList);
   return compact([
     systemPrompt,
     CONSTANT_SYSTEM_PROMPT,
+    'The following skills are available:',
+    skillsSummary,
     `The following MCP servers are available:\n${mcpServerNames}\nUse 'list_mcp_tools' to discover tools (no 'toolName' → name+description list; with a specific 'toolName' → that tool's full input/output schema). Always fetch the schema for a specific tool before invoking it via 'call_mcp_tool'.`,
     taskFragment,
   ]).join('\n');

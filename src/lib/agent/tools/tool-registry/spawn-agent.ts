@@ -1,7 +1,7 @@
 import { isEmptyArray } from '@vxti/typed';
 import * as z from 'zod';
 import { Result } from '../../../result';
-import { Agent } from '../../agent';
+import { SubAgent } from '../../sub-agent';
 import { type NotifierChannel } from '../../../events/notifier';
 import { createTool, type ToolChannelParams } from '../tool-definition';
 
@@ -51,7 +51,7 @@ async function runSubAgent(
 
     signal.addEventListener('abort', () => controller.abort());
 
-    new Agent(goal, resolve, controller.signal, channel);
+    new SubAgent(goal, resolve, controller.signal, channel);
   });
 }
 
