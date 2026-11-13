@@ -1,4 +1,4 @@
-import { Box, Text } from 'ink';
+import { Box } from 'ink';
 import { type ReactNode } from 'react';
 import { GitInfoLine } from './git-info-line';
 import { LoadingStatusLine } from './loading-status-line';
@@ -10,7 +10,6 @@ export function App(): ReactNode {
   return (
     <Box flexDirection="column" width="100%" alignItems="center">
       <Box width="80%" flexGrow={1} flexDirection="column">
-        <WelcomingText />
         <Box
           height="100%"
           width="100%"
@@ -23,17 +22,6 @@ export function App(): ReactNode {
           <InputField />
           <ModelInfoBar />
         </Box>
-      </Box>
-    </Box>
-  );
-}
-
-function WelcomingText() {
-  return (
-    <Box flexDirection="column" alignItems="center">
-      <Box paddingY={1}>
-        <Text color="blue">◆</Text>
-        <Text bold> Eccentric Agent</Text>
       </Box>
     </Box>
   );

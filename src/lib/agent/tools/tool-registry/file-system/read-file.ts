@@ -98,11 +98,15 @@ export const readFile = createTool({
       newline
     );
 
-    return Result.Ok({ content, filePath });
+    return Result.Ok({ content, filePath }, { selection });
   },
 
-  inputToString({ filePath }) {
-    return `Reading \`${filePath}\``;
+  inputToString({ filePath, selection }) {
+    const selectionString = selection
+      ? ` (Line \`${selection.fromLineNumber + 1}\` -> \`${isNotNil(selection.lineCount) ? selection.fromLineNumber + selection.lineCount : '...'}\`)`
+      : '';
+
+    return `Reading \`${filePath}\`${selectionString}`;
   },
 
   outputToString({ filePath }) {
