@@ -1,5 +1,17 @@
-import { isNonEmptyArray, isNonEmptyString, isNotNil } from '@vxti/typed';
-import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import {
+  isEmptyString,
+  isNil,
+  isNonEmptyArray,
+  isNonEmptyString,
+} from '@vxti/typed';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Box, type DOMElement, Text, useBoxMetrics, useInput } from 'ink';
 import {
   type Suggestion,
@@ -16,6 +28,7 @@ export function Suggestions(): ReactNode {
     input: { value, cursorOffset },
     setInput,
     suggestions,
+    setSuggestions,
     inputRequest,
   } = useUserInputField();
   const containerRef = useRef<DOMElement>(null);
@@ -24,15 +37,31 @@ export function Suggestions(): ReactNode {
   const [suggestionIndex, setSuggestionIndex] = useState<number>(0);
   const { processCommand } = useCommandProcessor();
 
+  // Any edit to the input resets the highlighted row back to the top. A new
+  // suggestion list is recomputed from the input in the context, so keying this
+  // off the input (rather than the list identity) keeps them in sync.
+  useEffect(() => {
+    setSuggestionIndex(0);
+  }, [value, cursorOffset]);
+
   const handlePickSuggestion = useCallback(
     (type: SuggestionType, suggestion: string) => {
+      if (isEmptyString(suggestion)) return;
+
       switch (type) {
         case SuggestionType.FILE: {
           const beforeCursor = value.slice(0, cursorOffset);
           const afterCursor = value.slice(cursorOffset);
+          // Replace the '@<partial>' token immediately before the cursor with
+          // the full path rather than appending to the half-typed query.
+          const tokenStart = beforeCursor.search(/@[\w./_-]*$/);
+          const prefix =
+            tokenStart >= 0 ? beforeCursor.slice(0, tokenStart) : beforeCursor;
+          const insertion = `@${suggestion} `;
+
           setInput(() => ({
-            value: beforeCursor + suggestion + afterCursor,
-            cursorOffset: cursorOffset + suggestion.length + 1,
+            value: prefix + insertion + afterCursor,
+            cursorOffset: prefix.length + insertion.length,
           }));
           break;
         }
@@ -61,7 +90,8 @@ export function Suggestions(): ReactNode {
       }
 
       if (key.escape) {
-        // Do something??
+        // Dismiss the list; it reappears when the input changes again.
+        setSuggestions(undefined);
         return;
       }
 
@@ -73,7 +103,9 @@ export function Suggestions(): ReactNode {
         return;
       }
     },
-    { isActive: isNotNil(inputRequest) }
+    {
+      isActive: isNil(inputRequest) && isNonEmptyArray(suggestions?.values),
+    }
   );
 
   const state = useMemo(() => {

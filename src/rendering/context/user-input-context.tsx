@@ -1,4 +1,4 @@
-import { isNil } from '@vxti/typed';
+import { isNil, isNonEmptyArray } from '@vxti/typed';
 import { type DOMElement, type Key, useInput, usePaste } from 'ink';
 import {
   createContext,
@@ -43,6 +43,7 @@ export interface UserInputContextType {
   inputRef: RefObject<DOMElement | null>;
 
   suggestions?: Suggestions;
+  setSuggestions: Dispatch<SetStateAction<Suggestions | undefined>>;
 }
 
 const UserInputContext = createContext<UserInputContextType | undefined>(
@@ -67,9 +68,17 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
   const { submitMessage } = useAgent();
 
   useEffect(() => {
+    let cancelled = false;
     getInputSuggestions(value, cursorOffset)
-      .then(res => setSuggestions(res))
-      .catch(() => {});
+      .then(res => {
+        if (!cancelled) setSuggestions(res);
+      })
+      .catch(() => {
+        if (!cancelled) setSuggestions(undefined);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [value, cursorOffset]);
 
   useEffect(() => {
@@ -99,6 +108,14 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
         controller.abort();
       }
 
+      // When suggestions are open, Enter/Tab belong to the suggestion list (it
+      // picks the highlighted entry), so don't also submit the message here.
+      // Arrow keys fall through: Up/Down are ignored by handleInput below and
+      // used by the list for navigation, Left/Right still move the cursor.
+      if (isNonEmptyArray(suggestions?.values) && (key.return || key.tab)) {
+        return;
+      }
+
       if (key.return) {
         handleSubmitMessage();
         return;
@@ -122,6 +139,7 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
     <UserInputContext.Provider
       value={{
         suggestions,
+        setSuggestions,
         input,
         setInput,
         inputRequest,

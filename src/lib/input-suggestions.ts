@@ -1,10 +1,15 @@
 import { isEmptyString, isNotNil } from '@vxti/typed';
 import { SUPPORTED_COMMANDS } from './commands';
 import fs from 'node:fs';
-import { useAppSelector } from './state';
+import { store } from './state';
 
-const FILE_SUGGESTION_PATTERN = /(?:\s|^)@([\w_.-]+)$/;
-const COMMAND_PATTERN = /^\/(\w*)$/;
+// Match the '@<partial path>' token immediately before the cursor. The path
+// chars include '/' so typing into a nested path keeps the suggestions open,
+// and the query may be empty so a bare '@' lists everything.
+const FILE_SUGGESTION_PATTERN = /(?:\s|^)@([\w./_-]*)$/;
+// Match a leading '/<partial command>'. The query may be empty so a bare '/'
+// lists every command, and '-' is allowed for names like 'system-prompt'.
+const COMMAND_PATTERN = /^\/([\w-]*)$/;
 const MAX_SHOWN_SUGGESTIONS = 200;
 
 export const enum SuggestionType {
@@ -30,7 +35,7 @@ export async function getInputSuggestions(
   const {
     cwd,
     git: { ignored },
-  } = useAppSelector(state => state.fileSystem);
+  } = store.getState().fileSystem;
 
   const preCursorInput = input.slice(0, cursorOffset);
 
@@ -41,7 +46,6 @@ export async function getInputSuggestions(
     isNotNil(matches[1])
   ) {
     const filePath = matches[1];
-    if (isEmptyString(filePath, true)) return;
 
     return await Array.fromAsync(
       fs.promises.glob('**/*', {
