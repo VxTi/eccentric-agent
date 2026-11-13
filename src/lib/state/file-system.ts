@@ -65,6 +65,8 @@ export const fetchGitInfo = createAsyncThunk<
               .filter(line => isNonEmptyString(line, true))
           )
       )
+      // `git check-ignore` exits non-zero when nothing is ignored or the
+      // directory is not a git repo; treat both as "nothing to exclude".
       .catch(() => new Set<string>()),
   ]);
 

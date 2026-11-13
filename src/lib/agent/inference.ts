@@ -62,7 +62,7 @@ export async function generateText<T>({
 export function getAppropriateModel(
   _complexity: TaskComplexity
 ): LanguageModel {
-  return 'nvidia/nemotron-3-ultra-550b-a55b';
+  return 'nvidia/nemotron-3.5-lightning-free';
   /*
   switch (complexity) {
     case TaskComplexity.SIMPLE:

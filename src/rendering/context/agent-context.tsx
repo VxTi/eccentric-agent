@@ -29,6 +29,7 @@ import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
 import { Features } from '../../lib/feaures';
 import { type FileCache } from '../../lib/file-cache';
 import { store, useAppDispatch, useAppSelector } from '../../lib/state';
+import { fetchGitInfo } from '../../lib/state/file-system';
 import {
   type AgentStatus,
   dequeueMessage,
@@ -74,7 +75,9 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
     cwd,
     git: { ignored: gitIgnored },
   } = useAppSelector(state => state.fileSystem);
-  const { taskList, mcpServers, skills } = useAppSelector(state => state.agent);
+  const { taskList, mcpServers, activeSkills, skills } = useAppSelector(
+    state => state.agent
+  );
   const { controller } = useAppSelector(state => state.app);
 
   const notifier = useMemo(() => new Notifier(), []);
@@ -82,6 +85,13 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
     () => makeToolSet(toolRegistry, notifier, controller.signal),
     [notifier, controller]
   );
+
+  // Load the repo's gitignore set so file suggestions and the system prompt
+  // exclude ignored paths such as node_modules. Without this the ignored set
+  // stays empty and every ignored file shows up as a suggestion.
+  useEffect(() => {
+    void dispatch(fetchGitInfo());
+  }, [dispatch]);
 
   useEffect(() => {
     void discoverSkillFiles().then(skills => {
@@ -121,9 +131,15 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
    */
   useEffect(() => {
     let cancelled = false;
-    void constructSystemPrompt(taskList, mcpServers, skills, {
-      cwd,
-      ignored: gitIgnored,
+    void constructSystemPrompt({
+      taskList,
+      mcps: mcpServers,
+      skills,
+      activeSkills,
+      globOptions: {
+        cwd,
+        ignored: gitIgnored,
+      },
     }).then(prompt => {
       if (!cancelled) dispatch(setSystemPromptAction(prompt));
     });
@@ -131,7 +147,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
     return () => {
       cancelled = true;
     };
-  }, [taskList, mcpServers, cwd, gitIgnored, dispatch, skills]);
+  }, [taskList, mcpServers, cwd, activeSkills, gitIgnored, dispatch, skills]);
 
   /**
    * Handling incoming messages from non-react world, and token consumption

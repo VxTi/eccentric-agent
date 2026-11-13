@@ -1,5 +1,5 @@
 import { isEmptyString, isNotNil } from '@vxti/typed';
-import { Text } from 'ink';
+import { Box, Text } from 'ink';
 import { parseMarkdown } from '../../terminal-markdown-renderer/markdown-renderer';
 
 interface MarkdownViewProps {
@@ -28,20 +28,22 @@ export function ChatMessageContent({ content, maxLines }: MarkdownViewProps) {
     ? allLines.slice(allLines.length - maxLines)
     : allLines;
 
+  // Render as a column of one <Text> per line. Each <Text> is its own row, so
+  // lines are single-spaced. A trailing '\n' inside a <Text> here (especially
+  // within the parent's wrapping row layout) produces extra blank lines, which
+  // is what made tables and multi-line content double-space.
   return (
-    <>
+    <Box flexDirection="column" flexShrink={1}>
       {isTruncated && (
-        <Text key="truncation" dimColor wrap="truncate">
+        <Text dimColor wrap="truncate">
           {'↑ earlier lines shown in full when the response completes'}
-          {'\n'}
         </Text>
       )}
       {lines.map((line, i) => (
         <Text key={i} wrap="wrap">
           {line}
-          {'\n'}
         </Text>
       ))}
-    </>
+    </Box>
   );
 }

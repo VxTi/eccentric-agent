@@ -7,12 +7,21 @@ import { type TaskList, TaskStatus } from '../tasks';
 import type { MCP } from './mcp/mcp';
 import { type AgentSkill } from './skills/common';
 
-export async function constructSystemPrompt(
-  taskList: TaskList,
-  mcps: MCP[],
-  skills: AgentSkill[],
-  globOptions: { cwd: string; ignored: Set<string> }
-): Promise<string> {
+interface ConstructSystemPromptProps {
+  taskList: TaskList;
+  mcps: MCP[];
+  skills: AgentSkill[];
+  activeSkills: Record<string, AgentSkill>;
+  globOptions: { cwd: string; ignored: Set<string> };
+}
+
+export async function constructSystemPrompt({
+  taskList,
+  mcps,
+  skills,
+  activeSkills,
+  globOptions,
+}: ConstructSystemPromptProps): Promise<string> {
   const systemPrompt = await loadSystemPrompt(globOptions);
 
   const mcpServerNames = (
@@ -31,11 +40,17 @@ export async function constructSystemPrompt(
     .join('\n');
 
   const taskFragment = constructTaskListSystemPromptFragment(taskList);
+
   return compact([
     systemPrompt,
     CONSTANT_SYSTEM_PROMPT,
+    `The current date is ${new Date().toLocaleString()}\n`,
     'The following skills are available:',
     skillsSummary,
+    'You possess the following skills, which you must obey / utilise:\n',
+    Object.entries(activeSkills)
+      .map(([skillName, skill]) => ` ${skillName}:    ${skill.content}`)
+      .join('\n\n'),
     `The following MCP servers are available:\n${mcpServerNames}\nUse 'list_mcp_tools' to discover tools (no 'toolName' → name+description list; with a specific 'toolName' → that tool's full input/output schema). Always fetch the schema for a specific tool before invoking it via 'call_mcp_tool'.`,
     taskFragment,
   ]).join('\n');
