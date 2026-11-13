@@ -239,7 +239,10 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
             buffer = '';
           } else if (part.type === 'text-delta') {
             buffer += part.text;
-            if (isNonEmptyString(currentTextId)) {
+            if (
+              isNonEmptyString(currentTextId) &&
+              isNonEmptyString(buffer, true)
+            ) {
               dispatch(
                 setMessageAction({
                   type: 'assistant',
