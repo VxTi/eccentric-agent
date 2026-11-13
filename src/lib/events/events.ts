@@ -17,7 +17,7 @@ export interface InputOption {
 export interface UserInputRequest {
   title?: string;
   description?: string;
-  options: InputOption[];
+  options: NonEmptyArray<InputOption>;
   allowMultiple?: boolean;
   channelId: string;
 }
@@ -45,7 +45,8 @@ export class AgentMessageEvent extends CustomEvent<Message> {
 
 export const enum TokenSource {
   PRIMARY = 'primary',
-  SUB_TASK = 'sub-task',
+  // Secondary tasks are those that don't fill the main context window (e.g., sub agents)
+  SECONDARY = 'secondary',
 }
 export interface TokenConsumeProps {
   input: number;

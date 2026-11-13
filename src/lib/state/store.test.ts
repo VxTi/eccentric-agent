@@ -24,7 +24,7 @@ describe('Redux Store and Slices', () => {
 
       store.dispatch(setMessages([msg1]));
       expect(store.getState().agent.messages).toHaveLength(1);
-      expect(store.getState().agent.messages[0].content).toBe('hello');
+      expect(store.getState().agent.messages[0]?.content).toBe('hello');
 
       store.dispatch(addMessage(msg2));
       expect(store.getState().agent.messages).toHaveLength(2);
@@ -35,7 +35,7 @@ describe('Redux Store and Slices', () => {
         content: 'hello world',
       };
       store.dispatch(setMessage(msg1Updated));
-      expect(store.getState().agent.messages[0].content).toBe('hello world');
+      expect(store.getState().agent.messages[0]?.content).toBe('hello world');
 
       store.dispatch(clearMessages());
       expect(store.getState().agent.messages).toHaveLength(0);
@@ -52,14 +52,14 @@ describe('Redux Store and Slices', () => {
         ])
       );
       expect(store.getState().agent.taskList.tasks).toHaveLength(1);
-      expect(store.getState().agent.taskList.tasks[0].status).toBe(
+      expect(store.getState().agent.taskList.tasks[0]?.status).toBe(
         TaskStatus.PENDING
       );
 
       store.dispatch(
         updateTasks([{ id: 'task-1', status: TaskStatus.COMPLETED }])
       );
-      expect(store.getState().agent.taskList.tasks[0].status).toBe(
+      expect(store.getState().agent.taskList.tasks[0]?.status).toBe(
         TaskStatus.COMPLETED
       );
     });
@@ -105,8 +105,8 @@ describe('Redux Store and Slices', () => {
           options: [{ id: 'opt1', label: 'Option 1' }],
         })
       );
-      expect(store.getState().userInput.inputRequest.channelId).toBe('ch-1');
-      expect(store.getState().userInput.inputRequest.options).toHaveLength(1);
+      expect(store.getState().userInput.inputRequest?.channelId).toBe('ch-1');
+      expect(store.getState().userInput.inputRequest?.options).toHaveLength(1);
     });
   });
 

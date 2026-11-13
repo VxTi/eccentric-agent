@@ -6,6 +6,7 @@ import {
   isNotNil,
 } from '@vxti/typed';
 import * as z from 'zod';
+import { TokenSource } from '../../../../events/events';
 import { Result } from '../../../../result';
 import { generateText, TaskComplexity } from '../../../inference';
 import { getMCPServer, type McpTool } from '../../../mcp/mcp';
@@ -56,7 +57,7 @@ async function listAllTools(mcpServer: string): Promise<McpTool[]> {
   let cursor: string | undefined;
   do {
     const { tools, nextCursor } = await mcp.withAuth(() =>
-      mcp.client.listTools({ cursor })
+      mcp.params.client.listTools({ cursor })
     );
     tools.forEach(t => all.set(t.name, t));
     cursor = nextCursor;
@@ -127,6 +128,7 @@ export const discoverMcpTool = createTool({
 
     const { toolName, reasoning } = await generateText({
       complexity: TaskComplexity.SIMPLE,
+      source: TokenSource.SECONDARY,
       schema: selectionSchema,
       signal,
       systemPrompt:

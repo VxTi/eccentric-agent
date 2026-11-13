@@ -40,8 +40,8 @@ export interface UserInputContextType {
   setSuggestionIndex: Dispatch<SetStateAction<number>>;
   cursorOffset: number;
   setCursorOffset: Dispatch<SetStateAction<number>>;
-  inputRequest: UserInputRequest;
-  setInputRequest: Dispatch<SetStateAction<UserInputRequest>>;
+  inputRequest: UserInputRequest | undefined;
+  setInputRequest: Dispatch<SetStateAction<UserInputRequest | undefined>>;
 }
 
 export function useUserInputField(): UserInputContextType {
@@ -102,7 +102,7 @@ export function useUserInputField(): UserInputContextType {
   );
 
   const setInputRequest = useCallback<
-    Dispatch<SetStateAction<UserInputRequest>>
+    Dispatch<SetStateAction<UserInputRequest | undefined>>
   >(
     action => {
       const value =
@@ -210,7 +210,7 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
     }
 
     // Handled in another component
-    if (isNonEmptyArray(inputRequest.options)) return;
+    if (isNonEmptyArray(inputRequest?.options)) return;
 
     // Suggestion handling
     if (suggestions && suggestions.values.length > 0) {

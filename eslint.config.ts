@@ -66,6 +66,8 @@ export default defineConfig([
 
       'no-duplicate-imports': 2,
 
+      'max-params': ['error', { max: 4 }],
+
       'import/export': 2, // No re-exporting the same name
       'import/no-mutable-exports': 2, // Disallow the export of non-constants
       'import/no-self-import': 2, // Prevent a module from importing itself

@@ -1,3 +1,4 @@
+import { type NonEmptyArray } from '@vxti/typed';
 import type * as z from 'zod';
 import { type Result } from '../../result';
 import { type GenericMessage } from '../../types/messages';
@@ -47,7 +48,7 @@ export interface IToolDefinition<
   approvalOptions(
     input: TIn,
     channel: NotifierChannel<ToolChannelParams>
-  ): MaybePromise<ApprovalOption<TApprovalOption>[]>;
+  ): MaybePromise<NonEmptyArray<ApprovalOption<TApprovalOption>>>;
 
   /**
    * @returns `false` if not provided upon tool creation
@@ -106,7 +107,10 @@ export function createTool<
     ...props,
     approvalOptions:
       props.approvalOptions ??
-      (() => DEFAULT_APPROVAL_OPTIONS as ApprovalOption<TApprovalOption>[]),
+      (() =>
+        DEFAULT_APPROVAL_OPTIONS as NonEmptyArray<
+          ApprovalOption<TApprovalOption>
+        >),
     requiresApproval: props.requiresApproval ?? (() => false),
     onOptionSelect: props.onOptionSelect ?? (() => ToolSelectionOption.ALLOW),
   };

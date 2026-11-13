@@ -1,7 +1,6 @@
 import {
-  type LanguageModel,
+  isLoopFinished,
   type ModelMessage,
-  stepCountIs,
   streamText,
   tool as createTool,
   type Tool,
@@ -9,33 +8,31 @@ import {
 } from 'ai';
 import * as z from 'zod';
 import { sleepFor } from '../utils/async-util';
+import { getAppropriateModel, TaskComplexity } from './inference';
 import { subAgentTools, type ToolChannelParams, type SomeTool } from './tools';
 import { emitConsumeTokenEvent } from '../events/token-usage';
 import { TokenSource } from '../events/events';
 import { type NotifierChannel } from '../events/notifier';
 import { Result } from '../result';
-import { geminiProvider } from './models';
 
 const AGENT_MAX_LOOP_ITERATIONS = 200;
 
 const PRIMARY_GOAL_TOOL_NAME = 'complete_goal';
 
-export class Agent<T = string> {
+export class Agent {
   private readonly toolset: ToolSet;
   private readonly messages: ModelMessage[] = [];
-  private readonly model: LanguageModel;
 
   private goalAccomplished = false;
   private result: string | undefined;
 
   constructor(
     private readonly goal: string,
-    private readonly callback: (data: Result<T, Error>) => void,
+    private readonly callback: (data: Result<string, Error>) => void,
     private readonly signal: AbortSignal,
     private readonly channel: NotifierChannel<ToolChannelParams>
   ) {
     this.toolset = this.constructToolset();
-    this.model = geminiProvider('gemini-2.5-flash');
     this.messages = [
       { role: 'system', content: this.constructSystemPrompt() },
       { role: 'user', content: this.goal },
@@ -43,26 +40,26 @@ export class Agent<T = string> {
 
     this.channel.addInterceptor(message => ({
       loading: true,
-      content: `Agent - \`${goal}\`
+      content: `\`${goal}\`
 
 ${message.content}`,
     }));
 
     this.process()
-      .then((result: T) => this.callback(Result.Ok(result)))
+      .then((result: string) => this.callback(Result.Ok(result)))
       .catch((error: Error) => this.callback(Result.Error(error)));
   }
 
-  private async process(): Promise<T> {
+  private async process(): Promise<string> {
     let iterations = 0;
     while (iterations++ < AGENT_MAX_LOOP_ITERATIONS) {
       if (this.goalAccomplished) {
-        return this.result as T;
+        return this.result ?? '';
       }
       const result = streamText({
         tools: this.toolset,
         allowSystemInMessages: true,
-        model: this.model,
+        model: getAppropriateModel(TaskComplexity.MEDIUM),
         messages: this.messages,
         abortSignal: this.signal,
         onError: ({ error }) => {
@@ -70,25 +67,18 @@ ${message.content}`,
             content: `An error occurred in agent task - ${String(error)}`,
           });
         },
-        onStepFinish: step => {
+        onStepEnd: step => {
           emitConsumeTokenEvent({
             input: step.usage.inputTokens ?? 0,
             output: step.usage.outputTokens ?? 0,
-            source: TokenSource.SUB_TASK,
+            source: TokenSource.SECONDARY,
           });
         },
-        providerOptions: {
-          google: {
-            thinkingConfig: {
-              thinkingBudget: 0,
-            },
-          },
-        },
-        stopWhen: stepCountIs(20),
+        stopWhen: isLoopFinished(),
       });
 
       try {
-        const response = await result.response;
+        const response = (await result.finalStep).response;
         this.messages.push(...response.messages);
       } catch (e) {
         this.channel.notify({

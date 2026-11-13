@@ -51,7 +51,7 @@ async function runSubAgent(
 
     signal.addEventListener('abort', () => controller.abort());
 
-    new Agent<string>(goal, resolve, controller.signal, channel);
+    new Agent(goal, resolve, controller.signal, channel);
   });
 }
 

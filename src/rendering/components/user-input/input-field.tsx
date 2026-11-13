@@ -1,4 +1,4 @@
-import { isEmptyString, isNonEmptyArray } from '@vxti/typed';
+import { isEmptyString, isNonEmptyArray, isNotNil } from '@vxti/typed';
 import { type JSX, type ReactNode, useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import { CURSOR_BLINK_INTERVAL_MS } from '../../../lib/constants';
@@ -13,10 +13,10 @@ export default function InputField(): JSX.Element {
   const { inputRequest } = useUserInputField();
 
   if (
-    isNonEmptyArray(inputRequest.options) &&
+    isNonEmptyArray(inputRequest?.options) &&
     inputRequest.channelId !== CHANNEL_ID_NONE
   ) {
-    return <InputRequest />;
+    return <InputRequest request={inputRequest}/>;
   }
 
   return (
@@ -87,7 +87,7 @@ export function formatReferencedFiles(input: string): string {
   const re = /@(\S+)/g;
   let match: RegExpExecArray | null;
   let sanitized = input;
-  while ((match = re.exec(input)) !== null) {
+  while ((match = re.exec(input)) !== null && isNotNil(match[1])) {
     const path = match[1].replace(/[.,;:!?)\]]+$/, '');
     sanitized = sanitized.replace(match[0], `\`${path}\``);
   }

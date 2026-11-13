@@ -66,7 +66,10 @@ export const callMcpTool = createTool({
     const mcp = getMCPServer(mcpServer);
 
     const result = await mcp.withAuth(() =>
-      mcp.client.callTool({ name: toolName, arguments: args }, { signal })
+      mcp.params.client.callTool(
+        { name: toolName, arguments: args },
+        { signal }
+      )
     );
 
     if (result.isError) {
@@ -87,10 +90,10 @@ export const callMcpTool = createTool({
     if (isTrusted({ mcpServer, toolName })) return false;
 
     // If no auto-approve options are present, we require approval (always)
-    if (!isNonEmptyArray(mcp.config.autoApprove)) return true;
+    if (!isNonEmptyArray(mcp.params.config.autoApprove)) return true;
 
     // Same here
-    return mcp.config.autoApprove.includes(toolName);
+    return mcp.params.config.autoApprove.includes(toolName);
   },
 
   approvalOptions({ mcpServer, toolName }) {
@@ -122,11 +125,9 @@ export const callMcpTool = createTool({
     return ToolSelectionOption.ALLOW;
   },
 
-  inputToString({ toolName, mcpServer }) {
-    return `Using MCP tool \`${toolName}\` from \`${mcpServer}\``;
-  },
+  inputToString: ({ toolName, mcpServer }) =>
+    `Using MCP tool \`${toolName}\` from \`${mcpServer}\``,
 
-  outputToString({ toolName, mcpServer }) {
-    return `Used MCP tool \`${toolName}\` from \`${mcpServer}\``;
-  },
+  outputToString: ({ toolName, mcpServer }) =>
+    `Used MCP tool \`${toolName}\` from \`${mcpServer}\``,
 });

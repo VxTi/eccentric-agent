@@ -1,5 +1,6 @@
-import { isEmptyArray } from '@vxti/typed';
+import { isEmptyArray, type NonEmptyArray } from '@vxti/typed';
 import * as z from 'zod';
+import { type InputOption } from '../../../events/events';
 import { requestUserInput } from '../../../events/user-input';
 import { Result } from '../../../result';
 import { createTool } from '../tool-definition';
@@ -92,7 +93,7 @@ export const promptUserOptions = createTool({
     const chosen = await requestUserInput({
       title: 'Your attention is needed',
       description: question,
-      options,
+      options: options as NonEmptyArray<InputOption>,
       allowMultiple: selectMultiple,
     });
 

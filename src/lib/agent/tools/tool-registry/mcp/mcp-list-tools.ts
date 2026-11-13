@@ -1,4 +1,4 @@
-import { compact, isNonEmptyString, isNotNil } from '@vxti/typed';
+import { compact, isNil, isNonEmptyString, isNotNil } from '@vxti/typed';
 import * as z from 'zod';
 import { Result } from '../../../../result';
 import { getMCPServer, type McpTool } from '../../../mcp/mcp';
@@ -48,11 +48,24 @@ export const listMcpTools = createTool({
     const allTools = new Map<string, McpTool>();
 
     let cursor: string | undefined;
+    let foundTool: McpTool | undefined;
+
     do {
       const { tools, nextCursor } = await mcp.withAuth(() =>
-        mcp.client.listTools({ cursor })
+        mcp.params.client.listTools({ cursor })
       );
       tools.forEach(t => allTools.set(t.name, t));
+
+      if (
+        !isNil(toolName) &&
+        (foundTool = allTools.get(toolName)) !== undefined
+      ) {
+        return Result.Ok({
+          mcpServer,
+          tools: [foundTool],
+        });
+      }
+
       cursor = nextCursor;
     } while (isNotNil(cursor));
 
@@ -61,14 +74,16 @@ export const listMcpTools = createTool({
       return Result.Ok({
         mcpServer,
         tools: compact([
-          tool && {
-            name: tool.name,
-            description: tool.description,
-            inputSchema: JSON.stringify(tool.inputSchema),
-            outputSchema: tool.outputSchema
-              ? JSON.stringify(tool.outputSchema)
-              : undefined,
-          },
+          isNotNil(tool)
+            ? {
+                name: tool.name,
+                description: tool.description,
+                inputSchema: JSON.stringify(tool.inputSchema),
+                outputSchema: tool.outputSchema
+                  ? JSON.stringify(tool.outputSchema)
+                  : undefined,
+              }
+            : undefined,
         ]),
       });
     }

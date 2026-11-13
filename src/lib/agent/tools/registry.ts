@@ -18,6 +18,7 @@ import {
   callMcpTool,
   discoverMcpTool,
 } from './tool-registry';
+import { useSkill } from './tool-registry/skill';
 
 export const subAgentTools: SomeTool[] = [
   findFile,
@@ -32,10 +33,12 @@ export const subAgentTools: SomeTool[] = [
   discoverMcpTool,
   listMcpTools,
   callMcpTool,
+  useSkill,
 ] as const;
 
 export const toolRegistry: SomeTool[] = [
   ...subAgentTools,
+  useSkill,
   spawnSubAgents,
   promptUserOptions,
   shell,

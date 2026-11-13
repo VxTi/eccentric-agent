@@ -1,5 +1,10 @@
 import { isNonEmptyString } from '@vxti/typed';
-import { type ModelMessage, stepCountIs, streamText, type ToolSet } from 'ai';
+import {
+  isLoopFinished,
+  type ModelMessage,
+  streamText,
+  type ToolSet,
+} from 'ai';
 import chalk from 'chalk';
 import {
   createContext,
@@ -12,30 +17,32 @@ import {
   useMemo,
 } from 'react';
 import { v7 as uuid } from 'uuid';
+import { getAppropriateModel, TaskComplexity } from '../../lib/agent/inference';
 import { loadMcpConfig, type MCP } from '../../lib/agent/mcp/mcp';
 import { getRandomMessage } from '../../lib/agent/rotating-messages';
+import { discoverSkillFiles } from '../../lib/agent/skills/discovery';
 import { constructSystemPrompt } from '../../lib/agent/system-prompt';
-import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
+import { makeToolSet, toolRegistry } from '../../lib/agent/tools';
 import { EventName, eventOn, TokenSource } from '../../lib/events/events';
 import { Notifier } from '../../lib/events/notifier';
+import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
 import { Features } from '../../lib/feaures';
 import { type FileCache } from '../../lib/file-cache';
-import { type TaskList } from '../../lib/tasks';
-import type { Message, UserMessage } from '../../lib/types/messages';
-import { toolRegistry } from '../../lib/agent/tools';
-import { makeToolSet } from '../../lib/agent/tools/core';
-import { useAppDispatch, useAppSelector, store } from '../../lib/state';
+import { store, useAppDispatch, useAppSelector } from '../../lib/state';
 import {
   type AgentStatus,
-  setMessages as setMessagesAction,
+  dequeueMessage,
+  enqueueMessage,
+  setMcpServers as setMcpServersAction,
   setMessage as setMessageAction,
+  setMessages as setMessagesAction,
   setModelMessages as setModelMessagesAction,
+  setSkills as setSkillsAction,
   setStatus as setStatusAction,
   setSystemPrompt as setSystemPromptAction,
-  setMcpServers as setMcpServersAction,
-  enqueueMessage,
-  dequeueMessage,
 } from '../../lib/state/agent';
+import { type TaskList } from '../../lib/tasks';
+import type { Message, UserMessage } from '../../lib/types/messages';
 import { basicHighlightFormatting } from '../terminal-markdown-renderer/markdown-renderer';
 
 export type { AgentStatus };
@@ -67,7 +74,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
     cwd,
     git: { ignored: gitIgnored },
   } = useAppSelector(state => state.fileSystem);
-  const { taskList, model, mcpServers } = useAppSelector(state => state.agent);
+  const { taskList, mcpServers } = useAppSelector(state => state.agent);
   const { controller } = useAppSelector(state => state.app);
 
   const notifier = useMemo(() => new Notifier(), []);
@@ -77,6 +84,30 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
   );
 
   useEffect(() => {
+    dispatch(
+      setStatusAction({
+        text: basicHighlightFormatting('Loading skills'),
+        loading: true,
+      })
+    );
+    discoverSkillFiles()
+      .then(skills => {
+        dispatch(setSkillsAction(skills));
+        dispatch(
+          setStatusAction({
+            text: `skills: ${skills.map(s => s.name).join(', ')}`,
+            loading: false,
+          })
+        );
+      })
+      .catch(() => {
+        dispatch(
+          setStatusAction({
+            text: chalk.red(`Failed to load skills`),
+            loading: false,
+          })
+        );
+      });
     if (!Features.MCP) return;
 
     dispatch(
@@ -85,8 +116,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
         loading: true,
       })
     );
-
-    void loadMcpConfig(controller.signal)
+    loadMcpConfig(controller.signal)
       .then(servers => {
         dispatch(setMcpServersAction(servers));
         dispatch(setStatusAction({ text: '', loading: false }));
@@ -165,7 +195,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
       const result = streamText({
         allowSystemInMessages: true,
         abortSignal: controller.signal,
-        model: model.modelName,
+        model: getAppropriateModel(TaskComplexity.MEDIUM),
         messages: [
           { content: currentSystemPrompt, role: 'system' },
           ...updatedMessages,
@@ -185,7 +215,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
             },
           },
         },
-        stopWhen: stepCountIs(100),
+        stopWhen: isLoopFinished(),
         onError: ({ error }) => {
           dispatch(
             setMessageAction({
@@ -253,7 +283,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
         }
       }
     },
-    [controller, dispatch, model, tools]
+    [controller, dispatch, tools]
   );
 
   const submitMessage = useCallback(

@@ -72,7 +72,10 @@ export function useInputSuggestionProvider(
       return;
     }
 
-    if ((matches = COMMAND_PATTERN.exec(preCursorInput)) !== null) {
+    if (
+      (matches = COMMAND_PATTERN.exec(preCursorInput)) !== null &&
+      isNotNil(matches[1])
+    ) {
       const command = matches[1];
 
       setSuggestions({

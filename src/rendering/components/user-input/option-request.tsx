@@ -1,22 +1,32 @@
-import { isEmptyArray, isEmptyString, isNonEmptyString } from '@vxti/typed';
+import {
+  isNonEmptyArray,
+  isNonEmptyString,
+  type NonEmptyArray,
+} from '@vxti/typed';
 import { Box, Text, useInput } from 'ink';
 import { type ReactNode, useMemo, useState } from 'react';
-import { emitEvent, EventName } from '../../../lib/events/events';
-import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
-import { useUserInputField } from '../../context/user-input-context';
+import {
+  emitEvent,
+  EventName,
+  type InputOption,
+  type UserInputRequest,
+} from '../../../lib/events/events';
+import { useUserInputField } from '../../context';
 import { parseMarkdown } from '../../terminal-markdown-renderer/markdown-renderer';
 
-export function InputRequest(): ReactNode {
-  const { inputRequest, setInputRequest } = useUserInputField();
+export function InputRequest({
+  request,
+}: {
+  request: UserInputRequest;
+}): ReactNode {
+  const { setInputRequest } = useUserInputField();
   const [userSelectedInputIndex, setUserSelectedInputIndex] =
     useState<number>(0);
   const [activeIndices, setActiveIndices] = useState<number[]>([]);
 
-  const { allowMultiple, options, title } = inputRequest;
+  const { allowMultiple, options, title } = request;
 
   useInput((char, key) => {
-    if (isEmptyArray(inputRequest.options)) return;
-
     if (char === ' ') {
       setActiveIndices(indices => {
         // If selected,
@@ -49,27 +59,28 @@ export function InputRequest(): ReactNode {
       return;
     }
     if (key.return || key.tab) {
-      const indices =
-        activeIndices.length === 0 ? [userSelectedInputIndex] : activeIndices;
+      const indices: NonEmptyArray<number> = isNonEmptyArray(activeIndices)
+        ? activeIndices
+        : [userSelectedInputIndex];
 
       emitEvent(
         EventName.INPUT_RESPONSE,
-        indices.map(idx => inputRequest.options[idx]),
-        inputRequest.channelId
+        indices.map(idx => request.options[idx]) as NonEmptyArray<InputOption>,
+        request.channelId
       );
 
-      setInputRequest({ channelId: CHANNEL_ID_NONE, options: [] });
+      setInputRequest(undefined);
       setUserSelectedInputIndex(-1);
     }
   });
 
   const description = useMemo(() => {
-    if (isEmptyString(inputRequest.description)) return;
+    if (!isNonEmptyString(request.description)) return;
 
-    const md = parseMarkdown(inputRequest.description);
+    const md = parseMarkdown(request.description);
 
     return md.split('\n').slice(0, 5).join('\n');
-  }, [inputRequest.description]);
+  }, [request.description]);
 
   return (
     <Box

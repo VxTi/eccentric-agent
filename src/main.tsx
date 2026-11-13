@@ -11,7 +11,6 @@ import { App } from './rendering/components/App';
 import { terminalRenderer } from './rendering/terminal-markdown-renderer/markdown-renderer';
 import chalk from 'chalk';
 
-
 // SGR mouse tracking (button events + SGR encoding) so the terminal reports
 // wheel scrolls; Ink surfaces the resulting sequences through `useInput`.
 const ANSI_MOUSE_ENABLE = '\x1b[?1000h\x1b[?1006h';

@@ -1,9 +1,11 @@
+import type { NonEmptyArray } from '@vxti/typed';
+import type { InputOption } from '../../events/events';
+import type { Notifier } from '../../events/notifier';
 import { tool as createTool, type Tool, type ToolSet } from 'ai';
 import chalk from 'chalk';
 import { v7 as uuid } from 'uuid';
 import { basicHighlightFormatting } from '../../../rendering/terminal-markdown-renderer/markdown-renderer';
 import { emitMessage } from '../../events/messaging';
-import { type Notifier } from '../../events/notifier';
 import { requestUserInput } from '../../events/user-input';
 import { Result } from '../../result';
 import {
@@ -55,7 +57,10 @@ function makeTool(
         const [chosen] = await requestUserInput({
           title: 'Approval required',
           description: `Tool \`${tool.name}\` requires approval\n ${JSON.stringify(input)}`,
-          options: options.map(opt => ({ label: opt.text, id: opt.option })),
+          options: options.map(opt => ({
+            label: opt.text,
+            id: opt.option,
+          })) as NonEmptyArray<InputOption>,
           allowMultiple: false,
         });
         const selectionOption = await tool.onOptionSelect(

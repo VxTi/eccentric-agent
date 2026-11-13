@@ -1,6 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { UserInputRequest } from '../events/events';
-import { CHANNEL_ID_NONE } from '../events/user-input';
 import type { SuggestionSet } from '../../rendering/hooks';
 
 export interface UserInputState {
@@ -9,7 +8,7 @@ export interface UserInputState {
   suggestions: SuggestionSet | undefined;
   suggestionCursorIndex: number;
   suggestionIndex: number;
-  inputRequest: UserInputRequest;
+  inputRequest: UserInputRequest | undefined;
 }
 
 const initialState: UserInputState = {
@@ -18,10 +17,7 @@ const initialState: UserInputState = {
   suggestions: undefined,
   suggestionCursorIndex: 0,
   suggestionIndex: 0,
-  inputRequest: {
-    channelId: CHANNEL_ID_NONE,
-    options: [],
-  },
+  inputRequest: undefined,
 };
 
 export const userInputSlice = createSlice({
@@ -46,7 +42,10 @@ export const userInputSlice = createSlice({
     setSuggestionIndex: (state, action: PayloadAction<number>) => {
       state.suggestionIndex = action.payload;
     },
-    setInputRequest: (state, action: PayloadAction<UserInputRequest>) => {
+    setInputRequest: (
+      state,
+      action: PayloadAction<UserInputRequest | undefined>
+    ) => {
       state.inputRequest = action.payload;
     },
   },

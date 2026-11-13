@@ -1,3 +1,4 @@
+import { isNotNil } from '@vxti/typed';
 import { type Change, diffTrimmedLines } from 'diff';
 import {
   DIFF_LANG,
@@ -12,6 +13,7 @@ export interface DiffLine {
   lineNumberModified?: number;
   collapsed?: boolean;
 }
+type SideBySideDiff = [DiffLine, DiffLine];
 
 const DEFAULT_CONTEXT_LINES = 2;
 
@@ -19,10 +21,10 @@ export function generateSideBySideDiff(
   original: string,
   modified: string,
   contextLines: number = DEFAULT_CONTEXT_LINES
-): DiffLine[][] {
+): SideBySideDiff[] {
   const changes = diffTrimmedLines(original, modified);
 
-  const diffs: DiffLine[][] = [];
+  const diffs: SideBySideDiff[] = [];
 
   let originalLineNumber = 1;
   let modifiedLineNumber = 1;
@@ -72,16 +74,18 @@ export function generateSideBySideDiff(
 }
 
 function collapseUnchangedRegions(
-  rows: DiffLine[][],
+  rows: SideBySideDiff[],
   contextLines: number
-): DiffLine[][] {
-  const isChanged = ([left, right]: DiffLine[]): boolean => {
+): SideBySideDiff[] {
+  const isChanged = ([left, right]: SideBySideDiff): boolean => {
     return Boolean(left.added || left.removed || right.added || right.removed);
   };
 
   const keep = new Array<boolean>(rows.length).fill(false);
   for (let i = 0; i < rows.length; i++) {
-    if (isChanged(rows[i] ?? [])) {
+    const row = rows[i];
+
+    if (isNotNil(row) && isChanged(row)) {
       const start = Math.max(0, i - contextLines);
       const end = Math.min(rows.length - 1, i + contextLines);
       for (let j = start; j <= end; j++) {
@@ -93,11 +97,13 @@ function collapseUnchangedRegions(
   const hasAnyChange = keep.some(Boolean);
   if (!hasAnyChange) return [];
 
-  const result: DiffLine[][] = [];
+  const result: SideBySideDiff[] = [];
   let inGap = false;
   for (let i = 0; i < rows.length; i++) {
-    if (keep[i]) {
-      result.push(rows[i]);
+    const row = rows[i];
+
+    if (keep[i] && isNotNil(row)) {
+      result.push(row);
       inGap = false;
     } else if (!inGap) {
       result.push([

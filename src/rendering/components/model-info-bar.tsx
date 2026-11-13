@@ -6,13 +6,8 @@ import {
   EventName,
   eventOn,
   type TokenConsumeProps,
-  TokenSource,
 } from '../../lib/events/events';
-import { useAppSelector } from '../../lib/state';
-import {
-  formatPercentageSymbol,
-  formatTokenCount,
-} from '../../lib/text-formatting';
+import { formatTokenCount } from '../../lib/text-formatting';
 
 export function ModelInfoBar(): ReactNode {
   const [{ input, output }, setCount] = useState<
@@ -21,36 +16,22 @@ export function ModelInfoBar(): ReactNode {
     input: 0,
     output: 0,
   });
-  const [{ input: extIn, output: extOut }, setExtCount] = useState<
-    Omit<TokenConsumeProps, 'source'>
-  >({ input: 0, output: 0 });
-  const { modelName, ...metadata } = useAppSelector(state => state.agent.model);
-
   useEffect(() => {
     return eventOn(
       EventName.CONSUME_TOKENS,
-      ({ detail: { input, output, source, reset } }: ConsumeTokenEvent) => {
+      ({ detail: { input, output, reset } }: ConsumeTokenEvent) => {
         if (reset) {
-          setExtCount({ input: 0, output: 0 });
           setCount({ input: 0, output: 0 });
           return;
         }
-        const updateState =
-          source === TokenSource.SUB_TASK ? setExtCount : setCount;
 
-        updateState(prev => ({
+        setCount(prev => ({
           input: prev.input + input,
           output: prev.output + output,
         }));
       }
     );
   }, []);
-
-  const contextWindowUsedPercentage =
-    100 * ((input + output) / metadata.contextWindow);
-  const cost =
-    ((input + extIn) / 1_000_000) * metadata.inputTokenPricing +
-    ((output + extOut) / 1_000_000) * metadata.outputTokenPricing;
 
   return (
     <Box
@@ -64,16 +45,6 @@ export function ModelInfoBar(): ReactNode {
       <Text color="gray">
         ↑ {formatTokenCount(input)} • ↓ {formatTokenCount(output)}
       </Text>
-      <Box gap={1}>
-        <Box paddingRight={1} gap={2}>
-          <Text underline>{modelName}</Text>
-          <Text>${cost.toFixed(cost < 100 ? 2 : 1)}</Text>
-        </Box>
-        <Box>
-          <Text>{formatPercentageSymbol(contextWindowUsedPercentage)} </Text>
-          <Text>{contextWindowUsedPercentage.toFixed(1)}% </Text>
-        </Box>
-      </Box>
     </Box>
   );
 }

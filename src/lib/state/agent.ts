@@ -1,11 +1,7 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { type ModelMessage } from 'ai';
 import type { MCP } from '../agent/mcp/mcp';
-import {
-  getModelForTask,
-  type LanguageModelMetadata,
-  ModelTaskType,
-} from '../agent/models';
+import { type AgentSkill } from '../agent/skills/common';
 import { DEFAULT_SYSTEM_PROMPT } from '../constants';
 import { FileCache } from '../file-cache';
 import { type Task, TaskList, type TaskUpdate } from '../tasks';
@@ -22,7 +18,8 @@ export interface AgentState {
   messages: Message[];
   modelMessages: ModelMessage[];
   status: AgentStatus;
-  model: LanguageModelMetadata;
+  skills: AgentSkill[];
+  activeSkills: Record<string, AgentSkill>;
   mcpServers: MCP[];
   systemPrompt: string;
   messageQueue: string[];
@@ -33,11 +30,12 @@ const initialState: AgentState = {
   fileCache: new FileCache(),
   messages: [],
   modelMessages: [],
+  activeSkills: {},
   status: {
     loading: false,
     text: '',
   },
-  model: getModelForTask(ModelTaskType.INVESTIGATION),
+  skills: [],
   mcpServers: [],
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   messageQueue: [],
@@ -64,6 +62,12 @@ export const agentSlice = createSlice({
     clearMessages: state => {
       state.messages = [];
     },
+    setActiveSkills: (
+      state,
+      action: PayloadAction<Record<string, AgentSkill>>
+    ) => {
+      state.activeSkills = action.payload;
+    },
     setModelMessages: (state, action: PayloadAction<ModelMessage[]>) => {
       // @ts-expect-error Immer draft recursion incompatibility with AI SDK ModelMessage URL type
       state.modelMessages = action.payload;
@@ -72,11 +76,11 @@ export const agentSlice = createSlice({
       // @ts-expect-error Immer draft recursion incompatibility with AI SDK ModelMessage URL type
       state.modelMessages.push(action.payload);
     },
+    setSkills: (state, action: PayloadAction<AgentSkill[]>) => {
+      state.skills = action.payload;
+    },
     setStatus: (state, action: PayloadAction<AgentStatus>) => {
       state.status = action.payload;
-    },
-    setModel: (state, action: PayloadAction<LanguageModelMetadata>) => {
-      state.model = action.payload;
     },
     setSystemPrompt: (state, action: PayloadAction<string>) => {
       state.systemPrompt = action.payload;
@@ -115,13 +119,14 @@ export const {
   clearMessages,
   setModelMessages,
   addModelMessage,
+  setActiveSkills,
   setStatus,
-  setModel,
   setSystemPrompt,
   setMcpServers,
   setTaskList,
   setTasks,
   updateTasks,
+  setSkills,
   setFileCache,
   setMessageQueue,
   enqueueMessage,

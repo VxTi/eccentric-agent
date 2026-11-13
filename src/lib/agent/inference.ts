@@ -5,18 +5,8 @@ import {
   Output,
 } from 'ai';
 import type * as z from 'zod';
-import { TokenSource } from '../events/events';
+import { type TokenSource } from '../events/events';
 import { emitConsumeTokenEvent } from '../events/token-usage';
-
-type InferModelName<T> = T extends `${string}/${infer F}` ? F : never;
-export type ModelName = InferModelName<LanguageModel>;
-
-export interface LanguageModelMetadata {
-  contextWindow: number;
-  inputTokenPricing: number;
-  outputTokenPricing: number;
-  modelName: ModelName;
-}
 
 export enum TaskComplexity {
   SIMPLE = 'simple',
@@ -30,6 +20,7 @@ interface GenerateTextProps<T> {
   prompt: string;
   systemPrompt: string;
   signal?: AbortSignal;
+  source: TokenSource;
 }
 
 export async function generateText<T>({
@@ -38,10 +29,11 @@ export async function generateText<T>({
   prompt,
   systemPrompt,
   signal,
+  source,
 }: GenerateTextProps<T>): Promise<T> {
   const {
     output,
-    usage: { totalTokens, inputTokens, outputTokens },
+    usage: { inputTokens, outputTokens },
   } = await aisdkGenerateText({
     prompt,
     output: Output.object({ schema }),
@@ -60,14 +52,14 @@ export async function generateText<T>({
     emitConsumeTokenEvent({
       input: inputTokens,
       output: outputTokens,
-      source: TokenSource.PRIMARY,
+      source,
     });
   }
 
   return output;
 }
 
-function getAppropriateModel(complexity: TaskComplexity): LanguageModel {
+export function getAppropriateModel(complexity: TaskComplexity): LanguageModel {
   switch (complexity) {
     case TaskComplexity.SIMPLE:
       return 'deepseek/deepseek-flash';

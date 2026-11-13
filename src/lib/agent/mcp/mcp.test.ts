@@ -13,7 +13,7 @@ vi.mock('node:os', () => ({
 describe('MCP server', () => {
   it('should create mcp server', async () => {
     const controller = new AbortController();
-    const server = await MCP.create(
+    const mcpServerResult = await MCP.create(
       'atlassian-rovo-mcp',
       {
         command: 'npx',
@@ -32,8 +32,8 @@ describe('MCP server', () => {
       },
       controller.signal
     );
-    if (server.ok) {
-      const tools = await server.data.client.listTools();
+    if (mcpServerResult.ok) {
+      const tools = await mcpServerResult.data.params.client.listTools();
       console.log(tools);
     }
   });

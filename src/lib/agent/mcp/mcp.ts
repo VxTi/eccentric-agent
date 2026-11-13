@@ -1,6 +1,8 @@
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { isNil } from '@vxti/typed';
 import { store } from '../../state';
 import type { PromiseResult } from '../../types/types';
+import { getMcpFilePath } from '../config-discovery';
 import type { mcp } from './types';
 import {
   applyMiddlewares,
@@ -10,104 +12,87 @@ import {
   type Transport,
   UnauthorizedError,
 } from '@modelcontextprotocol/client';
-import { config } from 'dotenv';
 import first from 'lodash/first';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
-import path from 'node:path';
 import { type z } from 'zod';
 import { debug, emitMessage } from '../../events/messaging';
 import { Result } from '../../result';
 import { mcpConfigSchema, mcpServerConfigSchema } from './models';
 import { LocalFileOAuthProvider } from './oauth-provider';
 
-config({ quiet: true });
-
 export type McpTool = PromiseResult<
-  ReturnType<(typeof MCP)['prototype']['client']['listTools']>
+  ReturnType<(typeof MCP)['prototype']['params']['client']['listTools']>
 >['tools'][number];
 
 const protocolVersion: string = '2025-11-25';
 
-const knownRelativePaths = ['.agents/mcp.json'];
-
 export async function loadMcpConfig(signal: AbortSignal): Promise<MCP[]> {
-  const home = os.homedir();
-  const cwd = process.cwd();
+  const path = getMcpFilePath();
 
-  const localPaths: string[] = knownRelativePaths
-    .map(relativePath => [
-      path.resolve(cwd, relativePath),
-      path.resolve(home, relativePath),
-    ])
-    .flat();
-
-  for (const path of localPaths) {
-    if (!fs.existsSync(path)) {
-      continue;
-    }
-
-    const content = await fs.promises.readFile(path, 'utf8');
-    const json: unknown = JSON.parse(content);
-    const parsed = mcpConfigSchema.safeParse(json);
-
-    if (!parsed.success) {
-      return Promise.reject(parsed.error);
-    }
-
-    const failed: string[] = [];
-    const configs = Object.entries(parsed.data.mcpServers)
-      .map(
-        ([key, value]): [
-          string,
-          z.infer<typeof mcpServerConfigSchema> | undefined,
-        ] => {
-          const parsed = mcpServerConfigSchema.safeParse(value);
-          if (!parsed.success) {
-            failed.push(key);
-            return [key, undefined];
-          }
-
-          return [key, parsed.data];
-        }
-      )
-      .filter(
-        (input): input is [string, z.infer<typeof mcpServerConfigSchema>] =>
-          !input[1]?.disabled
-      );
-
-    if (failed.length > 0) {
-      emitMessage({
-        type: 'generic',
-        failure: true,
-        content: `Failed to initialize the following MCPs:\n${failed.map(f => `- ${f}`).join('\n')}`,
-      });
-    }
-
-    const mcpList: MCP[] = [];
-
-    for (const [name, config] of configs) {
-      const mcpResult = await MCP.create(name, config, signal);
-      if (mcpResult.ok) {
-        mcpList.push(mcpResult.data);
-      }
-    }
-
-    return mcpList;
+  if (isNil(path) || !fs.existsSync(path)) {
+    return [];
   }
 
-  return [];
+  const content = await fs.promises.readFile(path, 'utf8');
+  const json: unknown = JSON.parse(content);
+  const parsed = mcpConfigSchema.safeParse(json);
+
+  if (!parsed.success) {
+    return Promise.reject(parsed.error);
+  }
+
+  const failed: string[] = [];
+  const configs = Object.entries(parsed.data.mcpServers)
+    .map(
+      ([key, value]): [
+        string,
+        z.infer<typeof mcpServerConfigSchema> | undefined,
+      ] => {
+        const parsed = mcpServerConfigSchema.safeParse(value);
+        if (!parsed.success) {
+          failed.push(key);
+          return [key, undefined];
+        }
+
+        return [key, parsed.data];
+      }
+    )
+    .filter(
+      (input): input is [string, z.infer<typeof mcpServerConfigSchema>] =>
+        !input[1]?.disabled
+    );
+
+  if (failed.length > 0) {
+    emitMessage({
+      type: 'generic',
+      failure: true,
+      content: `Failed to initialize the following MCPs:\n${failed.map(f => `- ${f}`).join('\n')}`,
+    });
+  }
+
+  const mcpList: MCP[] = [];
+
+  for (const [name, config] of configs) {
+    const mcpResult = await MCP.create(name, config, signal);
+    if (mcpResult.ok) {
+      mcpList.push(mcpResult.data);
+    }
+  }
+
+  return mcpList;
+}
+
+interface McpParams {
+  config: mcp.Config;
+  name: string;
+  client: Client;
+  transport: Transport;
+  authProvider?: LocalFileOAuthProvider;
 }
 
 export class MCP extends EventEmitter {
-  constructor(
-    public readonly config: mcp.Config,
-    public readonly name: string,
-    public readonly client: Client,
-    public readonly transport: Transport,
-    public readonly authProvider?: LocalFileOAuthProvider
-  ) {
+  constructor(public readonly params: McpParams) {
     super();
   }
 
@@ -127,14 +112,14 @@ export class MCP extends EventEmitter {
     } catch (err) {
       if (
         !(err instanceof UnauthorizedError) ||
-        !this.authProvider ||
-        !(this.transport instanceof StreamableHTTPClientTransport)
+        !this.params.authProvider ||
+        !(this.params.transport instanceof StreamableHTTPClientTransport)
       ) {
         throw err;
       }
 
-      const code = await this.authProvider.waitForAuthorizationCode();
-      await this.transport.finishAuth(code);
+      const code = await this.params.authProvider.waitForAuthorizationCode();
+      await this.params.transport.finishAuth(code);
       return await operation();
     }
   }
@@ -156,7 +141,7 @@ export class MCP extends EventEmitter {
         await client.close();
       });
 
-      const mcp = new MCP(config, name, client, transport, authProvider);
+      const mcp = new MCP({ config, name, client, transport, authProvider });
 
       return Result.Ok(mcp);
     } catch (err: unknown) {
@@ -167,7 +152,7 @@ export class MCP extends EventEmitter {
   private static async makeStdioTransport(
     config: mcp.CommandConfig,
     signal: AbortSignal
-  ) {
+  ): Promise<{ client: Client; transport: StdioClientTransport }> {
     const transport = new StdioClientTransport({
       command: config.command,
       args: config.args,
@@ -282,7 +267,9 @@ export function getMCPServer(name: string): MCP {
     agent: { mcpServers },
   } = store.getState();
 
-  const mcp = first(mcpServers.filter((server: MCP) => server.name === name));
+  const mcp = first(
+    mcpServers.filter((server: MCP) => server.params.name === name)
+  );
 
   if (!mcp) {
     throw new Error(`MCP "${name}" was not found`);
