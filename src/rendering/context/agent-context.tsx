@@ -63,15 +63,12 @@ interface AgentProviderProps {
 
 export function AgentProvider({ children }: AgentProviderProps): ReactNode {
   const dispatch = useAppDispatch();
-  const { controller, cwd, gitIgnored } = useAppSelector(
-    ({ fileSystem, app }) => ({
-      controller: app.controller,
-      cwd: fileSystem.cwd,
-      gitIgnored: fileSystem.git.ignored,
-    })
-  );
-
+  const {
+    cwd,
+    git: { ignored: gitIgnored },
+  } = useAppSelector(state => state.fileSystem);
   const { taskList, model, mcpServers } = useAppSelector(state => state.agent);
+  const { controller } = useAppSelector(state => state.app);
 
   const notifier = useMemo(() => new Notifier(), []);
   const tools = useMemo<ToolSet>(
@@ -188,7 +185,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
             },
           },
         },
-        stopWhen: stepCountIs(20),
+        stopWhen: stepCountIs(100),
         onError: ({ error }) => {
           dispatch(
             setMessageAction({
@@ -197,6 +194,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
               content: String(error),
             })
           );
+          clearInterval(interval);
         },
       });
 

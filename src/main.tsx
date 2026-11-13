@@ -1,4 +1,6 @@
 import { config } from 'dotenv';
+config({ quiet: true });
+
 import { marked } from 'marked';
 import { stdin, stdout } from 'node:process';
 import { render } from 'ink';
@@ -9,7 +11,6 @@ import { App } from './rendering/components/App';
 import { terminalRenderer } from './rendering/terminal-markdown-renderer/markdown-renderer';
 import chalk from 'chalk';
 
-config({ quiet: true });
 
 // SGR mouse tracking (button events + SGR encoding) so the terminal reports
 // wheel scrolls; Ink surfaces the resulting sequences through `useInput`.

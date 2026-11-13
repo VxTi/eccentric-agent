@@ -1,3 +1,4 @@
+import { type NonEmptyArray } from '@vxti/typed';
 import { type Message } from '../types/messages';
 
 export const eventTarget = new EventTarget();
@@ -28,10 +29,10 @@ export class UserInputRequestEvent extends CustomEvent<UserInputRequest> {
 }
 
 export class UserInputResponseEvent extends CustomEvent<{
-  options: InputOption[];
+  options: NonEmptyArray<InputOption>;
   channelId: string;
 }> {
-  constructor(options: InputOption[], channelId: string) {
+  constructor(options: NonEmptyArray<InputOption>, channelId: string) {
     super(EventName.INPUT_RESPONSE, { detail: { options, channelId } });
   }
 }

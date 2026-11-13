@@ -1,4 +1,5 @@
 {
+  "extends": ["@vxti/typed/tsconfig.strict.json"],
   "compilerOptions": {
     "target": "esnext",
     "useDefineForClassFields": true,

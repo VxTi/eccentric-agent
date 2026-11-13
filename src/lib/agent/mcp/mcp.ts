@@ -30,17 +30,18 @@ export type McpTool = PromiseResult<
 
 const protocolVersion: string = '2025-11-25';
 
+const knownRelativePaths = ['.agents/mcp.json'];
+
 export async function loadMcpConfig(signal: AbortSignal): Promise<MCP[]> {
   const home = os.homedir();
   const cwd = process.cwd();
 
-  const localPaths: string[] = [
-    path.resolve(cwd, '.agents/mcp.json'),
-    path.resolve(cwd, '.kiro/mcp.json'),
-    path.resolve(home, '.kiro/mcp.json'),
-    path.resolve(cwd, '.cursor/mcp.json'),
-    path.resolve(home, '.cursor/mcp.json'),
-  ];
+  const localPaths: string[] = knownRelativePaths
+    .map(relativePath => [
+      path.resolve(cwd, relativePath),
+      path.resolve(home, relativePath),
+    ])
+    .flat();
 
   for (const path of localPaths) {
     if (!fs.existsSync(path)) {

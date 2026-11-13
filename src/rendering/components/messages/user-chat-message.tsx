@@ -8,8 +8,10 @@ export function UserChatMessage({ message }: BaseProps<UserMessage>) {
     <Box
       flexDirection="row"
       flexShrink={0}
-      padding={1}
-      backgroundColor="#333333"
+      marginBottom={1}
+      paddingLeft={1}
+      paddingRight={1}
+      backgroundColor="#222222"
       borderLeft
       borderTop={false}
       borderBottom={false}
@@ -17,6 +19,7 @@ export function UserChatMessage({ message }: BaseProps<UserMessage>) {
       borderLeftColor="red"
       borderStyle="single"
       flexWrap="wrap"
+      width="100%"
     >
       <Text>Me</Text>
       <Text color="#777777"> ▶ </Text>

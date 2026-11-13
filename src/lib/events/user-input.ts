@@ -1,3 +1,4 @@
+import { type NonEmptyArray } from '@vxti/typed';
 import { v7 as uuid } from 'uuid';
 import {
   emitEvent,
@@ -13,7 +14,7 @@ export const CHANNEL_ID_NONE = 'channel$none';
 
 export function requestUserInput(
   props: Omit<UserInputRequest, 'channelId'>
-): Promise<InputOption[]> {
+): Promise<NonEmptyArray<InputOption>> {
   const channelId = uuid();
   return new Promise(resolve => {
     const handler = (event: UserInputResponseEvent) => {

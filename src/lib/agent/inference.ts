@@ -1,0 +1,79 @@
+import { isNil } from '@vxti/typed';
+import {
+  type LanguageModel,
+  generateText as aisdkGenerateText,
+  Output,
+} from 'ai';
+import type * as z from 'zod';
+import { TokenSource } from '../events/events';
+import { emitConsumeTokenEvent } from '../events/token-usage';
+
+type InferModelName<T> = T extends `${string}/${infer F}` ? F : never;
+export type ModelName = InferModelName<LanguageModel>;
+
+export interface LanguageModelMetadata {
+  contextWindow: number;
+  inputTokenPricing: number;
+  outputTokenPricing: number;
+  modelName: ModelName;
+}
+
+export enum TaskComplexity {
+  SIMPLE = 'simple',
+  MEDIUM = 'medium',
+  COMPLEX = 'complex',
+}
+
+interface GenerateTextProps<T> {
+  schema: z.ZodType<T>;
+  complexity: TaskComplexity;
+  prompt: string;
+  systemPrompt: string;
+  signal?: AbortSignal;
+}
+
+export async function generateText<T>({
+  schema,
+  complexity,
+  prompt,
+  systemPrompt,
+  signal,
+}: GenerateTextProps<T>): Promise<T> {
+  const {
+    output,
+    usage: { totalTokens, inputTokens, outputTokens },
+  } = await aisdkGenerateText({
+    prompt,
+    output: Output.object({ schema }),
+    instructions: {
+      role: 'system',
+      content: systemPrompt,
+    },
+    model: getAppropriateModel(complexity),
+    abortSignal: signal,
+  });
+  if (
+    !isNil(inputTokens) &&
+    !isNil(outputTokens) &&
+    (inputTokens > 0 || outputTokens > 0)
+  ) {
+    emitConsumeTokenEvent({
+      input: inputTokens,
+      output: outputTokens,
+      source: TokenSource.PRIMARY,
+    });
+  }
+
+  return output;
+}
+
+function getAppropriateModel(complexity: TaskComplexity): LanguageModel {
+  switch (complexity) {
+    case TaskComplexity.SIMPLE:
+      return 'deepseek/deepseek-flash';
+    case TaskComplexity.MEDIUM:
+      return 'deepseek/deepseek-v4-flash';
+    case TaskComplexity.COMPLEX:
+      return 'deepseek/deepseek-v4-pro';
+  }
+}

@@ -1,6 +1,5 @@
 import { Box, Text } from 'ink';
 import { type ReactNode } from 'react';
-import { useAgent } from '../context';
 import { GitInfoLine } from './git-info-line';
 import { LoadingStatusLine } from './loading-status-line';
 import { MessageList } from './messages/message-list';
@@ -30,9 +29,6 @@ export function App(): ReactNode {
 }
 
 function WelcomingText() {
-  const { messages } = useAgent();
-  if (messages.length > 0) return;
-
   return (
     <Box flexDirection="column" alignItems="center">
       <Box paddingY={1}>

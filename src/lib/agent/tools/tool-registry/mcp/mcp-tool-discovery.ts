@@ -1,10 +1,15 @@
-import { isNil, isNonEmptyString, isNotNil } from '@vxti/typed';
-import { generateText, Output } from 'ai';
-import { Result } from '../../../../result';
-import { getMCPServer, type McpTool } from '../../../mcp/mcp';
-import { getModelForTask, ModelTaskType } from '../../../models';
-import { createTool } from '../../tool-definition';
+import {
+  hasArrayLength,
+  isEmptyArray,
+  isNil,
+  isNonEmptyString,
+  isNotNil,
+} from '@vxti/typed';
 import * as z from 'zod';
+import { Result } from '../../../../result';
+import { generateText, TaskComplexity } from '../../../inference';
+import { getMCPServer, type McpTool } from '../../../mcp/mcp';
+import { createTool } from '../../tool-definition';
 
 const inputSchema = z.object({
   mcpServer: z
@@ -67,7 +72,7 @@ function findExactNameMatch(
   const haystack = task.toLowerCase();
   const candidates = tools.filter(t => haystack.includes(t.name.toLowerCase()));
 
-  if (candidates.length !== 1) return undefined;
+  if (!hasArrayLength(candidates, 1)) return undefined;
   return candidates[0];
 }
 
@@ -83,7 +88,7 @@ export const discoverMcpTool = createTool({
   async handle({ mcpServer, task }, _channel, signal) {
     const tools = await listAllTools(mcpServer);
 
-    if (tools.length === 0) {
+    if (isEmptyArray(tools)) {
       return Result.Ok<McpDiscoveryResult>({
         mcpServer,
         reasoning: `MCP server "${mcpServer}" exposes no tools.`,
@@ -91,7 +96,7 @@ export const discoverMcpTool = createTool({
       });
     }
 
-    if (tools.length === 1) {
+    if (hasArrayLength(tools, 1)) {
       const tool = tools[0];
       return Result.Ok<McpDiscoveryResult>({
         mcpServer,
@@ -120,15 +125,11 @@ export const discoverMcpTool = createTool({
       )
       .join('\n');
 
-    const {
-      output: { toolName, reasoning },
-    } = await generateText({
-      model: getModelForTask(ModelTaskType.INVESTIGATION).modelName,
-      output: Output.object({
-        schema: selectionSchema,
-      }),
-      abortSignal: signal,
-      system:
+    const { toolName, reasoning } = await generateText({
+      complexity: TaskComplexity.SIMPLE,
+      schema: selectionSchema,
+      signal,
+      systemPrompt:
         'You select the single best MCP tool for a given task. Choose only from the provided list. If no tool is a plausible match, return null. Never invent tool names.',
       prompt: `MCP server: ${mcpServer}\nTask: ${task}\n\nAvailable tools:${catalog}`,
     });

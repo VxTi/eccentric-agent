@@ -1,5 +1,5 @@
 import { isEmptyString } from '@vxti/typed';
-import { Box, Text } from 'ink';
+import { Text } from 'ink';
 import { parseMarkdown } from '../../terminal-markdown-renderer/markdown-renderer';
 
 interface MarkdownViewProps {
@@ -17,12 +17,12 @@ export function ChatMessageContent({ content }: MarkdownViewProps) {
   });
 
   return (
-    <Box flexDirection="column" width="100%">
+    <>
       {lines.map((line, i) => (
         <Text key={i} wrap="wrap">
           {line}
         </Text>
       ))}
-    </Box>
+    </>
   );
 }

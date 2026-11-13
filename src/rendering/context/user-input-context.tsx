@@ -140,9 +140,7 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
     setSuggestions,
   } = useInputSuggestionProvider(input, cursorOffset);
 
-  const { controller } = useAppSelector(({ app }) => ({
-    controller: app.controller,
-  }));
+  const { controller } = useAppSelector(state => state.app);
   const { submitMessage } = useAgent();
   const { processCommand } = useCommandProcessor();
 

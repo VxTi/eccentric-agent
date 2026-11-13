@@ -3,9 +3,10 @@ import { Box, Text } from 'ink';
 import { useAppSelector } from '../../lib/state';
 
 export function GitInfoLine() {
-  const { currentBranch, repoName, loading } = useAppSelector(
-    ({ fileSystem: { git, loading } }) => ({ ...git, loading })
-  );
+  const {
+    git: { currentBranch, repoName },
+    loading,
+  } = useAppSelector(state => state.fileSystem);
 
   if (loading || isNil(currentBranch) || isNil(repoName)) return;
 
