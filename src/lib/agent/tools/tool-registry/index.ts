@@ -1,6 +1,7 @@
 export * from './file-system';
 export * from './mcp';
 export * from './tasks';
+export * from './delegate-task';
 export * from './get-user-location';
 export * from './get-user-time';
 export * from './prompt-user-options';

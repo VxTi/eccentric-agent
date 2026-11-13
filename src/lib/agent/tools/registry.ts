@@ -2,6 +2,7 @@ import type { SomeTool } from './tool-definition';
 import {
   createFile,
   createTaskList,
+  delegateTask,
   findFile,
   findInFile,
   getUserLocation,
@@ -38,8 +39,8 @@ export const subAgentTools: SomeTool[] = [
 
 export const toolRegistry: SomeTool[] = [
   ...subAgentTools,
-  useSkill,
   spawnSubAgents,
+  delegateTask,
   promptUserOptions,
   shell,
   replaceInFile,

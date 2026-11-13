@@ -1,9 +1,9 @@
+import { basename } from 'node:path';
 import * as z from 'zod';
 import { Result } from '../../../../result';
 import { store } from '../../../../state';
 import { formatDiffMd } from '../../../../utils/diff-utils';
 import { mkdir, writeFile, access } from 'fs/promises';
-import { dirname } from 'path';
 import { createTool } from '../../tool-definition';
 
 const inputSchema = z.object({
@@ -72,7 +72,7 @@ export const createFile = createTool({
     }
 
     if (createDirs) {
-      await mkdir(dirname(filePath), { recursive: true });
+      await mkdir(basename(filePath), { recursive: true });
     }
 
     await fileCache.update(filePath);

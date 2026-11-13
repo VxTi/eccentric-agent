@@ -19,6 +19,15 @@ const AGENT_MAX_LOOP_ITERATIONS = 200;
 
 const PRIMARY_GOAL_TOOL_NAME = 'complete_goal';
 
+export interface SubAgentOptions {
+  readonly goal: string;
+  readonly callback: (data: Result<string, Error>) => void;
+  readonly signal: AbortSignal;
+  readonly channel: NotifierChannel<ToolChannelParams>;
+  /** Tools the sub-agent may use. Defaults to the read-only research set. */
+  readonly tools?: SomeTool[];
+}
+
 export class SubAgent {
   private readonly toolset: ToolSet;
   private readonly messages: ModelMessage[] = [];
@@ -26,12 +35,19 @@ export class SubAgent {
   private goalAccomplished = false;
   private result: string | undefined;
 
-  constructor(
-    private readonly goal: string,
-    private readonly callback: (data: Result<string, Error>) => void,
-    private readonly signal: AbortSignal,
-    private readonly channel: NotifierChannel<ToolChannelParams>
-  ) {
+  private readonly goal: string;
+  private readonly callback: (data: Result<string, Error>) => void;
+  private readonly signal: AbortSignal;
+  private readonly channel: NotifierChannel<ToolChannelParams>;
+  private readonly tools: SomeTool[];
+
+  constructor(options: SubAgentOptions) {
+    this.goal = options.goal;
+    this.callback = options.callback;
+    this.signal = options.signal;
+    this.channel = options.channel;
+    this.tools = options.tools ?? subAgentTools;
+
     this.toolset = this.constructToolset();
     this.messages = [
       { role: 'system', content: this.constructSystemPrompt() },
@@ -40,7 +56,7 @@ export class SubAgent {
 
     this.channel.addInterceptor(message => ({
       loading: true,
-      content: `\`${goal}\`
+      content: `\`${this.goal}\`
 
 ${message.content}`,
     }));
@@ -114,7 +130,7 @@ ${message.content}`,
     return {
       [PRIMARY_GOAL_TOOL_NAME]: this.constructPrimaryGoalTool(),
       ...Object.fromEntries(
-        subAgentTools.map((tool: SomeTool) => [
+        this.tools.map((tool: SomeTool) => [
           tool.internalName,
           this.constructTool(tool),
         ])
