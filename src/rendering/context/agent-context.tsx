@@ -84,30 +84,9 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
   );
 
   useEffect(() => {
-    dispatch(
-      setStatusAction({
-        text: basicHighlightFormatting('Loading skills'),
-        loading: true,
-      })
-    );
-    discoverSkillFiles()
-      .then(skills => {
-        dispatch(setSkillsAction(skills));
-        dispatch(
-          setStatusAction({
-            text: `skills: ${skills.map(s => s.name).join(', ')}`,
-            loading: false,
-          })
-        );
-      })
-      .catch(() => {
-        dispatch(
-          setStatusAction({
-            text: chalk.red(`Failed to load skills`),
-            loading: false,
-          })
-        );
-      });
+    void discoverSkillFiles().then(skills => {
+      dispatch(setSkillsAction(skills));
+    });
     if (!Features.MCP) return;
 
     dispatch(

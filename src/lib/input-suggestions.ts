@@ -1,6 +1,6 @@
 import { isEmptyString, isNotNil } from '@vxti/typed';
-import { SUPPORTED_COMMANDS } from './commands';
 import fs from 'node:fs';
+import { getCommandSuggestions } from './commands';
 import { store } from './state';
 
 // Match the '@<partial path>' token immediately before the cursor. The path
@@ -71,7 +71,7 @@ export async function getInputSuggestions(
 
     return {
       type: SuggestionType.COMMAND,
-      values: filterSuggestions(SUPPORTED_COMMANDS, command),
+      values: filterSuggestions(getCommandSuggestions(), command),
     };
   }
 

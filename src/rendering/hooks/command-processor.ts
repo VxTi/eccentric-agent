@@ -1,9 +1,10 @@
+import { isNil } from '@vxti/typed';
 import { useCallback } from 'react';
-import { isCommand } from '../../lib/commands';
+import { getCommandSuggestions } from '../../lib/commands';
 import { emitMessage } from '../../lib/events/messaging';
 import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
 import { TokenSource } from '../../lib/events/events';
-import { app, useAppDispatch } from '../../lib/state';
+import { app, setActiveSkill, store, useAppDispatch } from '../../lib/state';
 import { useAgent } from '../context';
 
 export function useCommandProcessor() {
@@ -12,7 +13,12 @@ export function useCommandProcessor() {
 
   const processCommand = useCallback(
     (command: string) => {
-      if (!isCommand(command)) return;
+      const commands = getCommandSuggestions();
+
+      if (!commands.some(c => c.value === command)) {
+        console.log(command, commands);
+        return;
+      }
 
       switch (command) {
         case 'clear': {
@@ -33,12 +39,28 @@ export function useCommandProcessor() {
         }
         case 'system-prompt':
           emitMessage({
-            type: 'user',
+            type: 'generic',
             content: `Here is the system prompt:
 
 ${systemPrompt}`,
           });
           break;
+        default:
+          const skill = store
+            .getState()
+            .agent.skills.find(s => s.name === command);
+          if (isNil(skill)) {
+            emitMessage({
+              type: 'assistant',
+              content: `Unable to load skill \`${command}\``,
+            });
+            return;
+          }
+          emitMessage({
+            type: 'assistant',
+            content: `Using skill \`${command}\``,
+          });
+          dispatch(setActiveSkill(skill));
       }
     },
     [dispatch, setMessages, setModelMessages, systemPrompt]

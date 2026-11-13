@@ -18,10 +18,6 @@ import { generateSideBySideDiff } from '../../lib/utils/diff-utils';
 import { ellipsize, Position } from '../../lib/utils/string-utils';
 import { type TerminalMarked } from './types';
 
-const TABLE_CELL_SPLIT = '^*||*^';
-const TABLE_ROW_WRAP = '*|*|*|*';
-const TABLE_ROW_WRAP_REGEXP = new RegExp(escapeRegExp(TABLE_ROW_WRAP), 'g');
-
 const DEFAULT_INDENTATION = 2;
 const DEFAULT_LANG = 'plaintext';
 
@@ -282,36 +278,26 @@ export class TerminalRenderer extends Renderer {
   }
 
   public override table({ header, rows }: Tokens.Table): string {
-    let formattedHeader: string = header.reduce((text, cell) => {
-      return text + this.tablecell(cell);
-    }, '');
-    formattedHeader += this.tablerow({ text: '' });
-
+    // marked passes structured cell tokens, so build the cli-table3 rows
+    // directly. Each body row must be an array of cell strings; pushing a plain
+    // string (or an object) makes cli-table3 render a vertical table, which is
+    // what produced the stray "text" first column and one cell per line.
     const table = new Table({
-      head: generateTableRow(formattedHeader),
+      head: header.map(cell => this.renderTableCell(cell)),
       ...(this.config.tableOptions ?? {}),
     });
 
-    const body = rows.reduce((text, tableCells) => {
-      const cell = tableCells.reduce((text, tableCell) => {
-        return text + this.tablecell(tableCell);
-      }, '');
+    for (const row of rows) {
+      table.push(row.map(cell => this.renderTableCell(cell)));
+    }
 
-      return text + this.tablerow({ text: cell });
-    }, '');
-
-    generateTableRow(body).forEach(row => table.push({ text: row }));
     const content = table.toString();
 
     return this.makeSection(this.config.table?.(content) ?? content, 2);
   }
 
-  public override tablerow({ text }: Tokens.TableRow): string {
-    return `${TABLE_ROW_WRAP}${text}${TABLE_ROW_WRAP}\n`;
-  }
-
-  public override tablecell({ tokens }: Tokens.TableCell): string {
-    return this.parser.parseInline(tokens) + TABLE_CELL_SPLIT;
+  private renderTableCell(cell: Tokens.TableCell): string {
+    return this.parser.parseInline(cell.tokens).trim();
   }
 
   public override strong({ tokens, text }: Tokens.Strong): string {
@@ -532,24 +518,4 @@ export class TerminalRenderer extends Renderer {
     const padding = length - currentLength;
     return input + (padding > 0 ? ' '.repeat(padding) : '');
   }
-}
-
-function generateTableRow(text: string): string[] {
-  if (isEmptyString(text)) return [];
-  const lines = text.split('\n');
-
-  const data: string[] = [];
-  lines.forEach(line => {
-    if (isEmptyString(line)) return;
-    const parsed: string[] = line
-      .replace(TABLE_ROW_WRAP_REGEXP, '')
-      .split(TABLE_CELL_SPLIT);
-
-    data.push(...parsed.splice(0, parsed.length - 1));
-  });
-  return data;
-}
-
-function escapeRegExp(str: string): string {
-  return str.replace(/[\-\[\]\/{}()*+?.\\^$|]/g, '\\$&');
 }

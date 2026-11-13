@@ -1,6 +1,8 @@
 import type { Suggestion } from './input-suggestions';
+import { store } from './state';
+import { ellipsize, Position } from './utils/string-utils';
 
-export const SUPPORTED_COMMANDS = [
+const SUPPORTED_COMMANDS = [
   { value: 'clear', description: 'Clears the context window' },
   { value: 'exit' },
   { value: 'quit' },
@@ -11,4 +13,14 @@ export type Command = (typeof SUPPORTED_COMMANDS)[number]['value'];
 
 export function isCommand(input: string): input is Command {
   return SUPPORTED_COMMANDS.findIndex(cmd => cmd.value === input) > -1;
+}
+
+export function getCommandSuggestions(): Suggestion[] {
+  return [
+    ...SUPPORTED_COMMANDS,
+    ...store.getState().agent.skills.map(s => ({
+      value: s.name,
+      description: ellipsize(s.description, 100, Position.END),
+    })),
+  ];
 }

@@ -68,6 +68,9 @@ export const agentSlice = createSlice({
     ) => {
       state.activeSkills = action.payload;
     },
+    setActiveSkill: (state, action: PayloadAction<AgentSkill>) => {
+      state.activeSkills[action.payload.name] = action.payload;
+    },
     setModelMessages: (state, action: PayloadAction<ModelMessage[]>) => {
       // @ts-expect-error Immer draft recursion incompatibility with AI SDK ModelMessage URL type
       state.modelMessages = action.payload;
@@ -120,6 +123,7 @@ export const {
   setModelMessages,
   addModelMessage,
   setActiveSkills,
+  setActiveSkill,
   setStatus,
   setSystemPrompt,
   setMcpServers,
