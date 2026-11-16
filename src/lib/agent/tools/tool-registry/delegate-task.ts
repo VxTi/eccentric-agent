@@ -105,16 +105,21 @@ export const delegateTask = createTool({
   internalName: 'delegate_task',
   name: 'Delegate Task',
   description:
-    'Delegates one or more small, concrete, actionable tasks to capable sub-agents that can read, search,' +
-    ' write files and run shell commands — more than the read-only research agents spawned by' +
-    ' `spawn_agents`. Use this when a request can be split into a handful of small, well-defined pieces of' +
-    ' work (e.g. "add an export and update the index", "rename this helper and fix its callers",' +
-    ' "scaffold a file and wire it up") that each stand on their own and do NOT warrant a full task list.' +
-    ' Each task agent receives ONLY the goal you provide, with no access to your conversation history, so' +
-    ' make every goal fully self-contained with all necessary context, file paths, constraints, and the' +
-    ' exact shape of the expected result. Tasks run sequentially in the order given, so order them when a' +
-    ' later task depends on an earlier one. Prefer `spawn_agents` for read-only research and aggregation,' +
-    ' and a proper task list for large, multi-stage work.',
+    'Delegates concrete, self-contained units of work — above all any work that WRITES — to sub-agents' +
+    ' that can read, search, edit files and run shell commands. THIS IS THE DEFAULT TOOL FOR MULTI-STEP' +
+    ' CODE WORK: whenever a request breaks into two or more independent pieces that each involve editing,' +
+    ' creating, or verifying files, or running commands, dispatch them here as separate tasks instead of' +
+    ' performing them serially in your own loop. Reach for it proactively, not as a last resort —' +
+    ' refactors spanning several files, adding a feature across layers, renaming a symbol and updating its' +
+    ' callers, scaffolding a module and wiring it into an index, migrating a set of call sites, or running' +
+    ' a build or test suite and repairing what it reports. Boundary with the other tools: use' +
+    ' `spawn_agents` when the pieces are purely read-only (gathering, summarizing, comparing, auditing),' +
+    ' because those sub-agents cannot write; use `create_task_list` when the stages are large, ordered, and' +
+    ' worth tracking visibly. Tasks run sequentially in the order given and share one workspace, so order' +
+    ' dependent work accordingly. Each task agent receives ONLY the goal you provide, with no access to' +
+    ' your conversation history, so make every goal fully self-contained: exact file paths, constraints,' +
+    ' and the shape of the expected result. Keep each task small enough for one agent to finish — a batch' +
+    ' of three tight tasks beats one vague task.',
   inputSchema,
   outputSchema,
 

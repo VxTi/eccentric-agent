@@ -13,8 +13,15 @@ const inputSchema = z.object({
     .boolean()
     .optional()
     .describe(
-      'When true, an existing file at `filePath` will be overwritten. Defaults to false: if the file' +
+      'When true, an existing file at `path` will be overwritten. Defaults to false: if the file' +
         ' already exists the call will fail without modifying the existing file.'
+    ),
+  createDirectories: z
+    .boolean()
+    .optional()
+    .describe(
+      'When true (the default), missing parent directories of `path` are created automatically.' +
+        ' Set to false to fail instead when a parent directory does not exist.'
     ),
 });
 
@@ -42,27 +49,37 @@ export const createFile = createTool({
     ' file, prefer `insert_in_file` instead.',
   inputSchema,
   outputSchema,
-
-  async handle({ overwrite, path: filePath, content }) {
-    const {
-      agent: { fileCache },
-    } = store.getState();
-    const override = overwrite ?? false;
-
-    const alreadyExists = await safeExists(filePath);
-    if (alreadyExists && !override) {
-      return Result.Error(
-        `File already exists at ${filePath}. Pass overwrite: true to replace it.`
-      );
-    }
-    await mkdir(path.basename(path.dirname(filePath)), { recursive: true });
-
-    await fileCache.update(filePath);
-    await writeFile(filePath, content, 'utf-8');
-    return Result.Ok({ success: true }, { filePath, newContent: content });
-  },
-  inputToString: ({ path: filePath }) => `Create file \`${filePath}\``,
+  requiresApproval: () => true,
+  handle: createFileImpl,
+  inputToString: ({ path: filePath }) => `Writing file \`${filePath}\``,
   outputToString(_, __, { newContent, filePath }) {
-    return `Updated \`${filePath}\`\\n${formatDiffMd('', newContent)}`;
+    return `Wrote to \`${filePath}\`\n\n${formatDiffMd('', newContent)}`;
   },
 });
+
+async function createFileImpl({
+  overwrite,
+  createDirectories,
+  path: filePath,
+  content,
+}: z.infer<typeof inputSchema>) {
+  const {
+    agent: { fileCache },
+  } = store.getState();
+  const override = overwrite ?? false;
+
+  const alreadyExists = await safeExists(filePath);
+  if (alreadyExists && !override) {
+    return Result.Error(
+      `File already exists at ${filePath}. Pass overwrite: true to replace it.`
+    );
+  }
+
+  if (createDirectories ?? true) {
+    await mkdir(path.dirname(filePath), { recursive: true });
+  }
+
+  await writeFile(filePath, content, 'utf-8');
+  await fileCache.update(filePath);
+  return Result.Ok({ success: true }, { filePath, newContent: content });
+}

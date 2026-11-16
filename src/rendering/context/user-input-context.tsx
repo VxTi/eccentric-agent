@@ -70,8 +70,7 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
   >(action => {
     setRequestQueue(prev => {
       const current = prev[0];
-      const next =
-        typeof action === 'function' ? action(current) : action;
+      const next = typeof action === 'function' ? action(current) : action;
 
       if (isNil(next)) return prev.slice(1);
       return [next, ...prev.slice(1)];

@@ -84,17 +84,18 @@ export function InputRequest({
 
   return (
     <Box
-      minWidth={60}
-      width="50%"
-      alignSelf="center"
+      width="100%"
       flexDirection="column"
       flexShrink={0}
       paddingBottom={2}
+      borderLeft={false}
+      borderRight={false}
+      borderBottom={false}
       borderStyle="round"
       borderColor="gray"
       borderDimColor
     >
-      <Box flexDirection="column" alignItems="center">
+      <Box flexDirection="column">
         {isNonEmptyString(title) && (
           <Text bold color="whiteBright">
             {title}
@@ -104,9 +105,9 @@ export function InputRequest({
           <Text color="white">{description}</Text>
         )}
       </Box>
-      <Box marginTop={1} marginLeft={2} flexDirection="column">
+      <Box marginTop={1} marginLeft={1} flexDirection="column">
         <Text italic color="gray">
-          Press space to select one
+          Press space to select one and enter to submit
         </Text>
         {options.map((option, i) => (
           <InputOption
@@ -135,7 +136,11 @@ function InputOption({
       <Text color={selected ? 'redBright' : 'white'}>
         {selected ? '◉' : '◯'}{' '}
       </Text>
-      <Text color={highlighted ? 'red' : 'white'} italic={highlighted}>
+      <Text
+        color={highlighted ? 'red' : 'white'}
+        underline={highlighted}
+        italic={highlighted}
+      >
         {label}
       </Text>
     </Box>

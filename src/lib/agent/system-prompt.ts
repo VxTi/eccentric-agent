@@ -3,32 +3,23 @@ import compact from 'lodash/compact';
 import first from 'lodash/first';
 import fs from 'node:fs';
 import { CONSTANT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT } from '../constants';
+import { store } from '../state';
 import { type TaskList, TaskStatus } from '../tasks';
-import type { MCP } from './mcp/mcp';
-import { type AgentSkill } from './skills/common';
 
-interface ConstructSystemPromptProps {
-  taskList: TaskList;
-  mcps: MCP[];
-  skills: AgentSkill[];
-  activeSkills: Record<string, AgentSkill>;
-  cwd: string;
-  gitIgnore: Set<string>;
-}
+export async function constructSystemPrompt(): Promise<string> {
+  const {
+    fileSystem: {
+      cwd,
+      git: { ignored: gitIgnore },
+    },
+    agent: { mcpServers, taskList, activeSkills, skills },
+  } = store.getState();
 
-export async function constructSystemPrompt({
-  taskList,
-  mcps,
-  skills,
-  activeSkills,
-  cwd,
-  gitIgnore,
-}: ConstructSystemPromptProps): Promise<string> {
   const systemPrompt = await loadSystemPrompt({ cwd, ignored: gitIgnore });
 
   const mcpServerNames = (
     await Promise.all(
-      mcps.map(async mcp => {
+      mcpServers.map(async mcp => {
         const { tools } = await mcp.withAuth(() =>
           mcp.params.client.listTools()
         );

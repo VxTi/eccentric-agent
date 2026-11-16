@@ -50,6 +50,8 @@ export interface IToolDefinition<
     channel: NotifierChannel<ToolChannelParams>
   ): MaybePromise<NonEmptyArray<ApprovalOption<TApprovalOption>>>;
 
+  formatArguments(input: TIn): string;
+
   /**
    * @returns `false` if not provided upon tool creation
    */
@@ -92,7 +94,7 @@ type ToolProps<
   TApprovalOption extends string = string,
 > = MakeOptional<
   IToolDefinition<TIn, TOut, TOutMeta, TApprovalOption>,
-  'approvalOptions' | 'requiresApproval' | 'onOptionSelect'
+  'approvalOptions' | 'requiresApproval' | 'onOptionSelect' | 'formatArguments'
 > & {};
 
 export function createTool<
@@ -105,6 +107,7 @@ export function createTool<
 ): IToolDefinition<TIn, TOut, TOutMeta, TApprovalOption> {
   return {
     ...props,
+    formatArguments: props.formatArguments ?? (args => JSON.stringify(args)),
     approvalOptions:
       props.approvalOptions ??
       (() =>

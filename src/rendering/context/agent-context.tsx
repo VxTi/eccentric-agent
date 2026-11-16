@@ -28,8 +28,12 @@ import { Notifier } from '../../lib/events/notifier';
 import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
 import { Features } from '../../lib/feaures';
 import { type FileCache } from '../../lib/file-cache';
-import { store, useAppDispatch, useAppSelector } from '../../lib/state';
-import { fetchGitInfo } from '../../lib/state/file-system';
+import {
+  store,
+  useAppDispatch,
+  useAppSelector,
+  fetchGitInfo,
+} from '../../lib/state';
 import {
   type AgentStatus,
   dequeueMessage,
@@ -42,11 +46,9 @@ import {
   setStatus as setStatusAction,
   setSystemPrompt as setSystemPromptAction,
 } from '../../lib/state/agent';
-import { type TaskList } from '../../lib/tasks';
+import type { TaskList } from '../../lib/tasks';
 import type { Message, UserMessage } from '../../lib/types/messages';
 import { basicHighlightFormatting } from '../terminal-markdown-renderer/markdown-renderer';
-
-export type { AgentStatus };
 
 export interface AgentContext {
   submitMessage: (input: string) => void;
@@ -130,14 +132,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
    */
   useEffect(() => {
     let cancelled = false;
-    void constructSystemPrompt({
-      taskList,
-      mcps: mcpServers,
-      skills,
-      activeSkills,
-      cwd,
-      gitIgnore: gitIgnored,
-    }).then(prompt => {
+    void constructSystemPrompt().then(prompt => {
       if (!cancelled) dispatch(setSystemPromptAction(prompt));
     });
 
@@ -151,8 +146,8 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
     activeSkills,
     gitIgnored,
     dispatch,
-    skills,
-    modelMessages,
+    skills.length,
+    modelMessages.length,
   ]);
 
   /**
@@ -211,13 +206,6 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
             output: step.usage.outputTokens ?? 0,
             source: TokenSource.PRIMARY,
           });
-        },
-        providerOptions: {
-          google: {
-            thinkingConfig: {
-              thinkingBudget: 0,
-            },
-          },
         },
         onStepStart: () => {},
         stopWhen: isLoopFinished(),

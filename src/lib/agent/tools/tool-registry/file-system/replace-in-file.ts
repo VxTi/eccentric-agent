@@ -67,8 +67,14 @@ export const replaceInFile = createTool({
   async handle({ filePath, line, count, replacement }) {
     const {
       agent: { fileCache },
+      fileSystem: { cwd },
     } = store.getState();
-    const absolutePath = await fileCache.getCachedFilePath(filePath);
+    const absolutePath = path.resolve(cwd, filePath);
+    if (await fileCache.isRecentlyModified(filePath)) {
+      return Result.Error(
+        'File changed on disk since it was last read in this session. Please re-read and retry.'
+      );
+    }
 
     const original = await readFile(absolutePath, 'utf-8');
     const lines = isEmptyString(original, true) ? [] : original.split('\n');

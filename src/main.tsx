@@ -38,7 +38,7 @@ async function main(): Promise<void> {
       exitOnCtrlC: true,
       patchConsole: true,
       maxFps: 60,
-      incrementalRendering: false,
+      incrementalRendering: true,
       concurrent: true,
       alternateScreen: false,
     }

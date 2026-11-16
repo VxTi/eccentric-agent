@@ -1,8 +1,8 @@
+import type { NotifierChannel } from '../../../events/notifier';
 import { isEmptyArray } from '@vxti/typed';
 import * as z from 'zod';
 import { Result } from '../../../result';
 import { SubAgent } from '../../sub-agent';
-import { type NotifierChannel } from '../../../events/notifier';
 import { createTool, type ToolChannelParams } from '../tool-definition';
 
 const agentSpecSchema = z.object({
@@ -64,20 +64,22 @@ export const spawnSubAgents = createTool({
   internalName: 'spawn_agents',
   name: 'Spawn Agents',
   description:
-    'Spawns one or more independent sub-agents in parallel, each given an isolated goal. Every sub-agent' +
-    ' runs its own tool-driven loop and returns a final textual result when its goal is accomplished.' +
-    ' YOU MUST ALWAYS USE THIS TOOL whenever the task requires gathering, collating, or aggregating' +
-    ' information from more than one source, file, topic, or input — including any request that asks you' +
-    ' to "summarize", "compare", "audit", "survey", "research", "review", or otherwise combine findings' +
-    ' across multiple distinct items. Do not attempt to aggregate such data inline in your own loop;' +
-    ' delegate each independent piece of work to its own sub-agent here and synthesize their returned' +
-    ' results. The tool is also appropriate whenever a larger problem can be decomposed into' +
-    ' self-contained sub-problems that can run concurrently (e.g. researching several topics at once,' +
-    ' drafting alternative solutions in parallel, or fanning out repetitive investigations across many' +
-    ' inputs). Each sub-agent receives ONLY the goal you provide; it has no access to your conversation' +
-    ' history, so make every goal fully self-contained, with all necessary context, constraints, and the' +
-    ' exact shape of the expected result. The ONLY case in which you may skip this tool is genuinely' +
-    ' trivial single-step work that does not involve aggregating data from multiple sources.',
+    'Spawns one or more independent, READ-ONLY sub-agents in parallel, each given an isolated goal.' +
+    ' Every sub-agent runs its own tool-driven loop and returns a final textual result when its goal is' +
+    ' accomplished. YOU MUST ALWAYS USE THIS TOOL whenever the task requires gathering, collating, or' +
+    ' aggregating information from more than one source, file, topic, or input — including any request' +
+    ' that asks you to "summarize", "compare", "audit", "survey", "research", "review", or otherwise' +
+    ' combine findings across multiple distinct items. Do not attempt to aggregate such data inline in' +
+    ' your own loop; delegate each independent piece of work to its own sub-agent here and synthesize' +
+    ' their returned results. The tool is also appropriate whenever a larger problem can be decomposed' +
+    ' into self-contained sub-problems that can run concurrently (e.g. researching several topics at' +
+    ' once, drafting alternative solutions in parallel, or fanning out repetitive investigations across' +
+    ' many inputs). These sub-agents cannot edit files, create files, or run shell commands: any task' +
+    ' that must produce a change in the workspace belongs in `delegate_task`, not here. Each sub-agent' +
+    ' receives ONLY the goal you provide; it has no access to your conversation history, so make every' +
+    ' goal fully self-contained, with all necessary context, constraints, and the exact shape of the' +
+    ' expected result. The ONLY case in which you may skip this tool is genuinely trivial single-step' +
+    ' work that does not involve aggregating read-only data from multiple sources.',
   inputSchema,
   outputSchema,
 

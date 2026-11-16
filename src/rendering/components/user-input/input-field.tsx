@@ -5,7 +5,7 @@ import { CURSOR_BLINK_INTERVAL_MS } from '../../../lib/constants';
 import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
 import { useUserInputField } from '../../context';
 import { Suggestions } from './input-suggestions';
-import { InputRequest } from './option-request';
+import { InputRequest } from './user-input-request-dialog';
 
 const INPUT_PLACEHOLDER = 'Reference files with @, and type commands using / ↵';
 
@@ -25,18 +25,9 @@ export default function InputField(): JSX.Element {
       alignSelf="center"
       flexDirection="column"
       flexShrink={0}
-      paddingTop={1}
       overflow="hidden"
     >
-      <Box
-        borderColor="gray"
-        borderStyle="single"
-        borderTop={true}
-        borderLeft={false}
-        borderRight={false}
-        borderBottom={true}
-        flexDirection="column"
-      >
+      <Box borderColor="gray" borderStyle="round" flexDirection="column">
         <InputText />
       </Box>
       <Suggestions />
@@ -82,9 +73,7 @@ function InputText(): ReactNode {
           {char}
         </Text>
       ))}
-      {safeCursor === value.length && blinkState && (
-        <Text inverse={true}> </Text>
-      )}
+      {safeCursor === value.length && <Text inverse={blinkState}> </Text>}
     </Box>
   );
 }

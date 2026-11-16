@@ -1,34 +1,25 @@
+import { isNil } from '@vxti/typed';
 import { stat } from 'fs/promises';
-import path from 'node:path';
+
+export type FilePath = string & {};
+export type MutationTimestampMs = number & {};
 
 export class FileCache {
-  private readonly cwd: string;
-  private readonly cache: Map<string, number>;
+  constructor(
+    private readonly cache: Map<FilePath, MutationTimestampMs> = new Map()
+  ) {}
 
-  constructor() {
-    this.cwd = process.cwd();
-    this.cache = new Map<string, number>();
-  }
-
-  private toAbsolutePath(filePath: string): string {
-    if (path.isAbsolute(filePath)) return filePath;
-
-    return path.join(this.cwd, filePath);
-  }
-
-  public async getCachedFilePath(filePath: string): Promise<string> {
-    const absolutePath = this.toAbsolutePath(filePath);
-
+  public async isRecentlyModified(absolutePath: FilePath): Promise<boolean> {
     const stats = await stat(absolutePath);
     const cachedMtime = this.cache.get(absolutePath);
 
-    if (cachedMtime !== undefined && stats.mtimeMs > cachedMtime) {
-      throw new Error(
-        `File '${absolutePath}' was modified on disk since it was last read. Re-read it before editing.`
-      );
-    }
+    if (isNil(cachedMtime)) return true; // We can't know
 
-    return absolutePath;
+    if (stats.mtimeMs > cachedMtime) {
+      this.cache.delete(absolutePath);
+      return true;
+    }
+    return false;
   }
 
   public set(absolutePath: string, modificationTimeMs: number): void {

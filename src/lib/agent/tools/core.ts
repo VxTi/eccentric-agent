@@ -51,12 +51,17 @@ function makeTool(
 
       const requiresApproval = await tool.requiresApproval(input, channel);
 
+      channel.notify({
+        loading: true,
+        content: tool.inputToString(input, channel),
+      });
+
       if (requiresApproval) {
         const options = await tool.approvalOptions(input, channel);
 
         const [chosen] = await requestUserInput({
           title: 'Approval required',
-          description: `Tool \`${tool.name}\` requires approval\n ${JSON.stringify(input)}`,
+          description: `Tool \`${tool.name}\` requires approval:\n ${tool.formatArguments(input)}`,
           options: options.map(opt => ({
             label: opt.text,
             id: opt.option,
@@ -86,10 +91,6 @@ function makeTool(
         }
       }
 
-      channel.notify({
-        loading: true,
-        content: tool.inputToString(input, channel),
-      });
       const result = await Result.trySafe(() =>
         tool.handle(input, channel, signal)
       );

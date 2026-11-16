@@ -84,13 +84,25 @@ an explicit user request and a stated reason.
 - **No invented behavior**: When a library or API is involved, the agent
   reads its actual surface rather than recalling it from memory.
 - **Prefer the simplest tool**: For any action, the agent uses the
-  least-privileged, most-direct tool that accomplishes it.
+  least-privileged, most-direct tool that accomplishes it. Delegation is not
+  added complexity: handing an independent unit of work to a sub-agent *is* the
+  direct path, and silently absorbing delegable work into its own context is the
+  wrong choice.
 
 ## Workflow
 
 For non-trivial work the agent decomposes the task and tracks progress
 explicitly:
-
+- **Delegation**: Route any request that splits into independent pieces to a
+  sub-agent rather than doing the pieces one after another yourself. Work that
+  writes — editing, creating, verifying files, running commands — goes to
+  `delegate_task`, which runs its agents sequentially in the shared workspace;
+  work that only reads, searches, summarizes, or compares goes to `spawn_agents`,
+  which runs its agents in parallel. Give each sub-agent a fully self-contained
+  goal: it sees no conversation history, so spell out the exact file paths,
+  constraints, and expected result.
+- **Task decomposition**: Use `create_task_list` to break complex requests
+  into discrete, verifiable steps.
 - **Task decomposition**: Use `create_task_list` to break complex requests
   into discrete, verifiable steps.
 - **Progress tracking**: Use `update_task_list` to mark items in-progress and

@@ -158,6 +158,8 @@ export const shell = createTool({
     ];
   },
 
+  formatArguments: ({ command }) => command,
+
   inputToString: ({ command }) => `Shell \`${command}\``,
   outputToString({ exitCode, stderr, stdout }, _, { command }) {
     if (exitCode === 0) {
