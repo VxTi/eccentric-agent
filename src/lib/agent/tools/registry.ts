@@ -5,6 +5,7 @@ import {
   delegateTask,
   findFile,
   findInFile,
+  grep,
   getUserLocation,
   getUserTime,
   promptUserOptions,
@@ -24,6 +25,7 @@ import { useSkill } from './tool-registry/skill';
 export const subAgentTools: SomeTool[] = [
   findFile,
   findInFile,
+  grep,
   readFile,
   webSearch,
   webFetch,
