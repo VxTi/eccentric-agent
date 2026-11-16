@@ -3,6 +3,7 @@ import * as z from 'zod';
 import { Result } from '../../../result';
 import { exec } from 'child_process';
 import { createTool, ToolSelectionOption } from '../tool-definition';
+import { isNonEmptyArray } from '@vxti/typed';
 
 const inputSchema = z.object({
   command: z
@@ -94,11 +95,14 @@ export const shell = createTool({
               : stderr;
 
             resolve(
-              Result.Ok({
-                stdout,
-                stderr: totalErr,
-                exitCode: error ? (error.code ?? 1) : 0,
-              })
+              Result.Ok(
+                {
+                  stdout,
+                  stderr: totalErr,
+                  exitCode: error ? (error.code ?? 1) : 0,
+                },
+                { command }
+              )
             );
           }
         );
@@ -110,11 +114,14 @@ export const shell = createTool({
       const e = err as ExecException;
       // It might've just been a command error, but we still deem it as 'ok', as
       // error results are still processed correctly
-      return Result.Ok({
-        stdout: e.stdout ?? '',
-        stderr: e.stderr ?? e.message,
-        exitCode: e.code ?? 1,
-      });
+      return Result.Ok(
+        {
+          stdout: e.stdout ?? '',
+          stderr: e.stderr ?? e.message,
+          exitCode: e.code ?? 1,
+        },
+        { command }
+      );
     }
   },
 
@@ -156,9 +163,13 @@ export const shell = createTool({
     if (exitCode === 0) {
       const lines = stdout.split('\n');
 
-      return `Shell \`${command}\`\n\n${lines
-        .slice(0, Math.min(lines.length, MAX_SHOWN_OUTPUT_LINES))
-        .join('\n')}`;
+      const formatted = isNonEmptyArray(lines)
+        ? `\`\`\`
+${lines.slice(0, Math.min(lines.length, MAX_SHOWN_OUTPUT_LINES)).join('\n')}
+\`\`\``
+        : 'exited successfully.';
+
+      return `Shell \`${command}\`\n${formatted}`;
     }
 
     return `Command exited with status \`${exitCode}\`: ${stderr.split('\n').slice(0, MAX_SHOWN_OUTPUT_LINES).join('\n')}`;

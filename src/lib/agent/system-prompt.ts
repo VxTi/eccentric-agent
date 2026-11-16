@@ -38,18 +38,19 @@ export async function constructSystemPrompt({
   ).join('\n');
 
   const skillsSummary = skills
-    .map(skill => `- ${skill.name}:    ${skill.description}`)
-    .join('\n');
+    .map(skill => `- Name: ${skill.name}.\nDescription:\n${skill.description}`)
+    .join('\n---');
 
   const taskFragment = constructTaskListSystemPromptFragment(taskList);
 
   return compact([
     systemPrompt,
     CONSTANT_SYSTEM_PROMPT,
-    `The working dir is '${cwd}'.`,
-    `The current user is ${process.env.USER ?? process.env.USERNAME}.`,
-    `The current date is ${new Date().toLocaleString()}.`,
-    'The following skills are available:',
+    'Some important information:',
+    `- The working dir is '${cwd}'.`,
+    `- The current user is ${process.env.USER ?? process.env.USERNAME}.`,
+    `- The current date is ${new Date().toLocaleString()}.\n`,
+    'You have access to the following tools, which are described by `name` and `description`. Use them if the current context relates to the description:',
     skillsSummary,
     'You possess the following skills, which you must obey / utilise:\n',
     Object.entries(activeSkills)
@@ -57,7 +58,7 @@ export async function constructSystemPrompt({
       .join('\n\n'),
     `The following MCP servers are available:\n${mcpServerNames}\nUse 'list_mcp_tools' to discover tools (no 'toolName' → name+description list; with a specific 'toolName' → that tool's full input/output schema). Always fetch the schema for a specific tool before invoking it via 'call_mcp_tool'.`,
     taskFragment,
-  ]).join('\n');
+  ]).join('\n\n');
 }
 
 function constructTaskListSystemPromptFragment(

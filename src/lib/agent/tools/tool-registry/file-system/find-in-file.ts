@@ -104,7 +104,7 @@ export const findInFile = createTool({
     }
     const formattedMatches = matches
       .map(match => `${match.line}: \`${match.lineContent}\``)
-      .join('\n');
-    return `Found ${matches.length} match(es):\n${formattedMatches}`;
+      .join('\n\n');
+    return `Found ${matches.length} match${matches.length === 1 ? 's' : 'es'}:\n\`\`\`\n${formattedMatches}\n\`\`\``;
   },
 });

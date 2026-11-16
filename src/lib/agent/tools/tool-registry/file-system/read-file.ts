@@ -28,7 +28,7 @@ const inputSchema = z.object({
       })
     )
     .describe(
-      "An optional selection to provide, if you don\'t need to read the entire file."
+      "An optional selection to provide, if you don\'t need to read the entire file. Prefer using selections to reduce context pollution"
     ),
 });
 
@@ -102,18 +102,16 @@ export const readFile = createTool({
   },
 
   inputToString({ filePath, selection }) {
-    const selectionString = selection
-      ? ` (Line \`${selection.fromLineNumber + 1}\` -> \`${isNotNil(selection.lineCount) ? selection.fromLineNumber + selection.lineCount : '...'}\`)`
-      : '';
-
-    return `Reading \`${filePath}\`${selectionString}`;
+    return `Reading \`${filePath}\`${formatSelection(selection)}`;
   },
 
   outputToString({ filePath }, _, { selection }) {
-    const selectionString = selection
-      ? ` (Line \`${selection.fromLineNumber + 1}\` -> \`${isNotNil(selection.lineCount) ? selection.fromLineNumber + selection.lineCount : '...'}\`)`
-      : '';
-
-    return `Read \`${filePath}\`${selectionString}`;
+    return `Read \`${filePath}\`${formatSelection(selection)}`;
   },
 });
+
+function formatSelection(selection: z.infer<typeof inputSchema>['selection']) {
+  if (!selection) return '';
+
+  return ` (Line \`${selection.fromLineNumber + 1}\` → \`${isNotNil(selection.lineCount) ? selection.fromLineNumber + selection.lineCount : '...'}\`)`;
+}

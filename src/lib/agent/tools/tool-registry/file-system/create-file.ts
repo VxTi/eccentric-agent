@@ -1,5 +1,5 @@
-import { basename } from 'node:path';
 import * as z from 'zod';
+import path from 'node:path';
 import { Result } from '../../../../result';
 import { store } from '../../../../state';
 import { formatDiffMd } from '../../../../utils/diff-utils';
@@ -7,7 +7,7 @@ import { mkdir, writeFile, access } from 'fs/promises';
 import { createTool } from '../../tool-definition';
 
 const inputSchema = z.object({
-  filePath: z.string().describe('The absolute path of the file to create'),
+  path: z.string().describe('The absolute path of the file to create'),
   content: z.string().describe('The content to write into the new file'),
   overwrite: z
     .boolean()
@@ -16,24 +16,10 @@ const inputSchema = z.object({
       'When true, an existing file at `filePath` will be overwritten. Defaults to false: if the file' +
         ' already exists the call will fail without modifying the existing file.'
     ),
-  createDirectories: z
-    .boolean()
-    .optional()
-    .describe(
-      'When true, any missing parent directories of `filePath` will be created. Defaults to true.'
-    ),
 });
 
 const outputSchema = z.object({
-  filePath: z.string().describe('The absolute path of the created file'),
-  bytesWritten: z
-    .number()
-    .describe('The number of bytes written to the new file'),
-  created: z
-    .boolean()
-    .describe(
-      'Whether the file was newly created (false means it was overwritten)'
-    ),
+  success: z.boolean().describe('Whether the file was successfully updated'),
 });
 
 async function safeExists(path: string): Promise<boolean> {
@@ -57,12 +43,11 @@ export const createFile = createTool({
   inputSchema,
   outputSchema,
 
-  async handle({ overwrite, createDirectories, filePath, content }) {
+  async handle({ overwrite, path: filePath, content }) {
     const {
       agent: { fileCache },
     } = store.getState();
     const override = overwrite ?? false;
-    const createDirs = createDirectories ?? true;
 
     const alreadyExists = await safeExists(filePath);
     if (alreadyExists && !override) {
@@ -70,25 +55,14 @@ export const createFile = createTool({
         `File already exists at ${filePath}. Pass overwrite: true to replace it.`
       );
     }
-
-    if (createDirs) {
-      await mkdir(basename(filePath), { recursive: true });
-    }
+    await mkdir(path.basename(path.dirname(filePath)), { recursive: true });
 
     await fileCache.update(filePath);
     await writeFile(filePath, content, 'utf-8');
-    return Result.Ok(
-      {
-        filePath,
-        bytesWritten: Buffer.byteLength(content, 'utf-8'),
-        created: !alreadyExists,
-      },
-      { current: content }
-    );
+    return Result.Ok({ success: true }, { filePath, newContent: content });
   },
-  inputToString: ({ filePath }) => `Create file \`${filePath}\``,
-  outputToString({ filePath, created }, _, { current }) {
-    const previous = created ? '' : 'File existed prior to write.';
-    return `Updated \`${filePath}\`\\n${formatDiffMd(previous, current)}`;
+  inputToString: ({ path: filePath }) => `Create file \`${filePath}\``,
+  outputToString(_, __, { newContent, filePath }) {
+    return `Updated \`${filePath}\`\\n${formatDiffMd('', newContent)}`;
   },
 });
