@@ -99,7 +99,7 @@ export function MessageList(): JSX.Element {
 function WelcomingText({ width }: { width: number }): JSX.Element {
   return (
     <Box width={width} flexDirection="column" alignItems="center">
-      <Box paddingY={1}>
+      <Box paddingTop={1} paddingBottom={8}>
         <Text color="blue">◆</Text>
         <Text bold> Eccentric Agent</Text>
       </Box>

@@ -12,7 +12,7 @@ const inputSchema = z.object({
   directoryPath: z
     .string()
     .describe('The directory path in which to search files in'),
-  filePattern: z
+  pattern: z
     .string()
     .describe(
       'A glob pattern (NOT a bare filename) used to match file paths under `directoryPath`. Must use glob' +
@@ -65,17 +65,17 @@ export const findFile = createTool({
   inputSchema,
   outputSchema,
 
-  async handle({ filePattern, directoryPath, maxResults }) {
+  async handle({ pattern, directoryPath, maxResults }) {
     const cwd = path.resolve(process.cwd(), directoryPath);
 
-    const files = await Array.fromAsync(fs.promises.glob(filePattern, { cwd }));
+    const files = await Array.fromAsync(fs.promises.glob(pattern, { cwd }));
     const results: string[] = files.slice(0, maxResults);
 
-    return Result.Ok({ files: results, metadata: { pattern: filePattern } });
+    return Result.Ok({ files: results }, { pattern });
   },
 
-  inputToString: ({ filePattern, directoryPath }) =>
-    `Looking for file pattern \`${filePattern}\` in \`${directoryPath}\``,
+  inputToString: ({ pattern, directoryPath }) =>
+    `Looking for file pattern \`${pattern}\` in \`${directoryPath}\``,
 
   outputToString({ files }, _, { pattern }): string {
     if (hasArrayLength(files, 0)) {

@@ -6,6 +6,7 @@ import {
   type ReactNode,
   type RefObject,
   type SetStateAction,
+  useCallback,
   useContext,
   useEffect,
   useRef,
@@ -21,7 +22,7 @@ import {
   type Suggestions,
 } from '../../lib/input-suggestions';
 import { type Optional, wrapOptional } from '../../lib/optional';
-import { useAppDispatch, useAppSelector } from '../../lib/state';
+import { useAppSelector } from '../../lib/state';
 import { formatReferencedFiles } from '../components/user-input/input-field';
 import { useAgent } from './agent-context';
 
@@ -51,13 +52,32 @@ const UserInputContext = createContext<UserInputContextType | undefined>(
 );
 
 export function UserInputProvider({ children }: { children: ReactNode }) {
-  const dispatch = useAppDispatch();
   const inputRef = useRef<DOMElement>(null);
 
   const [suggestions, setSuggestions] = useState<Suggestions>();
-  const [inputRequest, setInputRequest] = useState<
-    InputRequestState | undefined
-  >(undefined);
+
+  // Pending input requests are served one at a time, oldest first. New requests
+  // are appended to the tail; the head is the one currently shown. Without this
+  // a second request would overwrite the first, leaving its awaiter hung.
+  const [requestQueue, setRequestQueue] = useState<InputRequestState[]>([]);
+  const inputRequest = requestQueue[0];
+
+  // Preserve the single-request setter contract: `undefined` dismisses the
+  // current request and advances to the next queued one; a concrete value
+  // replaces the head in place.
+  const setInputRequest = useCallback<
+    Dispatch<SetStateAction<InputRequestState | undefined>>
+  >(action => {
+    setRequestQueue(prev => {
+      const current = prev[0];
+      const next =
+        typeof action === 'function' ? action(current) : action;
+
+      if (isNil(next)) return prev.slice(1);
+      return [next, ...prev.slice(1)];
+    });
+  }, []);
+
   const [input, setInput] = useState<InputState>({
     cursorOffset: 0,
     value: '',
@@ -83,9 +103,12 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     return eventOn(EventName.REQUEST_INPUT, ({ detail }) =>
-      setInputRequest({ request: detail, suggestionIndex: 0 })
+      setRequestQueue(prev => [
+        ...prev,
+        { request: detail, suggestionIndex: 0 },
+      ])
     );
-  }, [dispatch]);
+  }, []);
 
   const handleSubmitMessage = () => {
     submitMessage(formatReferencedFiles(value));

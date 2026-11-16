@@ -75,9 +75,8 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
     cwd,
     git: { ignored: gitIgnored },
   } = useAppSelector(state => state.fileSystem);
-  const { taskList, mcpServers, activeSkills, skills } = useAppSelector(
-    state => state.agent
-  );
+  const { taskList, mcpServers, activeSkills, skills, modelMessages } =
+    useAppSelector(state => state.agent);
   const { controller } = useAppSelector(state => state.app);
 
   const notifier = useMemo(() => new Notifier(), []);
@@ -136,10 +135,8 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
       mcps: mcpServers,
       skills,
       activeSkills,
-      globOptions: {
-        cwd,
-        ignored: gitIgnored,
-      },
+      cwd,
+      gitIgnore: gitIgnored,
     }).then(prompt => {
       if (!cancelled) dispatch(setSystemPromptAction(prompt));
     });
@@ -147,7 +144,16 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
     return () => {
       cancelled = true;
     };
-  }, [taskList, mcpServers, cwd, activeSkills, gitIgnored, dispatch, skills]);
+  }, [
+    taskList,
+    mcpServers,
+    cwd,
+    activeSkills,
+    gitIgnored,
+    dispatch,
+    skills,
+    modelMessages,
+  ]);
 
   /**
    * Handling incoming messages from non-react world, and token consumption

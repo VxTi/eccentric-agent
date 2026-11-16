@@ -65,6 +65,10 @@ export function isAllowedCommand(command: string): boolean {
   return ALLOWED_COMMAND_PATTERNS.some(pattern => pattern.test(trimmed));
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 type Metadata = { command: string };
 
 export const shell = createTool({
@@ -89,7 +93,13 @@ export const shell = createTool({
               ? [stderr, error.message].join('\n')
               : stderr;
 
-            resolve(Result.Ok({ stdout, stderr: totalErr, exitCode: 0 }));
+            resolve(
+              Result.Ok({
+                stdout,
+                stderr: totalErr,
+                exitCode: error ? (error.code ?? 1) : 0,
+              })
+            );
           }
         );
         process.on('message', msg => {
@@ -108,13 +118,26 @@ export const shell = createTool({
     }
   },
 
-  requiresApproval: ({ command }) => !isAllowedCommand(command),
+  requiresApproval: ({ command }) => {
+    // Allow-listed commands are known-safe and run without prompting; anything
+    // else must be approved by the user.
+    if (isAllowedCommand(command)) return false;
+
+    //  TODO: Add decision model to determine whether to approve command
+
+    return true;
+  },
 
   onOptionSelect({ command }, option: Option) {
     if (option === Option.DENY) return ToolSelectionOption.DENY;
 
     if (option === Option.TRUST) {
-      ALLOWED_COMMAND_PATTERNS.push(new RegExp(command));
+      // Trust only this exact command: escape regex metacharacters and anchor,
+      // so e.g. trusting `ls foo.txt` does not also allow unrelated commands via
+      // substring or wildcard matching.
+      ALLOWED_COMMAND_PATTERNS.push(
+        new RegExp(`^${escapeRegExp(command.trim())}$`)
+      );
     }
 
     return ToolSelectionOption.ALLOW;

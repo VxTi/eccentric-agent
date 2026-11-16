@@ -101,7 +101,7 @@ function makeTool(
       } else {
         channel.notify({
           failure: true,
-          content: chalk.red(`\`${tool.name}\` failed: ${result.error}`),
+          content: chalk.red(`\`${tool.name}\` failed: ${result.error.trim()}`),
         });
       }
       notifier.unsubscribe(toolCallId);

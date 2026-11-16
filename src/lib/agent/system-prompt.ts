@@ -12,7 +12,8 @@ interface ConstructSystemPromptProps {
   mcps: MCP[];
   skills: AgentSkill[];
   activeSkills: Record<string, AgentSkill>;
-  globOptions: { cwd: string; ignored: Set<string> };
+  cwd: string;
+  gitIgnore: Set<string>;
 }
 
 export async function constructSystemPrompt({
@@ -20,9 +21,10 @@ export async function constructSystemPrompt({
   mcps,
   skills,
   activeSkills,
-  globOptions,
+  cwd,
+  gitIgnore,
 }: ConstructSystemPromptProps): Promise<string> {
-  const systemPrompt = await loadSystemPrompt(globOptions);
+  const systemPrompt = await loadSystemPrompt({ cwd, ignored: gitIgnore });
 
   const mcpServerNames = (
     await Promise.all(
@@ -44,7 +46,9 @@ export async function constructSystemPrompt({
   return compact([
     systemPrompt,
     CONSTANT_SYSTEM_PROMPT,
-    `The current date is ${new Date().toLocaleString()}\n`,
+    `The working dir is '${cwd}'.`,
+    `The current user is ${process.env.USER ?? process.env.USERNAME}.`,
+    `The current date is ${new Date().toLocaleString()}.`,
     'The following skills are available:',
     skillsSummary,
     'You possess the following skills, which you must obey / utilise:\n',

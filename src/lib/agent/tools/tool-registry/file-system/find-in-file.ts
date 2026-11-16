@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { Result } from '../../../../result';
-import { readFile } from 'fs/promises';
+import { readFile, stat } from 'fs/promises';
 import { createTool } from '../../tool-definition';
 
 const inputSchema = z.object({
@@ -60,6 +60,11 @@ export const findInFile = createTool({
   outputSchema,
 
   async handle({ filePath, caseSensitive, isRegex, maxResults, pattern }) {
+    const stats = await stat(filePath);
+    if (stats.isDirectory()) {
+      return Result.Error(`File path ${filePath} is a directory`);
+    }
+
     const content = await readFile(filePath, 'utf-8');
     const lines = content.split(/\r?\n/);
 
