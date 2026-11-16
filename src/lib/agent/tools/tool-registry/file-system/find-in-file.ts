@@ -98,10 +98,7 @@ export const findInFile = createTool({
       return `Found no matches.`;
     }
     const formattedMatches = matches
-      .map(
-        match =>
-          `- Line ${match.line}, Column ${match.column}: \`${match.match}\` in \`${match.lineContent}\``
-      )
+      .map(match => `${match.line}: \`${match.lineContent}\``)
       .join('\n');
     return `Found ${matches.length} match(es):\n${formattedMatches}`;
   },

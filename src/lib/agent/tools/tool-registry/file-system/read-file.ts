@@ -109,7 +109,11 @@ export const readFile = createTool({
     return `Reading \`${filePath}\`${selectionString}`;
   },
 
-  outputToString({ filePath }) {
-    return `Read \`${filePath}\``;
+  outputToString({ filePath }, _, { selection }) {
+    const selectionString = selection
+      ? ` (Line \`${selection.fromLineNumber + 1}\` -> \`${isNotNil(selection.lineCount) ? selection.fromLineNumber + selection.lineCount : '...'}\`)`
+      : '';
+
+    return `Read \`${filePath}\`${selectionString}`;
   },
 });

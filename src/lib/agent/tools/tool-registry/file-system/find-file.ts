@@ -1,3 +1,4 @@
+import { hasArrayLength } from '@vxti/typed';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as z from 'zod';
@@ -70,14 +71,14 @@ export const findFile = createTool({
     const files = await Array.fromAsync(fs.promises.glob(filePattern, { cwd }));
     const results: string[] = files.slice(0, maxResults);
 
-    return Result.Ok({ files: results });
+    return Result.Ok({ files: results, metadata: { pattern: filePattern } });
   },
 
   inputToString: ({ filePattern, directoryPath }) =>
     `Looking for file pattern \`${filePattern}\` in \`${directoryPath}\``,
 
-  outputToString({ files }): string {
-    if (files.length === 0) {
+  outputToString({ files }, _, { pattern }): string {
+    if (hasArrayLength(files, 0)) {
       return `Unable to find any files`;
     }
 
@@ -90,7 +91,7 @@ export const findFile = createTool({
     const formattedFiles = shownFiles
       .map(file => `- **${ellipsize(file, 30, Position.START)}**`)
       .join('\n');
-    return `Found ${files.length} file(s):\n\n${formattedFiles}${
+    return `Found ${files.length} file${files.length !== 1 ? 's' : ''} matching ${pattern}:\n\n${formattedFiles}${
       limitVisibleFiles
         ? `
 ... and ${files.length - MAX_SHOWN_FILE_COUNT} more`

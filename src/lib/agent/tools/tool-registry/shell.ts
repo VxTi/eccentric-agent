@@ -133,7 +133,7 @@ export const shell = createTool({
     if (exitCode === 0) {
       const lines = stdout.split('\n');
 
-      return `Shell \`${command}\`\n${lines
+      return `Shell \`${command}\`\n\n${lines
         .slice(0, Math.min(lines.length, MAX_SHOWN_OUTPUT_LINES))
         .join('\n')}`;
     }

@@ -81,7 +81,7 @@ export interface IToolDefinition<
   outputToString(
     output: TOut,
     channel: NotifierChannel<ToolChannelParams>,
-    metadata: TOutMeta
+    metadata: NoInfer<TOutMeta>
   ): string;
 }
 

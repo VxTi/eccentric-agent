@@ -59,17 +59,11 @@ export async function generateText<T>({
   return output;
 }
 
-export function getAppropriateModel(
-  _complexity: TaskComplexity
-): LanguageModel {
-  return 'nvidia/nemotron-3.5-lightning-free';
-  /*
+export function getAppropriateModel(complexity: TaskComplexity): LanguageModel {
   switch (complexity) {
     case TaskComplexity.SIMPLE:
-      return 'deepseek/deepseek-flash';
     case TaskComplexity.MEDIUM:
-      return 'deepseek/deepseek-v4-flash';
     case TaskComplexity.COMPLEX:
-      return 'deepseek/deepseek-v4-pro';
-  }*/
+      return 'alibaba/qwen3.8-omni-flash';
+  }
 }
