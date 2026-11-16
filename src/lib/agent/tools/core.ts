@@ -100,6 +100,7 @@ function makeTool(
         });
       } else {
         channel.notify({
+          loading: false,
           failure: true,
           content: chalk.red(`\`${tool.name}\` failed: ${result.error.trim()}`),
         });

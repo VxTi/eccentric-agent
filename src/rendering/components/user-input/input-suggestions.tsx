@@ -142,16 +142,7 @@ export function Suggestions(): ReactNode {
   const { itemsAfter, offsetIndex, shown } = state;
 
   return (
-    <Box
-      flexDirection="column"
-      paddingTop={1}
-      borderColor="gray"
-      borderStyle="round"
-      ref={containerRef}
-    >
-      {suggestions && suggestions.values.length > MAX_SUGGESTION_COUNT && (
-        <Text color="gray">{'  ...'}</Text>
-      )}
+    <Box flexDirection="column" ref={containerRef}>
       {shown.map((suggestion, i) => (
         <SuggestionText
           key={i}

@@ -7,7 +7,7 @@ import { useUserInputField } from '../../context';
 import { Suggestions } from './input-suggestions';
 import { InputRequest } from './option-request';
 
-const INPUT_PLACEHOLDER = 'Reference files with @, and type commands using /';
+const INPUT_PLACEHOLDER = 'Reference files with @, and type commands using / ↵';
 
 export default function InputField(): JSX.Element {
   const { inputRequest } = useUserInputField();
@@ -28,15 +28,18 @@ export default function InputField(): JSX.Element {
       paddingTop={1}
       overflow="hidden"
     >
-      <Suggestions />
       <Box
-        borderStyle="round"
         borderColor="gray"
-        paddingX={1}
+        borderStyle="single"
+        borderTop={true}
+        borderLeft={false}
+        borderRight={false}
+        borderBottom={true}
         flexDirection="column"
       >
         <InputText />
       </Box>
+      <Suggestions />
     </Box>
   );
 }
@@ -60,9 +63,9 @@ function InputText(): ReactNode {
   if (isEmptyString(value)) {
     return (
       <Box flexDirection="row">
+        <CursorPrefix />
         <Text inverse={blinkState}> </Text>
         <Text color="gray" italic wrap="wrap">
-          {' '}
           {INPUT_PLACEHOLDER}
         </Text>
       </Box>
@@ -73,6 +76,7 @@ function InputText(): ReactNode {
 
   return (
     <Box flexDirection="row" flexWrap="wrap" flexShrink={1}>
+      <CursorPrefix />
       {characters.map((char, index) => (
         <Text key={index} inverse={blinkState && index === safeCursor}>
           {char}
@@ -83,6 +87,10 @@ function InputText(): ReactNode {
       )}
     </Box>
   );
+}
+
+function CursorPrefix() {
+  return <Text>› </Text>;
 }
 
 export function formatReferencedFiles(input: string): string {

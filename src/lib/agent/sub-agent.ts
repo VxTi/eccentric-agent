@@ -54,8 +54,12 @@ export class SubAgent {
       { role: 'user', content: this.goal },
     ];
 
+    // Preserve the notified message's own `loading`/`failure` state; only the
+    // content is decorated with the goal. Forcing `loading: true` here would
+    // override the terminal `loading: false` notification core.ts emits when the
+    // tool resolves, leaving the aggregated message spinning forever.
     this.channel.addInterceptor(message => ({
-      loading: true,
+      ...message,
       content: `\`${this.goal}\`
 
 ${message.content}`,

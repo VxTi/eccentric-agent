@@ -8,11 +8,12 @@ import InputField from './user-input/input-field';
 
 export function App(): ReactNode {
   return (
-    <Box flexDirection="column" width="100%" alignItems="center">
-      <Box width="80%" flexGrow={1} flexDirection="column">
+    <Box flexDirection="column" width="100%" height="100%" alignItems="center">
+      <Box width="100%" flexGrow={1} flexDirection="column">
         <Box
           height="100%"
           width="100%"
+          paddingX={1}
           alignItems="flex-start"
           flexDirection="column"
         >
