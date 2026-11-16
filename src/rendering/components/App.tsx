@@ -1,7 +1,6 @@
 import { Box } from 'ink';
 import type { ReactNode } from 'react';
 import { GitInfoLine } from './git-info-line';
-import { LoadingStatusLine } from './loading-status-line';
 import { MessageList } from './messages/message-list';
 import { ModelInfoBar } from './model-info-bar';
 import InputField from './user-input/input-field';
@@ -18,7 +17,7 @@ export function App(): ReactNode {
           flexDirection="column"
         >
           <MessageList />
-          <LoadingStatusLine />
+          {/*<LoadingStatusLine />*/}
           <GitInfoLine />
           <InputField />
           <ModelInfoBar />

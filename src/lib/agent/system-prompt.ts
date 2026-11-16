@@ -6,6 +6,30 @@ import { CONSTANT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT } from '../constants';
 import { store } from '../state';
 import { type TaskList, TaskStatus } from '../tasks';
 
+const OPERATING_GUIDE = `# Working efficiently
+
+Spend a tool call only when it yields information you do not already have.
+
+- Reuse context first. If a file's content, a path, or a search result already appears in this
+  conversation, do NOT read, find, or search for it again — answer from what is in front of you.
+- Batch independent calls. When several reads, searches, or fetches do not depend on one
+  another, issue them together in a single step instead of one at a time.
+- Pick the narrowest tool for the job:
+    • \`find_file\` — locate files by name, extension, or path via a glob. Not for file contents.
+    • \`grep\` — search text across many files. Prefer it over running \`grep\`/\`rg\` through \`shell\`.
+    • \`find_in_file\` — search within one file you have already identified.
+    • \`read_file\` — read the full body of one file you already know you need.
+  Never read a whole file just to locate one symbol; \`grep\` or \`find_in_file\` instead.
+- Editing workflow: \`read_file\` returns every line prefixed with its 1-based number. Feed those
+  numbers to \`replace_in_file\` to change existing lines, or use \`create_file\` for new files. An
+  edit is rejected if the file changed on disk since you last read it, so read a file before
+  editing it and re-read it after any external change.
+- Prefer dedicated tools over \`shell\`. \`shell\` is restricted to an allow-list and needs user
+  approval; reach for it only when no dedicated tool fits.
+- Delegate only substantial, independent work: \`delegate_task\` for pieces that write files or
+  run commands, \`spawn_agents\` for read-only research spread across separate sources. For a
+  couple of files, read them yourself — spinning up an agent costs more than it saves.`;
+
 export async function constructSystemPrompt(): Promise<string> {
   const {
     fileSystem: {
@@ -41,7 +65,9 @@ export async function constructSystemPrompt(): Promise<string> {
     `- The working dir is '${cwd}'.`,
     `- The current user is ${process.env.USER ?? process.env.USERNAME}.`,
     `- The current date is ${new Date().toLocaleString()}.\n`,
-    'You have access to the following tools, which are described by `name` and `description`. Use them if the current context relates to the description:',
+    OPERATING_GUIDE,
+    'You have access to the following skills, which are described by `name` and `description`. Use the \`use_skill\`' +
+      ' tool to invoke them if the current context relates to the description:',
     skillsSummary,
     'You possess the following skills, which you must obey / utilise:\n',
     Object.entries(activeSkills)

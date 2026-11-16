@@ -20,6 +20,7 @@ const AGENT_MAX_LOOP_ITERATIONS = 200;
 const PRIMARY_GOAL_TOOL_NAME = 'complete_goal';
 
 export interface SubAgentOptions {
+  readonly summary: string;
   readonly goal: string;
   readonly callback: (data: Result<string, Error>) => void;
   readonly signal: AbortSignal;
@@ -36,6 +37,7 @@ export class SubAgent {
   private result: string | undefined;
 
   private readonly goal: string;
+  private readonly summary: string;
   private readonly callback: (data: Result<string, Error>) => void;
   private readonly signal: AbortSignal;
   private readonly channel: NotifierChannel<ToolChannelParams>;
@@ -43,6 +45,7 @@ export class SubAgent {
 
   constructor(options: SubAgentOptions) {
     this.goal = options.goal;
+    this.summary = options.summary;
     this.callback = options.callback;
     this.signal = options.signal;
     this.channel = options.channel;
@@ -60,7 +63,7 @@ export class SubAgent {
     // tool resolves, leaving the aggregated message spinning forever.
     this.channel.addInterceptor(message => ({
       ...message,
-      content: `\`${this.goal}\`
+      content: `\`${this.summary}\`
 
 ${message.content}`,
     }));

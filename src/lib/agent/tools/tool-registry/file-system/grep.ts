@@ -171,7 +171,7 @@ export const grep = createTool({
       )
       .join('\n');
 
-    return `Found ${matches.length} match${matches.length === 1 ? '' : 'es'}:\n${formatted}\n${
+    return `Found ${matches.length} match${matches.length === 1 ? '' : 'es'}:\n\n${formatted}\n${
       limitVisible ? `\n... and ${matches.length - MAX_SHOWN_MATCHES} more` : ''
     }`;
   },

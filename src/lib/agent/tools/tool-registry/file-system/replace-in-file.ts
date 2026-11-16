@@ -50,8 +50,9 @@ export const replaceInFile = createTool({
   description:
     'Replaces a contiguous range of lines in `filePath` with `replacement`. The range' +
     ' starts at the 1-based `line` and spans `count` lines (inclusive).\n\n' +
-    'Use this tool when changing one or more consecutive lines in a file. To add new' +
-    ' lines without removing existing content, use `insert_in_file` instead.\n\n' +
+    'Use this tool when changing one or more consecutive lines in a file. To insert new' +
+    ' lines without losing existing content, replace a line at the insertion point with' +
+    ' `replacement` set to that same line plus the new lines.\n\n' +
     'Rules:\n' +
     '  • `line` is 1-based; `count` must be >= 1.\n' +
     '  • `line + count - 1` must not exceed the file line count.\n' +
@@ -64,13 +65,15 @@ export const replaceInFile = createTool({
   inputSchema,
   outputSchema,
 
+  requiresApproval: () => true,
+
   async handle({ filePath, line, count, replacement }) {
     const {
       agent: { fileCache },
       fileSystem: { cwd },
     } = store.getState();
     const absolutePath = path.resolve(cwd, filePath);
-    if (await fileCache.isRecentlyModified(filePath)) {
+    if (await fileCache.isRecentlyModified(absolutePath)) {
       return Result.Error(
         'File changed on disk since it was last read in this session. Please re-read and retry.'
       );

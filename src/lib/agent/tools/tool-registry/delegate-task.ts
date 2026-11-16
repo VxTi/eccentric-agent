@@ -82,6 +82,7 @@ const outputSchema = z.object({
 });
 
 async function runTaskAgent(
+  summary: string,
   goal: string,
   channel: NotifierChannel<ToolChannelParams>,
   signal: AbortSignal
@@ -93,6 +94,7 @@ async function runTaskAgent(
 
     new SubAgent({
       goal,
+      summary,
       callback: resolve,
       signal: controller.signal,
       channel,
@@ -129,7 +131,7 @@ export const delegateTask = createTool({
     // Sequential, not parallel: these agents write to a shared workspace, so
     // concurrent edits could conflict and later tasks may rely on earlier ones.
     for (const { goal, name } of tasks) {
-      const result = await runTaskAgent(goal, channel, signal);
+      const result = await runTaskAgent(name, goal, channel, signal);
 
       results.push({
         taskName: name,

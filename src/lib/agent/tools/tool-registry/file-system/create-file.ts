@@ -46,7 +46,7 @@ export const createFile = createTool({
     ' file already exists at that path; pass `overwrite: true` to replace it. Missing parent directories' +
     ' are created automatically unless `createDirectories` is set to false. Use this tool when you need to' +
     ' produce an entirely new file (e.g. a new module, config file, or script). For editing an existing' +
-    ' file, prefer `insert_in_file` instead.',
+    ' file, prefer `replace_in_file` instead.',
   inputSchema,
   outputSchema,
   requiresApproval: () => true,

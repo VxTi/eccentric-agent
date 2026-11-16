@@ -6,6 +6,8 @@ import { Result } from '../../../../result';
 import { store } from '../../../../state';
 import { createTool } from '../../tool-definition';
 
+const MIN_LINE_NUMBER_OFFSET = 1;
+
 const inputSchema = z.object({
   filePath: z
     .string()
@@ -17,7 +19,9 @@ const inputSchema = z.object({
       z.object({
         fromLineNumber: z
           .number()
-          .describe('The starting line position of which frame to read'),
+          .describe(
+            `The starting line position of which frame to read, starting from ${MIN_LINE_NUMBER_OFFSET}`
+          ),
         lineCount: z
           .number()
           .optional()
@@ -28,7 +32,8 @@ const inputSchema = z.object({
       })
     )
     .describe(
-      "An optional selection to provide, if you don\'t need to read the entire file. Prefer using selections to reduce context pollution"
+      "An optional selection to provide, if you don't need to read the entire file. ONLY omit this if you need" +
+        ' to read everything in the file, otherwise provide a selection.'
     ),
 });
 
@@ -37,10 +42,17 @@ const outputSchema = z.object({
   filePath: z.string(),
 });
 
-function prefixWithLineNumbers(lines: string[], newline: string): string {
+function prefixWithLineNumbers(
+  lines: string[],
+  newline: string,
+  offset: number = 0
+): string {
   const width = String(lines.length).length;
   return lines
-    .map((line, i) => `${String(i + 1).padStart(width, ' ')}\t${line}`)
+    .map(
+      (line, i) =>
+        `${String(i + MIN_LINE_NUMBER_OFFSET + offset).padStart(width, ' ')}\t${line}`
+    )
     .join(newline);
 }
 
@@ -48,15 +60,14 @@ export const readFile = createTool({
   internalName: 'read_file',
   name: 'Read file',
   description:
-    'Reads the entire UTF-8 text content of a file from disk and returns it as a single string with' +
-    ' each line prefixed by its 1-based line number and a tab (`<n>\\t<line>`). These line' +
-    ' numbers can be passed to `insert_in_file` to insert new content at a specific position.\n' +
-    'Accepts either an absolute path or a path relative to the working directory. Use this tool' +
-    ' when you need to inspect the full contents of a known file — for example to understand its' +
-    ' structure, extract information, or prepare for an edit. Do NOT use this tool to discover' +
-    ' *which* files exist (use `find_file` for that) or to search for content across many files' +
-    ' (use `find_in_file` for that). ONLY invoke this tool when the file content is not already' +
-    ' present in the current context; prefer existing context over repeated reads.',
+    'Read one whole UTF-8 file off disk. One string back. Each line prefixed by its 1-based' +
+    ' number and a tab: `<n>\\t<line>`. Feed those numbers to `replace_in_file` to change content' +
+    ' at an exact line.\n' +
+    'Path: absolute, or relative to working dir. What is it for? The full body of one file you' +
+    ' already know. See its shape. Pull a fact. Prep an edit. What is it NOT for? Learning *which*' +
+    ' files exist — that is `find_file`. Hunting text across many files — that is `find_in_file`.\n' +
+    'Rule: invoke ONLY when the content is not in context. Already in context? Do not read it' +
+    ' again.',
   inputSchema,
   outputSchema,
 
@@ -76,26 +87,16 @@ export const readFile = createTool({
     fileCache.set(absolutePath, stats.mtimeMs);
 
     const newline = raw.match(/\r?\n/)?.[0] ?? '\n';
-    const lines = raw.split(/\r?\n/);
+    const lines = raw.split(newline);
 
-    if (
-      isNotNil(selection) &&
-      (selection.fromLineNumber < 0 ||
-        selection.fromLineNumber + (selection.lineCount ?? 0) > lines.length)
-    ) {
+    if (!isValidSelection(selection, lines.length)) {
       return Result.Error(`Invalid selection, line count: ${lines.length}`);
     }
 
     const content = prefixWithLineNumbers(
-      isNil(selection)
-        ? lines
-        : lines.slice(
-            selection.fromLineNumber,
-            isNotNil(selection.lineCount)
-              ? selection.fromLineNumber + selection.lineCount
-              : undefined
-          ),
-      newline
+      getLines(selection, lines),
+      newline,
+      selection?.fromLineNumber
     );
 
     return Result.Ok({ content, filePath }, { selection });
@@ -106,9 +107,42 @@ export const readFile = createTool({
   },
 
   outputToString({ filePath }, _, { selection }) {
-    return `Read \`${filePath}\`${formatSelection(selection)}`;
+    const cwd = store.getState().fileSystem.cwd;
+    return `Read \`${path.relative(cwd, filePath)}\`${formatSelection(selection)}`;
   },
 });
+
+function isValidSelection(
+  selection: z.infer<typeof inputSchema>['selection'],
+  lines: number
+): selection is z.infer<typeof inputSchema>['selection'] {
+  if (isNil(selection)) return true;
+
+  const { fromLineNumber, lineCount } = selection;
+
+  return (
+    isNotNil(fromLineNumber) &&
+    isNotNil(lineCount) &&
+    fromLineNumber - MIN_LINE_NUMBER_OFFSET >= 0 &&
+    fromLineNumber - MIN_LINE_NUMBER_OFFSET + lines <= lineCount
+  );
+}
+
+function getLines(
+  selection: z.infer<typeof inputSchema>['selection'],
+  lines: string[]
+): string[] {
+  if (isNil(selection)) return lines;
+
+  const endOffset = isNotNil(selection.lineCount)
+    ? selection.fromLineNumber + selection.lineCount
+    : undefined;
+
+  return lines.slice(
+    selection.fromLineNumber + MIN_LINE_NUMBER_OFFSET,
+    endOffset
+  );
+}
 
 function formatSelection(selection: z.infer<typeof inputSchema>['selection']) {
   if (!selection) return '';

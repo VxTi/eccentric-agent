@@ -42,6 +42,7 @@ const outputSchema = z.object({
 });
 
 async function runSubAgent(
+  summary: string,
   goal: string,
   channel: NotifierChannel<ToolChannelParams>,
   signal: AbortSignal
@@ -52,6 +53,7 @@ async function runSubAgent(
     signal.addEventListener('abort', () => controller.abort());
 
     new SubAgent({
+      summary,
       goal,
       callback: resolve,
       signal: controller.signal,
@@ -66,27 +68,23 @@ export const spawnSubAgents = createTool({
   description:
     'Spawns one or more independent, READ-ONLY sub-agents in parallel, each given an isolated goal.' +
     ' Every sub-agent runs its own tool-driven loop and returns a final textual result when its goal is' +
-    ' accomplished. YOU MUST ALWAYS USE THIS TOOL whenever the task requires gathering, collating, or' +
-    ' aggregating information from more than one source, file, topic, or input — including any request' +
-    ' that asks you to "summarize", "compare", "audit", "survey", "research", "review", or otherwise' +
-    ' combine findings across multiple distinct items. Do not attempt to aggregate such data inline in' +
-    ' your own loop; delegate each independent piece of work to its own sub-agent here and synthesize' +
-    ' their returned results. The tool is also appropriate whenever a larger problem can be decomposed' +
-    ' into self-contained sub-problems that can run concurrently (e.g. researching several topics at' +
-    ' once, drafting alternative solutions in parallel, or fanning out repetitive investigations across' +
-    ' many inputs). These sub-agents cannot edit files, create files, or run shell commands: any task' +
-    ' that must produce a change in the workspace belongs in `delegate_task`, not here. Each sub-agent' +
-    ' receives ONLY the goal you provide; it has no access to your conversation history, so make every' +
-    ' goal fully self-contained, with all necessary context, constraints, and the exact shape of the' +
-    ' expected result. The ONLY case in which you may skip this tool is genuinely trivial single-step' +
-    ' work that does not involve aggregating read-only data from multiple sources.',
+    ' accomplished. Reach for this tool when a task breaks into substantial, genuinely independent' +
+    ' read-only pieces that are worth running concurrently — e.g. researching several unrelated topics' +
+    ' at once, or fanning a repetitive investigation across many inputs. Weigh the cost first: each' +
+    ' sub-agent is a full extra agent loop, so a few file reads or searches you can do directly in your' +
+    ' own loop are cheaper done inline. Do NOT spawn an agent for work of one or two reads, for a' +
+    ' search you could run yourself, or for pieces that depend on one another. These sub-agents cannot' +
+    ' edit files, create files, or run shell commands: any task that must change the workspace belongs' +
+    ' in `delegate_task`, not here. Each sub-agent receives ONLY the goal you provide; it has no access' +
+    ' to your conversation history, so make every goal fully self-contained, with all necessary' +
+    ' context, constraints, and the exact shape of the expected result.',
   inputSchema,
   outputSchema,
 
   async handle({ agents }, channel, signal) {
     const result = await Promise.allSettled(
       agents.map(async ({ goal, name }) => {
-        const result = await runSubAgent(goal, channel, signal);
+        const result = await runSubAgent(name, goal, channel, signal);
 
         return { taskName: name, result };
       })
