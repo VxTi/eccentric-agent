@@ -2,7 +2,7 @@ import { Box, Static, Text } from 'ink';
 import type { ReactNode } from 'react';
 import { GitInfoLine } from './git-info-line';
 import { MessageList } from './messages/message-list';
-import { ModelInfoBar } from './model-info-bar';
+import { BottomInfoBar } from './bottom-info-bar';
 import InputField from './user-input/input-field';
 
 export function App(): ReactNode {
@@ -21,7 +21,7 @@ export function App(): ReactNode {
           {/*<LoadingStatusLine />*/}
           <GitInfoLine />
           <InputField />
-          <ModelInfoBar />
+          <BottomInfoBar />
         </Box>
       </Box>
     </Box>

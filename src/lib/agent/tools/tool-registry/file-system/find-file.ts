@@ -77,7 +77,7 @@ export const findFile = createTool({
 
   outputToString({ files }, _, { pattern }): string {
     if (hasArrayLength(files, 0)) {
-      return `Unable to find any files`;
+      return `No files found with name matching pattern \`${pattern}\``;
     }
 
     const limitVisibleFiles = files.length > MAX_SHOWN_FILE_COUNT;

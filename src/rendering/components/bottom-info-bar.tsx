@@ -7,9 +7,15 @@ import {
   eventOn,
   type TokenConsumeProps,
 } from '../../lib/events/events';
+import { useAppSelector } from '../../lib/state';
 import { formatTokenCount } from '../../lib/text-formatting';
+import { basicHighlightFormatting } from '../terminal-markdown-renderer/markdown-renderer';
+import { Spinner } from './spinner';
 
-export function ModelInfoBar(): ReactNode {
+const THINKING_TEXT = basicHighlightFormatting('Thinking...');
+
+export function BottomInfoBar(): ReactNode {
+  const reasoning = useAppSelector(state => state.agent.reasoning.active);
   const [{ input, output }, setCount] = useState<
     Omit<TokenConsumeProps, 'source'>
   >({
@@ -45,6 +51,12 @@ export function ModelInfoBar(): ReactNode {
       <Text color="gray">
         ↑ {formatTokenCount(input)} • ↓ {formatTokenCount(output)}
       </Text>
+      {reasoning && (
+        <Box flexShrink={0}>
+          <Spinner loading />
+          <Text>{THINKING_TEXT}</Text>
+        </Box>
+      )}
     </Box>
   );
 }

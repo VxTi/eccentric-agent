@@ -91,20 +91,20 @@ export const findInFile = createTool({
       }
     }
 
-    return Result.Ok({ matches }, { pattern });
+    return Result.Ok({ matches }, { pattern, filePath });
   },
 
   inputToString({ pattern, filePath }) {
     return `Looking for pattern \`${pattern}\` in \`${filePath}\``;
   },
 
-  outputToString({ matches }, _, { pattern }): string {
+  outputToString({ matches }, _, { pattern, filePath }): string {
     if (matches.length === 0) {
-      return `Found no matches for pattern \`${pattern}\``;
+      return `Found no matches for pattern \`${pattern}\` in \`${filePath}\``;
     }
     const formattedMatches = matches
       .map(match => `${match.line}: \`${match.lineContent}\``)
       .join('\n\n');
-    return `Found ${matches.length} match${matches.length === 1 ? 's' : 'es'} for pattern \`${pattern}\`:\n\`\`\`\n${formattedMatches}\n\`\`\``;
+    return `Found ${matches.length} match${matches.length === 1 ? 's' : 'es'} for pattern \`${pattern}\` in \`${filePath}\`:\n\`\`\`\n${formattedMatches}\n\`\`\``;
   },
 });

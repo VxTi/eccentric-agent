@@ -1,3 +1,4 @@
+import { emitReasoningState } from '../events/reasoning';
 import type { Message } from '../types/messages';
 import type { AgentSkill, SkillName } from './skills/common';
 import { isNonEmptyString } from '@vxti/typed';
@@ -247,23 +248,11 @@ export class Agent extends EventEmitter<EventMap> {
             break;
           }
           case 'reasoning-start':
-            reasoning.set(part.id, '');
+            emitReasoningState({ active: true });
             break;
-          case 'reasoning-delta': {
-            const rUpdated = (reasoning.get(part.id) ?? '') + part.text;
-            reasoning.set(part.id, rUpdated);
-
-            if (!isNonEmptyString(rUpdated)) break;
-
-            this.emit('message-delta', {
-              type: 'generic',
-              id: part.id,
-              content: rUpdated,
-            });
-            break;
-          }
           case 'reasoning-end':
-            reasoning.delete(part.id);
+            emitReasoningState({ active: false });
+            break;
         }
       }
     } catch (err) {
