@@ -18,7 +18,10 @@ export const FrontMatterSchema = z.object({
   metadata: z.optional(z.record(z.string(), z.string())),
 });
 
+export type SkillName = string & {};
+
 export type AgentSkill = z.infer<typeof FrontMatterSchema> & {
+  name: SkillName;
   content: string;
   path: string;
 };

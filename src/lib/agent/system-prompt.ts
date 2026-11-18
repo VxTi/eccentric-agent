@@ -1,10 +1,11 @@
 import { isNil, type Nullable } from '@vxti/typed';
-import compact from 'lodash/compact';
-import first from 'lodash/first';
+import { first, compact } from 'lodash-es';
 import fs from 'node:fs';
 import { CONSTANT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT } from '../constants';
-import { store } from '../state';
 import { type TaskList, TaskStatus } from '../tasks';
+import { MCP } from './mcp/mcp';
+import { AgentSkill, SkillName } from './skills/common';
+import { FileCache } from '../file-cache';
 
 const OPERATING_GUIDE = `# Working efficiently
 
@@ -30,20 +31,29 @@ Spend a tool call only when it yields information you do not already have.
   run commands, \`spawn_agents\` for read-only research spread across separate sources. For a
   couple of files, read them yourself — spinning up an agent costs more than it saves.`;
 
-export async function constructSystemPrompt(): Promise<string> {
-  const {
-    fileSystem: {
-      cwd,
-      git: { ignored: gitIgnore },
-    },
-    agent: { mcpServers, taskList, activeSkills, skills },
-  } = store.getState();
+interface Props {
+  mcpServers: Set<MCP>;
+  skills: Map<SkillName, AgentSkill>;
+  taskList: TaskList;
+  activeSkills: Map<SkillName, AgentSkill>;
+  fileCache: FileCache;
+  cwd: string;
+  gitIgnore: Set<string>;
+}
 
+export async function constructSystemPrompt({
+  mcpServers,
+  cwd,
+  gitIgnore,
+  taskList,
+  activeSkills,
+  skills,
+}: Props): Promise<string> {
   const systemPrompt = await loadSystemPrompt({ cwd, ignored: gitIgnore });
 
   const mcpServerNames = (
     await Promise.all(
-      mcpServers.map(async mcp => {
+      mcpServers.values().map(async mcp => {
         const { tools } = await mcp.withAuth(() =>
           mcp.params.client.listTools()
         );
@@ -53,7 +63,9 @@ export async function constructSystemPrompt(): Promise<string> {
   ).join('\n');
 
   const skillsSummary = skills
+    .values()
     .map(skill => `- Name: ${skill.name}.\nDescription:\n${skill.description}`)
+    .toArray()
     .join('\n---');
 
   const taskFragment = constructTaskListSystemPromptFragment(taskList);

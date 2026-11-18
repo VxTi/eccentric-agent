@@ -1,35 +1,51 @@
-import { type JSX, type ReactNode } from 'react';
-import { Box, Text } from 'ink';
+import { hasArrayLengthAtLeast, isNonEmptyArray } from '@vxti/typed';
+import { type ReactNode } from 'react';
+import { Box, Static } from 'ink';
+import { type Message } from '../../../lib/types/messages';
 import { useAgent } from '../../context';
 import { ChatMessage } from './chat-message';
 
 export function MessageList(): ReactNode {
   const { messages } = useAgent();
 
+  const chunked = chunkMessages(messages);
+
   return (
     <Box width="100%" flexDirection="column" alignItems="center">
-      <WelcomingText />
       <Box flexDirection="column" alignItems="flex-start" flexShrink={0}>
-        {messages.map(message => (
-          <ChatMessage key={message.id} message={message} />
-        ))}
+        {chunked.map((chunk, i) =>
+          chunk.immutable ? (
+            <Static items={chunk.messages} key={i}>
+              {message => <ChatMessage key={message.id} message={message} />}
+            </Static>
+          ) : (
+            chunk.messages.map(message => (
+              <ChatMessage key={message.id} message={message} />
+            ))
+          )
+        )}
       </Box>
     </Box>
   );
 }
 
-function WelcomingText(): JSX.Element {
-  return (
-    <Box width="80%" flexDirection="column" alignItems="center">
-      <Box paddingTop={1} paddingBottom={8}>
-        <Text bold>
-          {'                         _        _      \n' +
-            '  ___  ___ ___ ___ _ __ | |_ _ __(_) ___ \n' +
-            " / _ \\/ __/ __/ _ \\ '_ \\| __| '__| |/ __|\n" +
-            '|  __/ (_| (_|  __/ | | | |_| |  | | (__ \n' +
-            ' \\___|\\___\\___\\___|_| |_|\\__|_|  |_|\\___|'}
-        </Text>
-      </Box>
-    </Box>
-  );
+function chunkMessages(
+  list: Message[]
+): { messages: Message[]; immutable: boolean }[] {
+  if (!isNonEmptyArray(list)) return [];
+
+  const batches: { messages: Message[]; immutable: boolean }[] = [];
+
+  list.forEach(message => {
+    const immutable = message.immutable ?? false;
+    if (!hasArrayLengthAtLeast(batches, 1) || immutable !== batches[0]) {
+      batches.push({
+        immutable,
+        messages: [message],
+      });
+    } else {
+      batches[batches.length - 1]?.messages.push(message);
+    }
+  });
+  return batches;
 }

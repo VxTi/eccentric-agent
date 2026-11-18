@@ -1,4 +1,4 @@
-import { Box } from 'ink';
+import { Box, Static, Text } from 'ink';
 import type { ReactNode } from 'react';
 import { GitInfoLine } from './git-info-line';
 import { MessageList } from './messages/message-list';
@@ -16,6 +16,7 @@ export function App(): ReactNode {
           alignItems="flex-start"
           flexDirection="column"
         >
+          <WelcomingText />
           <MessageList />
           {/*<LoadingStatusLine />*/}
           <GitInfoLine />
@@ -24,5 +25,26 @@ export function App(): ReactNode {
         </Box>
       </Box>
     </Box>
+  );
+}
+
+const staticBanner = `
+                         _        _      
+  ___  ___ ___ ___ _ __ | |_ _ __(_) ___ 
+ / _ \\/ __/ __/ _ \\ '_ \\| __| '__| |/ __|
+|  __/ (_| (_|  __/ | | | |_| |  | | (__ 
+ \\___|\\___\\___\\___|_| |_|\\__|_|  |_|\\___|
+`;
+function WelcomingText() {
+  return (
+    <Static items={[staticBanner]}>
+      {(item, index) => (
+        <Box flexDirection="column" alignItems="center" key={index}>
+          <Box paddingTop={1} paddingBottom={8}>
+            <Text bold>{item}</Text>
+          </Box>
+        </Box>
+      )}
+    </Static>
   );
 }

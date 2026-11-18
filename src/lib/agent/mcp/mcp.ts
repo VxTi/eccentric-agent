@@ -12,7 +12,7 @@ import {
   type Transport,
   UnauthorizedError,
 } from '@modelcontextprotocol/client';
-import first from 'lodash/first';
+import { first } from 'lodash-es';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import { type z } from 'zod';

@@ -17,9 +17,9 @@ import {
   useMemo,
 } from 'react';
 import { v7 as uuid } from 'uuid';
+import { type Agent } from '../../lib/agent/agent';
 import { getAppropriateModel, TaskComplexity } from '../../lib/agent/inference';
 import { loadMcpConfig, type MCP } from '../../lib/agent/mcp/mcp';
-import { getRandomMessage } from '../../lib/agent/rotating-messages';
 import { discoverSkillFiles } from '../../lib/agent/skills/discovery';
 import { constructSystemPrompt } from '../../lib/agent/system-prompt';
 import { makeToolSet, toolRegistry } from '../../lib/agent/tools';
@@ -27,7 +27,6 @@ import { EventName, eventOn, TokenSource } from '../../lib/events/events';
 import { Notifier } from '../../lib/events/notifier';
 import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
 import { Features } from '../../lib/feaures';
-import { type FileCache } from '../../lib/file-cache';
 import {
   store,
   useAppDispatch,
@@ -46,32 +45,25 @@ import {
   setStatus as setStatusAction,
   setSystemPrompt as setSystemPromptAction,
 } from '../../lib/state/agent';
-import type { TaskList } from '../../lib/tasks';
 import type { Message, UserMessage } from '../../lib/types/messages';
 import { basicHighlightFormatting } from '../terminal-markdown-renderer/markdown-renderer';
 
-export interface AgentContext {
-  submitMessage: (input: string) => void;
-  taskList: TaskList;
-  fileCache: FileCache;
+export interface AgentContextType {
+  agent: Agent;
+
   messages: Message[];
   setMessages: Dispatch<SetStateAction<Message[]>>;
-  setModelMessages: Dispatch<SetStateAction<ModelMessage[]>>;
   status: AgentStatus;
   setStatus: Dispatch<SetStateAction<AgentStatus>>;
-  mcpServers: MCP[];
-  systemPrompt: string;
 }
 
-const PrimaryAgentContext = createContext<{
-  submitMessage: (input: string) => void;
-} | null>(null);
+const AgentContext = createContext<AgentContextType | undefined>(undefined);
 
-interface AgentProviderProps {
+export function AgentProvider({
+  children,
+}: {
   children: ReactNode;
-}
-
-export function AgentProvider({ children }: AgentProviderProps): ReactNode {
+}): ReactNode {
   const dispatch = useAppDispatch();
   const {
     cwd,
@@ -147,7 +139,6 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
     gitIgnored,
     dispatch,
     skills.length,
-    modelMessages.length,
   ]);
 
   /**
@@ -161,16 +152,6 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
 
   const processRequest = useCallback(
     async (prompt: string, quiet: boolean) => {
-      dispatch(setStatusAction({ text: getRandomMessage(), loading: true }));
-      const interval = setInterval(() => {
-        dispatch(
-          setStatusAction({
-            text: getRandomMessage(),
-            loading: true,
-          })
-        );
-      }, 3000);
-
       const currentModelMessages = store.getState().agent.modelMessages;
       const updatedMessages: ModelMessage[] = [
         ...currentModelMessages,
@@ -191,6 +172,7 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
       let currentTextId: string | null = null;
       let buffer = '';
       const currentSystemPrompt = store.getState().agent.systemPrompt;
+
       const result = streamText({
         allowSystemInMessages: true,
         abortSignal: controller.signal,
@@ -217,7 +199,6 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
               content: String(error),
             })
           );
-          clearInterval(interval);
         },
       });
 
@@ -246,7 +227,6 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
         }
         const response = (await result.finalStep).response;
 
-        clearInterval(interval);
         dispatch(setStatusAction({ text: '', loading: false }));
         const latestModelMessages = store.getState().agent.modelMessages;
         dispatch(
@@ -292,15 +272,15 @@ export function AgentProvider({ children }: AgentProviderProps): ReactNode {
   );
 
   return (
-    <PrimaryAgentContext.Provider value={{ submitMessage }}>
+    <AgentContext.Provider value={{ submitMessage }}>
       {children}
-    </PrimaryAgentContext.Provider>
+    </AgentContext.Provider>
   );
 }
 
-export function useAgent(): AgentContext {
+export function useAgent(): AgentContextType {
   const dispatch = useAppDispatch();
-  const context = useContext(PrimaryAgentContext);
+  const context = useContext(AgentContext);
   const {
     taskList,
     fileCache,

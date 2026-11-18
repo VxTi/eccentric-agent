@@ -16,7 +16,12 @@ export function emitMessage(
     | MakeOptional<AssistantMessage, 'id'>
     | MakeOptional<GenericMessage, 'id'>
 ): void {
-  emitEvent(EventName.AGENT_MESSAGE, { ...message, id: message.id ?? uuid() });
+  const immutable = message.type === 'generic' ? !message.loading : true;
+  emitEvent(EventName.AGENT_MESSAGE, {
+    immutable,
+    ...message,
+    id: message.id ?? uuid(),
+  });
 }
 
 export function debug(message: string, ...args: any[]): void {
