@@ -265,7 +265,7 @@ function resolveOAuthConfig(
 export function getMCPServer(name: string): MCP {
   const {
     agent: { mcpServers },
-  } = store.getState();
+  } = store.getState().agent;
 
   const mcp = first(
     mcpServers.filter((server: MCP) => server.params.name === name)

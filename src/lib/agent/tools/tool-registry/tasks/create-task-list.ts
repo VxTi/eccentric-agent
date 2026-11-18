@@ -52,7 +52,7 @@ export const createTaskList = createTool({
   handle({ tasks }) {
     const {
       agent: { taskList },
-    } = store.getState();
+    } = store.getState().agent;
     const newList: Task[] = tasks.map(task => ({
       id: task.id,
       description: task.description,

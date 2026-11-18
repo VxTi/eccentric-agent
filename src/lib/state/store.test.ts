@@ -6,9 +6,6 @@ import {
   addMessage,
   setMessage,
   clearMessages,
-  setStatus,
-  setTasks,
-  updateTasks,
 } from './agent';
 import { setGitInfo, setLoading, setCwd } from './file-system';
 import { setController, exit } from './app';
@@ -40,33 +37,20 @@ describe('Redux Store and Slices', () => {
       expect(store.getState().agent.messages).toHaveLength(0);
     });
 
-    it('should manage tasks', () => {
-      store.dispatch(
-        setTasks([
-          {
-            id: 'task-1',
-            description: 'Do something',
-            status: TaskStatus.PENDING,
-          },
-        ])
-      );
-      expect(store.getState().agent.taskList.tasks).toHaveLength(1);
-      expect(store.getState().agent.taskList.tasks[0]?.status).toBe(
-        TaskStatus.PENDING
-      );
+    it('manages tasks through the agent instance', () => {
+      const { taskList } = store.getState().agent.agent;
+      taskList.set([
+        {
+          id: 'task-1',
+          description: 'Do something',
+          status: TaskStatus.PENDING,
+        },
+      ]);
+      expect(taskList.tasks).toHaveLength(1);
+      expect(taskList.tasks[0]?.status).toBe(TaskStatus.PENDING);
 
-      store.dispatch(
-        updateTasks([{ id: 'task-1', status: TaskStatus.COMPLETED }])
-      );
-      expect(store.getState().agent.taskList.tasks[0]?.status).toBe(
-        TaskStatus.COMPLETED
-      );
-    });
-
-    it('should manage status', () => {
-      store.dispatch(setStatus({ loading: true, text: 'Thinking...' }));
-      expect(store.getState().agent.status.loading).toBe(true);
-      expect(store.getState().agent.status.text).toBe('Thinking...');
+      taskList.updateTasks([{ id: 'task-1', status: TaskStatus.COMPLETED }]);
+      expect(taskList.tasks[0]?.status).toBe(TaskStatus.COMPLETED);
     });
   });
 

@@ -4,11 +4,11 @@ import { getCommandSuggestions } from '../../lib/commands';
 import { emitMessage } from '../../lib/events/messaging';
 import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
 import { TokenSource } from '../../lib/events/events';
-import { app, setActiveSkill, store, useAppDispatch } from '../../lib/state';
+import { app, clearMessages, useAppDispatch } from '../../lib/state';
 import { useAgent } from '../context';
 
 export function useCommandProcessor() {
-  const { setMessages, setModelMessages, systemPrompt } = useAgent();
+  const { agent } = useAgent();
   const dispatch = useAppDispatch();
 
   const processCommand = useCallback(
@@ -16,14 +16,13 @@ export function useCommandProcessor() {
       const commands = getCommandSuggestions();
 
       if (!commands.some(c => c.value === command)) {
-        console.log(command, commands);
         return;
       }
 
       switch (command) {
         case 'clear': {
-          setModelMessages([]);
-          setMessages([]);
+          agent.clear();
+          dispatch(clearMessages());
           emitConsumeTokenEvent({
             input: 0,
             output: 0,
@@ -38,17 +37,23 @@ export function useCommandProcessor() {
           break;
         }
         case 'system-prompt':
-          emitMessage({
-            type: 'generic',
-            content: `Here is the system prompt:
-
-${systemPrompt}`,
-          });
+          void agent
+            .buildSystemPrompt()
+            .then(systemPrompt =>
+              emitMessage({
+                type: 'generic',
+                content: `Here is the system prompt:\n\n${systemPrompt}`,
+              })
+            )
+            .catch(() => {
+              emitMessage({
+                type: 'generic',
+                content: `Something went wrong whilst creating the system prompt`,
+              });
+            });
           break;
-        default:
-          const skill = store
-            .getState()
-            .agent.skills.find(s => s.name === command);
+        default: {
+          const skill = agent.skills.find(s => s.name === command);
           if (isNil(skill)) {
             emitMessage({
               type: 'assistant',
@@ -60,10 +65,11 @@ ${systemPrompt}`,
             type: 'assistant',
             content: `Using skill \`${command}\``,
           });
-          dispatch(setActiveSkill(skill));
+          agent.activateSkill(skill);
+        }
       }
     },
-    [dispatch, setMessages, setModelMessages, systemPrompt]
+    [agent, dispatch]
   );
 
   return { processCommand };

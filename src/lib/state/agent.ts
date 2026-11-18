@@ -1,44 +1,20 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import { type ModelMessage } from 'ai';
-import type { MCP } from '../agent/mcp/mcp';
-import { type AgentSkill } from '../agent/skills/common';
-import { DEFAULT_SYSTEM_PROMPT } from '../constants';
-import { FileCache } from '../file-cache';
-import { type Task, TaskList, type TaskUpdate } from '../tasks';
+import { Agent } from '../agent/agent';
 import type { Message } from '../types/messages';
-
-export interface AgentStatus {
-  loading: boolean;
-  text: string;
-}
+import { defaultController } from './app';
 
 export interface AgentState {
-  taskList: TaskList;
-  fileCache: FileCache;
+  /** User-facing message log rendered by the UI. */
   messages: Message[];
-  modelMessages: ModelMessage[];
-  status: AgentStatus;
-  skills: AgentSkill[];
-  activeSkills: Record<string, AgentSkill>;
-  mcpServers: MCP[];
-  systemPrompt: string;
-  messageQueue: string[];
+  /** The agent instance that owns all inference state (model messages, tasks,
+   *  skills, MCP servers, file cache, status). It is the single source of truth
+   *  for the agent; the UI only integrates with this instance. */
+  agent: Agent;
 }
 
 const initialState: AgentState = {
-  taskList: new TaskList(),
-  fileCache: new FileCache(),
   messages: [],
-  modelMessages: [],
-  activeSkills: {},
-  status: {
-    loading: false,
-    text: '',
-  },
-  skills: [],
-  mcpServers: [],
-  systemPrompt: DEFAULT_SYSTEM_PROMPT,
-  messageQueue: [],
+  agent: new Agent(defaultController.signal, process.cwd()),
 };
 
 export const agentSlice = createSlice({
@@ -62,80 +38,11 @@ export const agentSlice = createSlice({
     clearMessages: state => {
       state.messages = [];
     },
-    setActiveSkills: (
-      state,
-      action: PayloadAction<Record<string, AgentSkill>>
-    ) => {
-      state.activeSkills = action.payload;
-    },
-    setActiveSkill: (state, action: PayloadAction<AgentSkill>) => {
-      state.activeSkills[action.payload.name] = action.payload;
-    },
-    setModelMessages: (state, action: PayloadAction<ModelMessage[]>) => {
-      // @ts-expect-error Immer draft recursion incompatibility with AI SDK ModelMessage URL type
-      state.modelMessages = action.payload;
-    },
-    addModelMessage: (state, action: PayloadAction<ModelMessage>) => {
-      // @ts-expect-error Immer draft recursion incompatibility with AI SDK ModelMessage URL type
-      state.modelMessages.push(action.payload);
-    },
-    setSkills: (state, action: PayloadAction<AgentSkill[]>) => {
-      state.skills = action.payload;
-    },
-    setStatus: (state, action: PayloadAction<AgentStatus>) => {
-      state.status = action.payload;
-    },
-    setSystemPrompt: (state, action: PayloadAction<string>) => {
-      state.systemPrompt = action.payload;
-    },
-    setMcpServers: (state, action: PayloadAction<MCP[]>) => {
-      state.mcpServers = action.payload;
-    },
-    setTaskList: (state, action: PayloadAction<TaskList>) => {
-      state.taskList = action.payload;
-    },
-    setTasks: (state, action: PayloadAction<Task[]>) => {
-      state.taskList.set(action.payload);
-    },
-    updateTasks: (state, action: PayloadAction<TaskUpdate[]>) => {
-      state.taskList.updateTasks(action.payload);
-    },
-    setFileCache: (state, action: PayloadAction<FileCache>) => {
-      state.fileCache = action.payload;
-    },
-    setMessageQueue: (state, action: PayloadAction<string[]>) => {
-      state.messageQueue = action.payload;
-    },
-    enqueueMessage: (state, action: PayloadAction<string>) => {
-      state.messageQueue.push(action.payload);
-    },
-    dequeueMessage: state => {
-      state.messageQueue.shift();
-    },
   },
 });
 
-export const {
-  setMessages,
-  addMessage,
-  setMessage,
-  clearMessages,
-  setModelMessages,
-  addModelMessage,
-  setActiveSkills,
-  setActiveSkill,
-  setStatus,
-  setSystemPrompt,
-  setMcpServers,
-  setTaskList,
-  setTasks,
-  updateTasks,
-  setSkills,
-  setFileCache,
-  setMessageQueue,
-  enqueueMessage,
-  dequeueMessage,
-} = agentSlice.actions;
+export const { setMessages, addMessage, setMessage, clearMessages } =
+  agentSlice.actions;
 
 export const agent = {
   ...agentSlice.actions,

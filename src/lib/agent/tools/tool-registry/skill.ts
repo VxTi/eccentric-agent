@@ -1,7 +1,7 @@
 import { isNil } from '@vxti/typed';
 import * as z from 'zod';
 import { Result } from '../../../result';
-import { setActiveSkills, store } from '../../../state';
+import { store } from '../../../state';
 import { createTool } from '../tool-definition';
 
 const inputSchema = z.object({
@@ -18,16 +18,14 @@ export const useSkill = createTool({
   outputSchema: z.object({}),
 
   handle({ skill }) {
-    const {
-      agent: { activeSkills, skills },
-    } = store.getState();
+    const { agent } = store.getState().agent;
 
-    const skillItem = skills.find(s => s.name === skill);
+    const skillItem = agent.findSkill(skill);
     if (isNil(skillItem)) {
       return Result.Error(`Skill \`${skill}\` not found`, { skill });
     }
 
-    store.dispatch(setActiveSkills({ ...activeSkills, [skill]: skillItem }));
+    agent.activateSkill(skillItem);
 
     return Result.Ok({}, { skill });
   },

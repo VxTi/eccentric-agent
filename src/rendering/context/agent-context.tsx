@@ -1,60 +1,27 @@
-import { isNonEmptyString } from '@vxti/typed';
-import {
-  isLoopFinished,
-  type ModelMessage,
-  streamText,
-  type ToolSet,
-} from 'ai';
 import chalk from 'chalk';
 import {
   createContext,
-  type Dispatch,
   type ReactNode,
-  type SetStateAction,
   useCallback,
   useContext,
   useEffect,
   useMemo,
+  useState,
 } from 'react';
-import { v7 as uuid } from 'uuid';
-import { type Agent } from '../../lib/agent/agent';
-import { getAppropriateModel, TaskComplexity } from '../../lib/agent/inference';
-import { loadMcpConfig, type MCP } from '../../lib/agent/mcp/mcp';
-import { discoverSkillFiles } from '../../lib/agent/skills/discovery';
-import { constructSystemPrompt } from '../../lib/agent/system-prompt';
-import { makeToolSet, toolRegistry } from '../../lib/agent/tools';
-import { EventName, eventOn, TokenSource } from '../../lib/events/events';
-import { Notifier } from '../../lib/events/notifier';
+import { type Agent, type AgentStatus } from '../../lib/agent/agent';
 import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
+import { EventName, eventOn } from '../../lib/events/events';
 import { Features } from '../../lib/feaures';
-import {
-  store,
-  useAppDispatch,
-  useAppSelector,
-  fetchGitInfo,
-} from '../../lib/state';
-import {
-  type AgentStatus,
-  dequeueMessage,
-  enqueueMessage,
-  setMcpServers as setMcpServersAction,
-  setMessage as setMessageAction,
-  setMessages as setMessagesAction,
-  setModelMessages as setModelMessagesAction,
-  setSkills as setSkillsAction,
-  setStatus as setStatusAction,
-  setSystemPrompt as setSystemPromptAction,
-} from '../../lib/state/agent';
-import type { Message, UserMessage } from '../../lib/types/messages';
+import { useAppDispatch, useAppSelector, fetchGitInfo } from '../../lib/state';
+import { setMessage } from '../../lib/state/agent';
+import type { Message } from '../../lib/types/messages';
 import { basicHighlightFormatting } from '../terminal-markdown-renderer/markdown-renderer';
 
 export interface AgentContextType {
   agent: Agent;
-
+  submitMessage: (input: string) => void;
   messages: Message[];
-  setMessages: Dispatch<SetStateAction<Message[]>>;
   status: AgentStatus;
-  setStatus: Dispatch<SetStateAction<AgentStatus>>;
 }
 
 const AgentContext = createContext<AgentContextType | undefined>(undefined);
@@ -65,286 +32,94 @@ export function AgentProvider({
   children: ReactNode;
 }): ReactNode {
   const dispatch = useAppDispatch();
-  const {
-    cwd,
-    git: { ignored: gitIgnored },
-  } = useAppSelector(state => state.fileSystem);
-  const { taskList, mcpServers, activeSkills, skills, modelMessages } =
-    useAppSelector(state => state.agent);
-  const { controller } = useAppSelector(state => state.app);
+  const { ignored: gitIgnored } = useAppSelector(state => state.fileSystem.git);
+  const agent = useAppSelector(state => state.agent.agent);
+  const messages = useAppSelector(state => state.agent.messages);
 
-  const notifier = useMemo(() => new Notifier(), []);
-  const tools = useMemo<ToolSet>(
-    () => makeToolSet(toolRegistry, notifier, controller.signal),
-    [notifier, controller]
-  );
+  const [status, setStatus] = useState<AgentStatus>({
+    loading: false,
+    text: '',
+  });
 
-  // Load the repo's gitignore set so file suggestions and the system prompt
-  // exclude ignored paths such as node_modules. Without this the ignored set
-  // stays empty and every ignored file shows up as a suggestion.
+  // Load the repo's gitignore set so the system prompt excludes ignored paths
+  // such as node_modules, then feed it to the agent.
   useEffect(() => {
     void dispatch(fetchGitInfo());
   }, [dispatch]);
 
   useEffect(() => {
-    void discoverSkillFiles().then(skills => {
-      dispatch(setSkillsAction(skills));
-    });
-    if (!Features.MCP) return;
+    agent.setGitIgnore(gitIgnored);
+  }, [agent, gitIgnored]);
 
-    dispatch(
-      setStatusAction({
-        text: basicHighlightFormatting('Connecting with MCP server...'),
-        loading: true,
-      })
-    );
-    loadMcpConfig(controller.signal)
-      .then(servers => {
-        dispatch(setMcpServersAction(servers));
-        dispatch(setStatusAction({ text: '', loading: false }));
-      })
-      .catch((error): MCP[] => {
-        const errMsg = error instanceof Error ? error.message : String(error);
-        dispatch(
-          setStatusAction({
-            text: chalk.red(`Failed to load MCP config - ${errMsg}`),
-            loading: false,
-          })
-        );
-        setTimeout(
-          () => dispatch(setStatusAction({ text: '', loading: false })),
-          5000
-        );
-        return [];
-      });
-  }, [controller.signal, dispatch]);
-
-  /**
-   * System prompt construction
-   */
+  // Integrate the store's agent with the UI: mirror its events into React /
+  // Redux and kick off skill and MCP discovery. The agent itself is owned by
+  // the store, so this provider never creates or replaces it.
   useEffect(() => {
-    let cancelled = false;
-    void constructSystemPrompt().then(prompt => {
-      if (!cancelled) dispatch(setSystemPromptAction(prompt));
-    });
+    void agent.loadSkills();
+
+    if (Features.MCP) {
+      setStatus({
+        loading: true,
+        text: basicHighlightFormatting('Connecting with MCP server...'),
+      });
+      void agent.loadMcpServers().then(ok => {
+        if (ok) {
+          setStatus({ text: '', loading: false });
+          return;
+        }
+        setStatus({
+          text: chalk.red('Failed to load MCP config'),
+          loading: false,
+        });
+        setTimeout(() => setStatus({ text: '', loading: false }), 5000);
+      });
+    }
+
+    const onMessage = (message: Message): void => {
+      dispatch(setMessage(message));
+    };
+    const onStatus = (next: AgentStatus): void => setStatus(next);
+    const onTokens = emitConsumeTokenEvent;
+
+    agent.on('message-delta', onMessage);
+    agent.on('status-change', onStatus);
+    agent.on('tokens-consumed', onTokens);
+
+    // Tool output, reasoning and command feedback are emitted onto the global
+    // event bus rather than through the agent instance, so mirror those too.
+    const offAgentMessage = eventOn(EventName.AGENT_MESSAGE, ({ detail }) =>
+      dispatch(setMessage(detail))
+    );
 
     return () => {
-      cancelled = true;
+      agent.off('message-delta', onMessage);
+      agent.off('status-change', onStatus);
+      agent.off('tokens-consumed', onTokens);
+      offAgentMessage();
     };
-  }, [
-    taskList,
-    mcpServers,
-    cwd,
-    activeSkills,
-    gitIgnored,
-    dispatch,
-    skills.length,
-  ]);
-
-  /**
-   * Handling incoming messages from non-react world, and token consumption
-   */
-  useEffect(() => {
-    return eventOn(EventName.AGENT_MESSAGE, ({ detail }) => {
-      dispatch(setMessageAction(detail));
-    });
-  }, [dispatch]);
-
-  const processRequest = useCallback(
-    async (prompt: string, quiet: boolean) => {
-      const currentModelMessages = store.getState().agent.modelMessages;
-      const updatedMessages: ModelMessage[] = [
-        ...currentModelMessages,
-        { role: 'user', content: prompt },
-      ];
-      dispatch(setModelMessagesAction(updatedMessages));
-
-      if (!quiet) {
-        const currentMessages = store.getState().agent.messages;
-        dispatch(
-          setMessagesAction([
-            ...currentMessages,
-            { type: 'user', id: uuid(), content: prompt } satisfies UserMessage,
-          ])
-        );
-      }
-
-      let currentTextId: string | null = null;
-      let buffer = '';
-      const currentSystemPrompt = store.getState().agent.systemPrompt;
-
-      const result = streamText({
-        allowSystemInMessages: true,
-        abortSignal: controller.signal,
-        model: getAppropriateModel(TaskComplexity.MEDIUM),
-        messages: [
-          { content: currentSystemPrompt, role: 'system' },
-          ...updatedMessages,
-        ],
-        tools,
-        onStepEnd: step => {
-          emitConsumeTokenEvent({
-            input: step.usage.inputTokens ?? 0,
-            output: step.usage.outputTokens ?? 0,
-            source: TokenSource.PRIMARY,
-          });
-        },
-        onStepStart: () => {},
-        stopWhen: isLoopFinished(),
-        onError: ({ error }) => {
-          dispatch(
-            setMessageAction({
-              id: uuid(),
-              type: 'assistant',
-              content: String(error),
-            })
-          );
-        },
-      });
-
-      try {
-        for await (const part of result.stream) {
-          if (part.type === 'text-start') {
-            currentTextId = uuid();
-            buffer = '';
-          } else if (part.type === 'text-delta') {
-            buffer += part.text;
-            if (
-              isNonEmptyString(currentTextId) &&
-              isNonEmptyString(buffer, true)
-            ) {
-              dispatch(
-                setMessageAction({
-                  type: 'assistant',
-                  id: currentTextId,
-                  content: buffer,
-                })
-              );
-            }
-          } else if (part.type === 'text-end') {
-            currentTextId = null;
-          }
-        }
-        const response = (await result.finalStep).response;
-
-        dispatch(setStatusAction({ text: '', loading: false }));
-        const latestModelMessages = store.getState().agent.modelMessages;
-        dispatch(
-          setModelMessagesAction([...latestModelMessages, ...response.messages])
-        );
-      } catch (err) {
-        dispatch(
-          setMessageAction({
-            type: 'generic',
-            id: uuid(),
-            failure: true,
-            content: `Something went wrong whilst responding: ${String(err)}`,
-          })
-        );
-        dispatch(
-          setStatusAction({ text: chalk.red('Fatal error'), loading: false })
-        );
-        return;
-      }
-
-      const queue = store.getState().agent.messageQueue;
-      if (queue.length > 0) {
-        const firstQueuedMessage = queue[0];
-        dispatch(dequeueMessage());
-        if (isNonEmptyString(firstQueuedMessage)) {
-          await processRequest(firstQueuedMessage, false);
-        }
-      }
-    },
-    [controller, dispatch, tools]
-  );
+  }, [agent, dispatch]);
 
   const submitMessage = useCallback(
     (input: string) => {
-      const currentStatus = store.getState().agent.status;
-      if (currentStatus.loading) {
-        dispatch(enqueueMessage(input));
-        return;
-      }
-      void processRequest(input, false);
+      void agent.submitMessage(input);
     },
-    [dispatch, processRequest]
+    [agent]
+  );
+
+  const value = useMemo<AgentContextType>(
+    () => ({ agent, submitMessage, messages, status }),
+    [agent, submitMessage, messages, status]
   );
 
   return (
-    <AgentContext.Provider value={{ submitMessage }}>
-      {children}
-    </AgentContext.Provider>
+    <AgentContext.Provider value={value}>{children}</AgentContext.Provider>
   );
 }
 
 export function useAgent(): AgentContextType {
-  const dispatch = useAppDispatch();
   const context = useContext(AgentContext);
-  const {
-    taskList,
-    fileCache,
-    messages,
-    modelMessages: _modelMessages,
-    status,
-    mcpServers,
-    systemPrompt,
-  } = useAppSelector(state => state.agent);
-
-  const setMessages = useCallback<Dispatch<SetStateAction<Message[]>>>(
-    action => {
-      const value =
-        typeof action === 'function'
-          ? action(store.getState().agent.messages)
-          : action;
-      dispatch(setMessagesAction(value));
-    },
-    [dispatch]
-  );
-
-  const setModelMessages = useCallback<
-    Dispatch<SetStateAction<ModelMessage[]>>
-  >(
-    action => {
-      const value =
-        typeof action === 'function'
-          ? action(store.getState().agent.modelMessages)
-          : action;
-      dispatch(setModelMessagesAction(value));
-    },
-    [dispatch]
-  );
-
-  const setStatus = useCallback<Dispatch<SetStateAction<AgentStatus>>>(
-    action => {
-      const value =
-        typeof action === 'function'
-          ? action(store.getState().agent.status)
-          : action;
-      dispatch(setStatusAction(value));
-    },
-    [dispatch]
-  );
-
-  const submitMessage = useCallback(
-    (input: string) => {
-      if (context) {
-        context.submitMessage(input);
-      }
-    },
-    [context]
-  );
-
-  return {
-    submitMessage,
-    taskList,
-    fileCache,
-    messages,
-    setMessages,
-    setModelMessages,
-    status,
-    setStatus,
-    mcpServers,
-    systemPrompt,
-  };
+  if (!context) {
+    throw new Error('useAgent must be used within an AgentProvider');
+  }
+  return context;
 }

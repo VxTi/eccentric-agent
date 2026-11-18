@@ -1,51 +1,24 @@
-import { hasArrayLengthAtLeast, isNonEmptyArray } from '@vxti/typed';
-import { type ReactNode } from 'react';
-import { Box, Static } from 'ink';
-import { type Message } from '../../../lib/types/messages';
+import type { ReactNode } from 'react';
+import { Box } from 'ink';
 import { useAgent } from '../../context';
 import { ChatMessage } from './chat-message';
 
+// NOTE: ink supports only a single <Static> instance in the whole app, and the
+// welcome banner already uses it. Rendering finalized messages in a second
+// <Static> here silently prevented them (and anything after them) from being
+// drawn — which is why tool/command output emitted via `emitMessage` never
+// appeared. Messages are therefore rendered dynamically; the banner keeps the
+// sole <Static>.
 export function MessageList(): ReactNode {
   const { messages } = useAgent();
-
-  const chunked = chunkMessages(messages);
 
   return (
     <Box width="100%" flexDirection="column" alignItems="center">
       <Box flexDirection="column" alignItems="flex-start" flexShrink={0}>
-        {chunked.map((chunk, i) =>
-          chunk.immutable ? (
-            <Static items={chunk.messages} key={i}>
-              {message => <ChatMessage key={message.id} message={message} />}
-            </Static>
-          ) : (
-            chunk.messages.map(message => (
-              <ChatMessage key={message.id} message={message} />
-            ))
-          )
-        )}
+        {messages.map(message => (
+          <ChatMessage key={message.id} message={message} />
+        ))}
       </Box>
     </Box>
   );
-}
-
-function chunkMessages(
-  list: Message[]
-): { messages: Message[]; immutable: boolean }[] {
-  if (!isNonEmptyArray(list)) return [];
-
-  const batches: { messages: Message[]; immutable: boolean }[] = [];
-
-  list.forEach(message => {
-    const immutable = message.immutable ?? false;
-    if (!hasArrayLengthAtLeast(batches, 1) || immutable !== batches[0]) {
-      batches.push({
-        immutable,
-        messages: [message],
-      });
-    } else {
-      batches[batches.length - 1]?.messages.push(message);
-    }
-  });
-  return batches;
 }

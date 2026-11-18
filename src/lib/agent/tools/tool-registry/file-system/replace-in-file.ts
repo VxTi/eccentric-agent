@@ -69,7 +69,9 @@ export const replaceInFile = createTool({
 
   async handle({ filePath, line, count, replacement }) {
     const {
-      agent: { fileCache },
+      agent: {
+        agent: { fileCache },
+      },
       fileSystem: { cwd },
     } = store.getState();
     const absolutePath = path.resolve(cwd, filePath);

@@ -18,7 +18,7 @@ export function isCommand(input: string): input is Command {
 export function getCommandSuggestions(): Suggestion[] {
   return [
     ...SUPPORTED_COMMANDS,
-    ...store.getState().agent.skills.map(s => ({
+    ...store.getState().agent.agent.skills.map(s => ({
       value: s.name,
       description: ellipsize(s.description, 100, Position.END),
     })),

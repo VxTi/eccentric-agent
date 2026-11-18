@@ -9,6 +9,7 @@ import {
   type TextStreamPart,
   type ToolSet,
 } from 'ai';
+import chalk from 'chalk';
 import { EventEmitter } from 'node:events';
 import { v7 as uuid } from 'uuid';
 import { type TokenConsumeProps, TokenSource } from '../events/events';
@@ -21,10 +22,15 @@ import { discoverSkillFiles } from './skills/discovery';
 import { constructSystemPrompt } from './system-prompt';
 import { makeToolSet, toolRegistry } from './tools';
 
+export interface AgentStatus {
+  loading: boolean;
+  text?: string;
+}
+
 interface EventMap {
-  'message-delta': Message[];
-  'reasoning-delta': Message[];
-  'tokens-consumed': TokenConsumeProps[];
+  'message-delta': [Message];
+  'tokens-consumed': [TokenConsumeProps];
+  'status-change': [AgentStatus];
 }
 
 export class Agent extends EventEmitter<EventMap> {
@@ -36,11 +42,14 @@ export class Agent extends EventEmitter<EventMap> {
   private readonly _toolset: ToolSet;
   private readonly _skills: Map<SkillName, AgentSkill>;
   private readonly _activeSkills: Map<SkillName, AgentSkill>;
+  private readonly _messageQueue: string[] = [];
+  private _status: AgentStatus = { loading: false, text: '' };
+  private _gitIgnore: Set<string>;
 
   public constructor(
     private readonly signal: AbortSignal,
     private readonly _cwd: string,
-    private readonly _gitIgnore: Set<string> = new Set()
+    gitIgnore: Set<string> = new Set()
   ) {
     super();
     this._taskList = new TaskList();
@@ -49,11 +58,44 @@ export class Agent extends EventEmitter<EventMap> {
     this._skills = new Map();
     this._notifier = new Notifier();
     this._mcpServers = new Set<MCP>();
+    this._gitIgnore = gitIgnore;
     this._toolset = makeToolSet(toolRegistry, this._notifier, this.signal);
+  }
+
+  public get status(): AgentStatus {
+    return this._status;
+  }
+
+  public get taskList(): TaskList {
+    return this._taskList;
+  }
+
+  public get fileCache(): FileCache {
+    return this._fileCache;
+  }
+
+  public get mcpServers(): MCP[] {
+    return Array.from(this._mcpServers);
+  }
+
+  public findSkill(name: string): AgentSkill | undefined {
+    return this._skills.get(name);
+  }
+
+  public get skills(): AgentSkill[] {
+    return Array.from(this._skills.values());
+  }
+
+  public setGitIgnore(gitIgnore: Set<string>): void {
+    this._gitIgnore = gitIgnore;
   }
 
   public loadSkill(skill: AgentSkill): void {
     this._skills.set(skill.name, skill);
+  }
+
+  public activateSkill(skill: AgentSkill): void {
+    this._activeSkills.set(skill.name, skill);
   }
 
   public async loadSkills(): Promise<boolean> {
@@ -78,13 +120,13 @@ export class Agent extends EventEmitter<EventMap> {
     this._mcpServers.add(mcpServer);
   }
 
-  public async submitMessage(message: string) {
-    this._modelMessages.push({ role: 'user', content: message });
-    await this.processRequest();
-  }
-
-  private async processRequest(): Promise<void> {
-    const systemPrompt = await constructSystemPrompt({
+  /**
+   * Builds the system prompt from the agent's current state (skills, tasks,
+   * MCP servers, working directory). Exposed so the UI can render the prompt
+   * on demand; `processRequest` uses it for every turn.
+   */
+  public async buildSystemPrompt(): Promise<string> {
+    return constructSystemPrompt({
       activeSkills: this._activeSkills,
       fileCache: this._fileCache,
       mcpServers: this._mcpServers,
@@ -93,6 +135,45 @@ export class Agent extends EventEmitter<EventMap> {
       skills: this._skills,
       gitIgnore: this._gitIgnore,
     });
+  }
+
+  /**
+   * Discards the current conversation. The user-facing message list is owned by
+   * the UI layer and cleared separately.
+   */
+  public clear(): void {
+    this._modelMessages.length = 0;
+    this._messageQueue.length = 0;
+    this.setStatus({ loading: false, text: '' });
+  }
+
+  public async submitMessage(message: string): Promise<void> {
+    // A turn is already running: queue the message and let the active turn
+    // drain it once it finishes, preserving submission order.
+    if (this._status.loading) {
+      this._messageQueue.push(message);
+      return;
+    }
+
+    this.emit('message-delta', { id: uuid(), type: 'user', content: message });
+    this._modelMessages.push({ role: 'user', content: message });
+    await this.processRequest();
+
+    const next = this._messageQueue.shift();
+    if (isNonEmptyString(next)) {
+      await this.submitMessage(next);
+    }
+  }
+
+  private setStatus(status: AgentStatus): void {
+    this._status = status;
+    this.emit('status-change', status);
+  }
+
+  private async processRequest(): Promise<void> {
+    this.setStatus({ loading: true, text: '' });
+
+    const systemPrompt = await this.buildSystemPrompt();
 
     const result = streamText({
       allowSystemInMessages: true,
@@ -125,8 +206,7 @@ export class Agent extends EventEmitter<EventMap> {
       await this.handleResponseStream(result.stream);
 
       const finalStep = await result.finalStep;
-      const response = finalStep.response;
-      this._modelMessages.push(...response.messages);
+      this._modelMessages.push(...finalStep.response.messages);
     } catch (err: unknown) {
       this.emit('message-delta', {
         type: 'generic',
@@ -134,13 +214,16 @@ export class Agent extends EventEmitter<EventMap> {
         failure: true,
         content: `Something went wrong whilst responding: ${String(err)}`,
       });
+      this.setStatus({ loading: false, text: chalk.red('Fatal error') });
+      return;
     }
-    return;
+
+    this.setStatus({ loading: false, text: '' });
   }
 
   private async handleResponseStream(
     stream: AsyncIterableStream<TextStreamPart<ToolSet>>
-  ) {
+  ): Promise<void> {
     const messages = new Map<string, string>();
     const reasoning = new Map<string, string>();
 
@@ -150,9 +233,8 @@ export class Agent extends EventEmitter<EventMap> {
           case 'text-start':
             messages.set(part.id, '');
             break;
-          case 'text-delta':
-            const initialContent = messages.get(part.id) ?? '';
-            const updated = initialContent + part.text;
+          case 'text-delta': {
+            const updated = (messages.get(part.id) ?? '') + part.text;
             messages.set(part.id, updated);
 
             if (isNonEmptyString(updated)) {
@@ -163,12 +245,12 @@ export class Agent extends EventEmitter<EventMap> {
               });
             }
             break;
+          }
           case 'reasoning-start':
             reasoning.set(part.id, '');
             break;
-          case 'reasoning-delta':
-            const reasoningContent = reasoning.get(part.id) ?? '';
-            const rUpdated = reasoningContent + part.text;
+          case 'reasoning-delta': {
+            const rUpdated = (reasoning.get(part.id) ?? '') + part.text;
             reasoning.set(part.id, rUpdated);
 
             if (!isNonEmptyString(rUpdated)) break;
@@ -179,6 +261,7 @@ export class Agent extends EventEmitter<EventMap> {
               content: rUpdated,
             });
             break;
+          }
           case 'reasoning-end':
             reasoning.delete(part.id);
         }
@@ -190,12 +273,6 @@ export class Agent extends EventEmitter<EventMap> {
         failure: true,
         content: `Something went wrong whilst responding: ${String(err)}`,
       });
-
-      return;
     }
-  }
-
-  private get activeSkills(): AgentSkill[] {
-    return Array.from(this._activeSkills.values());
   }
 }

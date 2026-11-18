@@ -64,8 +64,9 @@ async function createFileImpl({
   content,
 }: z.infer<typeof inputSchema>) {
   const {
-    agent: { fileCache },
+    agent: { agent },
   } = store.getState();
+  const { fileCache } = agent;
   const override = overwrite ?? false;
 
   const alreadyExists = await safeExists(filePath);

@@ -1,11 +1,11 @@
-import { isNil, type Nullable } from '@vxti/typed';
+import type { MCP } from './mcp/mcp';
+import type { AgentSkill, SkillName } from './skills/common';
+import type { FileCache } from '../file-cache';
+import { type TaskList, TaskStatus } from '../tasks';
+import { type Nullable, isNil } from '@vxti/typed';
 import { first, compact } from 'lodash-es';
 import fs from 'node:fs';
 import { CONSTANT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT } from '../constants';
-import { type TaskList, TaskStatus } from '../tasks';
-import { MCP } from './mcp/mcp';
-import { AgentSkill, SkillName } from './skills/common';
-import { FileCache } from '../file-cache';
 
 const OPERATING_GUIDE = `# Working efficiently
 
@@ -82,7 +82,7 @@ export async function constructSystemPrompt({
       ' tool to invoke them if the current context relates to the description:',
     skillsSummary,
     'You possess the following skills, which you must obey / utilise:\n',
-    Object.entries(activeSkills)
+    Array.from(activeSkills.entries())
       .map(([skillName, skill]) => ` ${skillName}:    ${skill.content}`)
       .join('\n\n'),
     `The following MCP servers are available:\n${mcpServerNames}\nUse 'list_mcp_tools' to discover tools (no 'toolName' → name+description list; with a specific 'toolName' → that tool's full input/output schema). Always fetch the schema for a specific tool before invoking it via 'call_mcp_tool'.`,

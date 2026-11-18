@@ -8,7 +8,10 @@ export interface AppState {
   };
 }
 
-const defaultController = new AbortController();
+// Shared across the app: ctrl+C (user input) and the `exit`/`quit` commands
+// abort this controller, and the agent runs its inference against its signal so
+// those actions interrupt an in-flight turn.
+export const defaultController = new AbortController();
 const initialState: AppState = {
   controller: defaultController,
   io: {

@@ -73,7 +73,9 @@ export const readFile = createTool({
 
   async handle({ filePath, selection }) {
     const {
-      agent: { fileCache },
+      agent: {
+        agent: { fileCache },
+      },
       fileSystem: { cwd },
     } = store.getState();
 

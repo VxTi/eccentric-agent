@@ -51,7 +51,7 @@ export const updateTaskList = createTool({
   handle({ updates }) {
     const {
       agent: { taskList },
-    } = store.getState();
+    } = store.getState().agent;
 
     if (!taskList.hasTasks) {
       return Result.Error(
