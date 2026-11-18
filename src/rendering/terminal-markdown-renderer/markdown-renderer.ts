@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import { marked } from 'marked';
 import { githubDark } from './code-highlight-theme';
 import { HEADINGS, TerminalRenderer } from './terminal-markdown-renderer';
-import { type TerminalMarked } from './types';
+import type { TerminalMarked } from './types';
 
 export const basicHighlightFormatting = chalk.rgb(165, 214, 255);
 

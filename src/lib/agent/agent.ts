@@ -226,7 +226,6 @@ export class Agent extends EventEmitter<EventMap> {
     stream: AsyncIterableStream<TextStreamPart<ToolSet>>
   ): Promise<void> {
     const messages = new Map<string, string>();
-    const reasoning = new Map<string, string>();
 
     try {
       for await (const part of stream) {

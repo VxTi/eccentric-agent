@@ -14,17 +14,64 @@ import { highlight as highlightCli } from 'cli-highlight';
 import ansiEscapes from 'ansi-escapes';
 import supportsHyperlinks from 'supports-hyperlinks';
 import ansiRegex from 'ansi-regex';
-import { generateSideBySideDiff } from '../../lib/utils/diff-utils';
-import { ellipsize, Position } from '../../lib/utils/string-utils';
-import { type TerminalMarked } from './types';
+import {
+  generateSideBySideDiff,
+  type DiffLine,
+} from '../../lib/utils/diff-utils';
+import { Position } from '../../lib/utils/string-utils';
+import type { TerminalMarked } from './types';
 
 const DEFAULT_INDENTATION = 2;
 const DEFAULT_LANG = 'plaintext';
 
 const ANSI_REGEXP = ansiRegex();
+const ESC = '\u001b';
+const ANSI_RESET = `${ESC}[0m`;
+// Captures SGR sequences so `split` retains them as alternate array entries.
+const ANSI_FRAGMENT_RE = new RegExp(`(${ESC}\\[[0-9;]*m)`);
 
 export const DIFF_LANG = 'diff';
 export const DIFF_SEPARATOR = '---DIFF_SEPARATOR---';
+
+const DIFF_LANG_PREFIX = `${DIFF_LANG}:`;
+
+/**
+ * The language a fenced block's *content* is written in.
+ *
+ * ` ```diff ` carries no information about the language being diffed, so it
+ * resolves to plain text. ` ```diff:typescript ` states it explicitly, which is
+ * the only way to highlight both columns as real code. Returns null when the
+ * block is not a diff at all.
+ */
+function parseDiffLanguage(lang: string | undefined): string | null {
+  if (lang === DIFF_LANG) return DEFAULT_LANG;
+  if (isNonEmptyString(lang) && lang.startsWith(DIFF_LANG_PREFIX)) {
+    return lang.slice(DIFF_LANG_PREFIX.length);
+  }
+  return null;
+}
+
+/**
+ * The highlighted text for one line of a diff side, addressed by the 1-based
+ * line number the diff algorithm recorded against it.
+ */
+function diffSideLine(side: string[], lineNumber: number | undefined): string {
+  if (!isNotNil(lineNumber)) return '';
+  return side[lineNumber - 1] ?? '';
+}
+/** Characters a row spends on everything that is not cell content. */
+const DIFF_COLUMN_OVERHEAD = 5; // '<num> <cell> | <num> <cell>'
+const DIFF_MIN_COL_WIDTH = 10;
+
+const DIFF_REMOVED_MARKER = '- ';
+const DIFF_ADDED_MARKER = '+ ';
+const DIFF_NEUTRAL_MARKER = '  ';
+
+const DIFF_TRUNCATION_MARK = '...';
+const DIFF_ELLISION = '—';
+
+const DIFF_REMOVED_BG = chalk.bgRed;
+const DIFF_ADDED_BG = chalk.bgRgb(30, 150, 34);
 
 // HARD_RETURN holds a character sequence used to indicate text has a
 // hard (no-reflowing) line break.  Previously \r and \r\n were turned
@@ -49,7 +96,6 @@ const defaultOptions: TerminalMarked.RendererOptions = {
   del: chalk.dim.gray.strikethrough,
   link: chalk.blue,
   href: chalk.blue.underline,
-  maxWidth: 80,
   reflowText: false,
   indentation: 4,
 };
@@ -66,7 +112,7 @@ export class TerminalRenderer extends Renderer {
   ) {
     super(markedOptions);
     this.config = { ...defaultOptions, ...options };
-    this.shellWidth = options.maxWidth ?? process.stdout.columns;
+    this.shellWidth = process.stdout.columns;
   }
 
   public textLength(input: string): number {
@@ -74,20 +120,17 @@ export class TerminalRenderer extends Renderer {
   }
 
   public override code({ text, lang }: Tokens.Code) {
+    const contentLang = parseDiffLanguage(lang);
     let renderedContent: string;
 
-    if (lang === DIFF_LANG) {
+    if (isNotNil(contentLang)) {
       const parts = text.split(DIFF_SEPARATOR);
-      if (parts.length === 2) {
-        const oldStr = parts[0] ?? '';
-        const newStr = parts[1] ?? '';
-        renderedContent = this.renderDiff(oldStr, newStr, lang);
-      } else {
-        // Fallback for 'diff' language if separator is not found
-        renderedContent = this.highlightCode(text, lang);
-      }
+
+      renderedContent =
+        parts.length === 2
+          ? this.renderDiff(parts[0] ?? '', parts[1] ?? '', contentLang)
+          : this.highlightCode(text, contentLang);
     } else {
-      // Original behavior for other languages
       renderedContent = this.highlightCode(text, lang ?? DEFAULT_LANG);
     }
 
@@ -175,80 +218,201 @@ export class TerminalRenderer extends Renderer {
     return this.config.html?.(text) ?? text;
   }
 
+  /**
+   * Renders `oldStr` -> `newStr` as two aligned columns.
+   *
+   * `lang` is the language of the *content*, not of the diff itself; it is
+   * what the two sides are highlighted as.
+   */
   public renderDiff(
     oldStr: string,
     newStr: string,
     lang: string = DEFAULT_LANG
   ): string {
-    const diff = generateSideBySideDiff(oldStr, newStr);
-    const lineNumberWidth = String(
+    const rows = generateSideBySideDiff(oldStr, newStr);
+    if (!isNonEmptyArray(rows)) return '';
+
+    const numberWidth = String(
       Math.max(oldStr.split('\n').length, newStr.split('\n').length)
     ).length;
 
-    // Layout per row:
-    //   "<LN> <leftCol> | <LN> <rightCol>"
-    //   = lineNumberWidth + 1 + colWidth + 1 + 1 + 1 + lineNumberWidth + 1 + colWidth
-    //   = 2*lineNumberWidth + 2*colWidth + 5
-    const fixedOverhead = 2 * lineNumberWidth + 5;
-    const colWidth = Math.max(10, Math.floor((this.width - fixedOverhead) / 2));
+    // A row is "<num> <cell> | <num> <cell>", so the non-cell cost is
+    // 2 * numberWidth + DIFF_COLUMN_OVERHEAD. Floor the cell width so a
+    // narrow terminal stays legible instead of collapsing to nothing.
+    const colWidth = Math.max(
+      DIFF_MIN_COL_WIDTH,
+      Math.floor((this.width - 2 * numberWidth - DIFF_COLUMN_OVERHEAD) / 2)
+    );
 
-    const result: string[] = [];
+    // Highlight each side as a single block, then index it by line number.
+    // Highlighting per line loses the state of any token that spans a line
+    // break (block comment, template literal, multi-line literal), which is
+    // most of what a diff of real code contains.
+    const oldLines = this.highlightDiffSide(oldStr, lang);
+    const newLines = this.highlightDiffSide(newStr, lang);
 
-    diff.forEach(([left, right], i) => {
-      if ((left.collapsed || right.collapsed) && i + 1 < diff.length) {
-        const gap = chalk.dim('—'.repeat(colWidth));
-        const blankLn = ' '.repeat(lineNumberWidth);
-        result.push(`${blankLn} ${gap} | ${blankLn} ${gap}`);
-        return;
+    const lines = rows.map(([left, right]) => {
+      if (left.collapsed || right.collapsed) {
+        return this.collapsedRow(numberWidth, colWidth);
       }
 
-      const leftLineNumber = isNotNil(left.lineNumberOriginal)
-        ? String(left.lineNumberOriginal).padStart(lineNumberWidth, ' ')
-        : ' '.repeat(lineNumberWidth);
-      const rightLineNumber = isNotNil(right.lineNumberModified)
-        ? String(right.lineNumberModified).padStart(lineNumberWidth, ' ')
-        : ' '.repeat(lineNumberWidth);
+      const row = [
+        this.diffNumber(left.lineNumberOriginal, numberWidth),
+        this.diffCell(
+          diffSideLine(oldLines, left.lineNumberOriginal),
+          left,
+          colWidth,
+          Position.END
+        ),
+        this.diffNumber(right.lineNumberModified, numberWidth),
+        this.diffCell(
+          diffSideLine(newLines, right.lineNumberModified),
+          right,
+          colWidth,
+          Position.START
+        ),
+      ].join(' ');
 
-      const leftPrefix = left.removed ? '- ' : left.added ? '+ ' : '  ';
-      const rightPrefix = right.added ? '+ ' : right.removed ? '- ' : '  ';
-
-      // Reserve 2 chars for the prefix; truncate plain text BEFORE highlighting
-      // so the ANSI escapes stay intact.
-      const contentMax = colWidth - leftPrefix.length;
-      let leftContent = ellipsize(left.value, contentMax, Position.END);
-      let rightContent = ellipsize(right.value, contentMax, Position.START);
-
-      if (isNonEmptyString(lang) && this.isFormattingEnabled) {
-        try {
-          if (isNonEmptyString(leftContent)) {
-            leftContent = this.highlightCode(leftContent, lang);
-          }
-          if (isNonEmptyString(rightContent)) {
-            rightContent = this.highlightCode(rightContent, lang);
-          }
-        } catch (error) {
-          console.error(`Highlighting error for language ${lang}:`, error);
-        }
-      }
-
-      if (left.removed) leftContent = chalk.bgRed(leftContent);
-      if (right.added) rightContent = chalk.bgRgb(30, 150, 34)(rightContent);
-
-      const paddedLeftContent = this.padRight(
-        leftPrefix + leftContent,
-        colWidth
-      );
-      const paddedRightContent = this.padRight(
-        rightPrefix + rightContent,
-        colWidth
-      );
-
-      result.push(
-        `${chalk.dim(leftLineNumber)} ${paddedLeftContent} | ${chalk.dim(rightLineNumber)} ${paddedRightContent}`
-      );
+      // Clipping can cut a highlighted line inside an escape sequence, and the
+      // background wrappers only close their own background. Terminate the row
+      // so nothing bleeds into the next one or into the rest of the frame.
+      return row.includes(ESC) ? `${row}${ANSI_RESET}` : row;
     });
 
-    return result.join('\n');
+    return lines.join('\n');
+  }
+
+  private diffNumber(lineNumber: number | undefined, width: number): string {
+    if (!isNotNil(lineNumber)) return ' '.repeat(width);
+    return chalk.dim(String(lineNumber).padStart(width, ' '));
+  }
+
+  private diffCell(
+    source: string,
+    line: DiffLine,
+    width: number,
+    at: Position
+  ): string {
+    const marker = line.removed
+      ? DIFF_REMOVED_MARKER
+      : line.added
+        ? DIFF_ADDED_MARKER
+        : DIFF_NEUTRAL_MARKER;
+
+    // Clip after highlighting: the escape sequences are zero-width, so this is
+    // the only order that both preserves colour and fills the column.
+    const cell = this.padRight(
+      marker + this.clipAnsi(source, width - marker.length, at),
+      width
+    );
+
+    if (line.removed) return DIFF_REMOVED_BG(cell);
+    if (line.added) return DIFF_ADDED_BG(cell);
+    return cell;
+  }
+
+  private collapsedRow(numberWidth: number, colWidth: number): string {
+    const blank = ' '.repeat(numberWidth);
+    const rule = chalk.dim(DIFF_ELLISION.repeat(colWidth));
+
+    return `${blank} ${rule} | ${blank} ${rule}`;
+  }
+
+  /**
+   * Highlights `source` once and returns it split back into lines, each entry
+   * corresponding to the same-indexed line of `source`. Falls back to the
+   * plain lines whenever highlighting cannot be trusted to be line-aligned.
+   */
+  private highlightDiffSide(source: string, lang: string): string[] {
+    const plain = source.split('\n');
+
+    if (!this.isFormattingEnabled || !isNonEmptyString(lang)) return plain;
+    if (lang === DEFAULT_LANG) return plain;
+
+    let highlighted: string;
+    try {
+      highlighted = highlightCli(source, {
+        language: lang,
+        ...this.config.codeHighlighting,
+      });
+    } catch {
+      // Highlighting is decorative; plain text is still a correct diff.
+      return plain;
+    }
+
+    // cli-highlight terminates a multi-line block with a newline but not a
+    // single-line one, so normalise before splitting.
+    if (highlighted.endsWith('\n')) {
+      highlighted = highlighted.slice(0, -1);
+    }
+
+    const lines = highlighted.split('\n');
+
+    // A highlighter that rewraps or expands would shift every row against its
+    // line number. Misaligned colour is worse than no colour.
+    return lines.length === plain.length ? lines : plain;
+  }
+
+  /**
+   * Truncates to `maxWidth` *display* characters while keeping the escape
+   * sequences attached to the text they decorate. Unlike `ellipsize`, which
+   * counts escape bytes as if they were visible.
+   */
+  private clipAnsi(text: string, maxWidth: number, at: Position): string {
+    if (maxWidth <= 0) return '';
+    if (this.textLength(text) <= maxWidth) return text;
+
+    const budget = maxWidth - DIFF_TRUNCATION_MARK.length;
+    const fragments = text.split(ANSI_FRAGMENT_RE);
+    const kept: string[] = [];
+
+    if (at === Position.START) {
+      // Retain the tail, but carry the escapes that preceded it so the
+      // surviving text keeps the colours it was rendered with.
+      let skip = this.textLength(text) - budget;
+      const pending: string[] = [];
+
+      for (const fragment of fragments) {
+        if (this.textLength(fragment) === 0) {
+          if (skip > 0) pending.push(fragment);
+          continue;
+        }
+
+        const characters = [...fragment];
+
+        if (skip > 0) {
+          if (characters.length <= skip) {
+            skip -= characters.length;
+            continue;
+          }
+
+          kept.push(...pending, ...characters.slice(skip));
+          skip = 0;
+          continue;
+        }
+
+        kept.push(...characters);
+      }
+
+      return `${DIFF_TRUNCATION_MARK}${kept.join('')}`;
+    }
+
+    let used = 0;
+
+    for (const fragment of fragments) {
+      if (used >= budget) break;
+
+      if (this.textLength(fragment) === 0) {
+        kept.push(fragment);
+        continue;
+      }
+
+      const characters = [...fragment].slice(0, budget - used);
+      kept.push(...characters);
+      used += characters.length;
+    }
+
+    return `${kept.join('')}${DIFF_TRUNCATION_MARK}`;
   }
 
   public override heading({ tokens, depth, text }: Tokens.Heading): string {

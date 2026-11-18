@@ -6,7 +6,7 @@ import { Result } from '../../../../result';
 import { ellipsize, Position } from '../../../../utils/string-utils';
 import { createTool } from '../../tool-definition';
 
-const MAX_SHOWN_FILE_COUNT = 5;
+const MAX_SHOWN_FILE_COUNT = 4;
 
 const inputSchema = z.object({
   directoryPath: z
@@ -87,7 +87,7 @@ export const findFile = createTool({
       : files;
 
     const formattedFiles = shownFiles
-      .map(file => `- **${ellipsize(file, 64, Position.MIDDLE)}**`)
+      .map(file => `- **${ellipsize(file, 40, Position.MIDDLE)}**`)
       .join('\n');
     return `Found ${files.length} file${files.length !== 1 ? 's' : ''} matching ${pattern}:\n\n${formattedFiles}${
       limitVisibleFiles

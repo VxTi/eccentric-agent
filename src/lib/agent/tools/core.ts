@@ -61,7 +61,7 @@ function makeTool(
 
         const [chosen] = await requestUserInput({
           title: 'Approval required',
-          description: `Tool \`${tool.name}\` requires approval:\n ${tool.formatArguments(input)}`,
+          description: `Tool \`${tool.name}\` requires approval:\n\n${tool.formatArguments(input)}`,
           options: options.map(opt => ({
             label: opt.text,
             id: opt.option,

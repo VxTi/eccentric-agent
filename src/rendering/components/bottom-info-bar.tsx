@@ -46,7 +46,7 @@ export function BottomInfoBar(): ReactNode {
       gap={1}
       width="100%"
       flexWrap="wrap"
-      justifyContent="space-between"
+      justifyContent="flex-start"
     >
       <Text color="gray">
         ↑ {formatTokenCount(input)} • ↓ {formatTokenCount(output)}

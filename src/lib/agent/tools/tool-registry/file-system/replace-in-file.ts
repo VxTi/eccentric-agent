@@ -1,5 +1,5 @@
 import { isEmptyString, isNonEmptyArray } from '@vxti/typed';
-import { readFile, writeFile } from 'fs/promises';
+import { access, readFile, writeFile } from 'fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
 import { Result } from '../../../../result';
@@ -32,8 +32,8 @@ const inputSchema = z.object({
     .string()
     .describe(
       'The text to insert in place of the removed range. May contain multiple lines' +
-        ' separated by `\\n`, or be empty to delete the range entirely. Inserted verbatim;' +
-        ' a trailing `\\n` is treated as part of the block, not as a separator.'
+        ' separated by `\\n`, or be empty to delete the range entirely. A trailing `\\n`' +
+        ' is a separator and is dropped; the file keeps its own trailing-newline state.'
     ),
 });
 
@@ -57,9 +57,8 @@ export const replaceInFile = createTool({
     '  • `line` is 1-based; `count` must be >= 1.\n' +
     '  • `line + count - 1` must not exceed the file line count.\n' +
     '  • `replacement` may span multiple lines separated by `\\n`, or be empty to delete' +
-    '    the range. A trailing `\\n` in `replacement` is treated as part of the block,' +
-    '    not as a separator.\n' +
-    "  • The file's original trailing-newline state is preserved.\n" +
+    '    the range. A trailing `\\n` in `replacement` is a separator and is dropped.\n' +
+    "  • The file's original line ending and trailing-newline state are preserved.\n" +
     '  • If the file changed on disk since it was last read in this session, the operation' +
     '    is rejected so you can re-read and retry against fresh content.',
   inputSchema,
@@ -75,6 +74,11 @@ export const replaceInFile = createTool({
       fileSystem: { cwd },
     } = store.getState();
     const absolutePath = path.resolve(cwd, filePath);
+
+    if (!(await exists(absolutePath))) {
+      return Result.Error(`No file exists at \`${absolutePath}\`.`);
+    }
+
     if (await fileCache.isRecentlyModified(absolutePath)) {
       return Result.Error(
         'File changed on disk since it was last read in this session. Please re-read and retry.'
@@ -82,9 +86,10 @@ export const replaceInFile = createTool({
     }
 
     const original = await readFile(absolutePath, 'utf-8');
-    const lines = isEmptyString(original, true) ? [] : original.split('\n');
+    const newline = original.match(/\r?\n/)?.[0] ?? '\n';
+    const lines = original.split(newline);
 
-    const hadTrailingNewline = original.endsWith('\n');
+    const hadTrailingNewline = original.endsWith(newline);
     if (hadTrailingNewline) lines.pop();
 
     if (line < 1 || line > lines.length) {
@@ -104,7 +109,7 @@ export const replaceInFile = createTool({
 
     const replacementLines = isEmptyString(replacement)
       ? []
-      : replacement.split('\n');
+      : replacement.split(/\r?\n/);
     if (
       replacementLines.length > 1 &&
       replacementLines[replacementLines.length - 1] === ''
@@ -114,12 +119,9 @@ export const replaceInFile = createTool({
 
     lines.splice(line - 1, count, ...replacementLines);
 
-    let updated = lines.join('\n');
-    if (
-      (hadTrailingNewline || isEmptyString(original)) &&
-      isNonEmptyArray(lines)
-    ) {
-      updated += '\n';
+    let updated = lines.join(newline);
+    if (hadTrailingNewline && isNonEmptyArray(lines)) {
+      updated += newline;
     }
     await writeFile(absolutePath, updated, 'utf-8');
     await fileCache.update(absolutePath);
@@ -143,7 +145,7 @@ export const replaceInFile = createTool({
     const range =
       count === 1 ? `line ${line}` : `lines ${line}-${line + count - 1}`;
 
-    return `Editing ${range} in \`${fileName}\`:\n\`\`\`${replacement}\`\`\``;
+    return `Editing ${range} in \`${fileName}\`:\n\n\`\`\`\n${replacement}\n\`\`\``;
   },
 
   inputToString({ filePath, line, count }) {
@@ -158,3 +160,12 @@ export const replaceInFile = createTool({
     return `Edited \`${fileName}\`\n\n${formatDiffMd(previous, current)}`;
   },
 });
+
+async function exists(target: string): Promise<boolean> {
+  try {
+    await access(target);
+    return true;
+  } catch {
+    return false;
+  }
+}

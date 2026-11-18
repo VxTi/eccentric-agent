@@ -157,7 +157,7 @@ export const grep = createTool({
 
   outputToString({ matches }, _, { pattern }): string {
     if (matches.length === 0) {
-      return `Found no matches for \`${pattern}\`.`;
+      return `Found no matches for pattern \`${pattern}\`.`;
     }
 
     const limitVisible = matches.length > MAX_SHOWN_MATCHES;
@@ -171,7 +171,7 @@ export const grep = createTool({
       )
       .join('\n');
 
-    return `Found ${matches.length} match${matches.length === 1 ? '' : 'es'}:\n\n${formatted}\n${
+    return `Found ${matches.length} match${matches.length === 1 ? '' : 'es'} for pattern \`${pattern}\`:\n\n${formatted}\n${
       limitVisible ? `\n... and ${matches.length - MAX_SHOWN_MATCHES} more` : ''
     }`;
   },

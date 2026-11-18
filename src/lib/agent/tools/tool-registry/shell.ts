@@ -1,9 +1,10 @@
+import { isNonEmptyArray, isNotNil } from '@vxti/typed';
+import { exec } from 'child_process';
 import { type ExecException } from 'node:child_process';
 import * as z from 'zod';
 import { Result } from '../../../result';
-import { exec } from 'child_process';
+import { ellipsize, Position } from '../../../utils/string-utils';
 import { createTool, ToolSelectionOption } from '../tool-definition';
-import { isNonEmptyArray, isNotNil } from '@vxti/typed';
 
 const inputSchema = z.object({
   command: z
@@ -154,11 +155,14 @@ export const shell = createTool({
     return [
       { option: Option.APPROVE, text: 'Allow' },
       { option: Option.DENY, text: 'Deny' },
-      { option: Option.TRUST, text: `Trust '${command}'` },
+      {
+        option: Option.TRUST,
+        text: `Trust '${ellipsize(command, 64, Position.END)}'`,
+      },
     ];
   },
 
-  formatArguments: ({ command }) => command,
+  formatArguments: ({ command }) => `\`\`\`shell\n${command}\n\`\`\``,
 
   inputToString({ command, timeoutMs }) {
     const timeoutStr =
