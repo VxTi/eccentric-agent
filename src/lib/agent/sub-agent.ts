@@ -85,6 +85,7 @@ ${message.content}`,
         model: getAppropriateModel(TaskComplexity.MEDIUM),
         messages: this.messages,
         abortSignal: this.signal,
+        reasoning: 'medium',
         onError: ({ error }) => {
           this.channel.notify({
             content: `An error occurred in agent task - ${String(error)}`,

@@ -7,6 +7,7 @@ export const enum EventName {
   REQUEST_INPUT = 'request-user-input',
   INPUT_RESPONSE = 'user-input-response',
   AGENT_MESSAGE = 'agent-message',
+  AGENT_REASONING = 'agent-reasoning',
   CONSUME_TOKENS = 'consume-tokens',
 }
 
@@ -43,6 +44,20 @@ export class AgentMessageEvent extends CustomEvent<Message> {
   }
 }
 
+/**
+ * Whether the model is presently producing reasoning. The reasoning text itself
+ * is not surfaced yet — the UI derives a fixed indicator from this flag.
+ */
+export interface ReasoningState {
+  active: boolean;
+}
+
+export class AgentReasoningEvent extends CustomEvent<ReasoningState> {
+  constructor(detail: ReasoningState) {
+    super(EventName.AGENT_REASONING, { detail });
+  }
+}
+
 export const enum TokenSource {
   PRIMARY = 'primary',
   // Secondary tasks are those that don't fill the main context window (e.g., sub agents)
@@ -64,6 +79,7 @@ const EventConstructorRegistry = {
   [EventName.REQUEST_INPUT]: UserInputRequestEvent,
   [EventName.INPUT_RESPONSE]: UserInputResponseEvent,
   [EventName.AGENT_MESSAGE]: AgentMessageEvent,
+  [EventName.AGENT_REASONING]: AgentReasoningEvent,
   [EventName.CONSUME_TOKENS]: ConsumeTokenEvent,
 } as const satisfies Record<EventName, any>;
 
@@ -71,6 +87,7 @@ type EventRegistry = {
   [EventName.REQUEST_INPUT]: UserInputRequestEvent;
   [EventName.INPUT_RESPONSE]: UserInputResponseEvent;
   [EventName.AGENT_MESSAGE]: AgentMessageEvent;
+  [EventName.AGENT_REASONING]: AgentReasoningEvent;
   [EventName.CONSUME_TOKENS]: ConsumeTokenEvent;
 };
 

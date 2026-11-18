@@ -3,7 +3,7 @@ import * as z from 'zod';
 import { Result } from '../../../result';
 import { exec } from 'child_process';
 import { createTool, ToolSelectionOption } from '../tool-definition';
-import { isNonEmptyArray } from '@vxti/typed';
+import { isNonEmptyArray, isNotNil } from '@vxti/typed';
 
 const inputSchema = z.object({
   command: z
@@ -160,7 +160,14 @@ export const shell = createTool({
 
   formatArguments: ({ command }) => command,
 
-  inputToString: ({ command }) => `Shell \`${command}\``,
+  inputToString({ command, timeoutMs }) {
+    const timeoutStr =
+      isNotNil(timeoutMs) && timeoutMs > 0
+        ? `with timeout \`${timeoutMs}ms\``
+        : '';
+
+    return `Shell \`${command}\` ${timeoutStr}`;
+  },
   outputToString({ exitCode, stderr, stdout }, _, { command }) {
     if (exitCode === 0) {
       const lines = stdout.split('\n');

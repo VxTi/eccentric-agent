@@ -47,7 +47,9 @@ function prefixWithLineNumbers(
   newline: string,
   offset: number = 0
 ): string {
-  const width = String(lines.length).length;
+  const maxLineNumber = lines.length + offset;
+  const width = String(maxLineNumber).length;
+
   return lines
     .map(
       (line, i) =>
@@ -122,12 +124,22 @@ function isValidSelection(
 
   const { fromLineNumber, lineCount } = selection;
 
-  return (
-    isNotNil(fromLineNumber) &&
-    isNotNil(lineCount) &&
-    fromLineNumber - MIN_LINE_NUMBER_OFFSET >= 0 &&
-    fromLineNumber - MIN_LINE_NUMBER_OFFSET + lines <= lineCount
+  const isValidFromLineNumber = isWithinRange(
+    fromLineNumber,
+    MIN_LINE_NUMBER_OFFSET,
+    lines
   );
+
+  if (isNil(lineCount)) {
+    return isValidFromLineNumber;
+  }
+
+  const endLineNumber = fromLineNumber + lineCount - 1;
+  return isValidFromLineNumber && lineCount >= 1 && endLineNumber <= lines;
+}
+
+function isWithinRange(input: number, min: number, max: number): boolean {
+  return input >= min && input <= max;
 }
 
 function getLines(
@@ -137,7 +149,7 @@ function getLines(
   if (isNil(selection)) return lines;
 
   const endOffset = isNotNil(selection.lineCount)
-    ? selection.fromLineNumber + selection.lineCount
+    ? selection.fromLineNumber + selection.lineCount - 1
     : undefined;
 
   return lines.slice(
@@ -149,5 +161,9 @@ function getLines(
 function formatSelection(selection: z.infer<typeof inputSchema>['selection']) {
   if (!selection) return '';
 
-  return ` (Line \`${selection.fromLineNumber + 1}\` → \`${isNotNil(selection.lineCount) ? selection.fromLineNumber + selection.lineCount : '...'}\`)`;
+  const ending = isNotNil(selection.lineCount)
+    ? selection.fromLineNumber + selection.lineCount
+    : '...';
+
+  return ` (Line \`${selection.fromLineNumber}\` → \`${ending}\`)`;
 }

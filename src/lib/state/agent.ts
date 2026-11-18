@@ -1,11 +1,15 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { Agent } from '../agent/agent';
+import type { ReasoningState } from '../events/events';
 import type { Message } from '../types/messages';
 import { defaultController } from './app';
 
 export interface AgentState {
   /** User-facing message log rendered by the UI. */
   messages: Message[];
+  /** Whether the model is currently reasoning, mirrored from the agent's
+   *  reasoning lifecycle events. Drives the UI's thinking indicator. */
+  reasoning: ReasoningState;
   /** The agent instance that owns all inference state (model messages, tasks,
    *  skills, MCP servers, file cache, status). It is the single source of truth
    *  for the agent; the UI only integrates with this instance. */
@@ -14,6 +18,7 @@ export interface AgentState {
 
 const initialState: AgentState = {
   messages: [],
+  reasoning: { active: false },
   agent: new Agent(defaultController.signal, process.cwd()),
 };
 
@@ -35,14 +40,22 @@ export const agentSlice = createSlice({
         state.messages[i] = action.payload;
       }
     },
+    setReasoning: (state, action: PayloadAction<ReasoningState>) => {
+      state.reasoning = action.payload;
+    },
     clearMessages: state => {
       state.messages = [];
     },
   },
 });
 
-export const { setMessages, addMessage, setMessage, clearMessages } =
-  agentSlice.actions;
+export const {
+  setMessages,
+  addMessage,
+  setMessage,
+  setReasoning,
+  clearMessages,
+} = agentSlice.actions;
 
 export const agent = {
   ...agentSlice.actions,

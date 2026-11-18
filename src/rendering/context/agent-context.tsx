@@ -13,9 +13,11 @@ import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
 import { EventName, eventOn } from '../../lib/events/events';
 import { Features } from '../../lib/feaures';
 import { useAppDispatch, useAppSelector, fetchGitInfo } from '../../lib/state';
-import { setMessage } from '../../lib/state/agent';
+import { setMessage, setReasoning } from '../../lib/state/agent';
 import type { Message } from '../../lib/types/messages';
 import { basicHighlightFormatting } from '../terminal-markdown-renderer/markdown-renderer';
+
+const THINKING_TEXT = basicHighlightFormatting('Thinking...');
 
 export interface AgentContextType {
   agent: Agent;
@@ -91,11 +93,24 @@ export function AgentProvider({
       dispatch(setMessage(detail))
     );
 
+    // Reasoning reaches the UI as a start/end flag rather than as status text,
+    // so fold it into the status line: a fixed indicator while the model thinks,
+    // and back to whatever the agent last reported once it stops.
+    const offReasoning = eventOn(EventName.AGENT_REASONING, ({ detail }) => {
+      dispatch(setReasoning(detail));
+      setStatus(prev =>
+        detail.active
+          ? { loading: true, text: THINKING_TEXT }
+          : { ...prev, text: '' }
+      );
+    });
+
     return () => {
       agent.off('message-delta', onMessage);
       agent.off('status-change', onStatus);
       agent.off('tokens-consumed', onTokens);
       offAgentMessage();
+      offReasoning();
     };
   }, [agent, dispatch]);
 

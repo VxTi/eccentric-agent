@@ -138,6 +138,14 @@ export const replaceInFile = createTool({
     );
   },
 
+  formatArguments({ filePath, line, count, replacement }) {
+    const fileName = path.basename(filePath);
+    const range =
+      count === 1 ? `line ${line}` : `lines ${line}-${line + count - 1}`;
+
+    return `Editing ${range} in \`${fileName}\`:\n\`\`\`${replacement}\`\`\``;
+  },
+
   inputToString({ filePath, line, count }) {
     const fileName = path.basename(filePath);
     const range =
