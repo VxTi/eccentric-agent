@@ -5,7 +5,7 @@ import { emitMessage } from '../../lib/events/messaging';
 import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
 import { TokenSource } from '../../lib/events/events';
 import { app, clearMessages, useAppDispatch } from '../../lib/state';
-import { useAgent } from '../context';
+import { useAgent } from '../hooks/use-agent';
 
 export function useCommandProcessor() {
   const { agent } = useAgent();

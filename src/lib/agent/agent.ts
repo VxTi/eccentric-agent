@@ -28,10 +28,21 @@ export interface AgentStatus {
   text?: string;
 }
 
+export enum ReasoningEffort {
+  NONE = 'none',
+  MINIMAL = 'minimal',
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  EXTRA_HIGH = 'xhigh',
+  MAX = 'max',
+}
+
 interface EventMap {
   'message-delta': [Message];
   'tokens-consumed': [TokenConsumeProps];
   'status-change': [AgentStatus];
+  'reasoning-effort-change': [ReasoningEffort];
 }
 
 export class Agent extends EventEmitter<EventMap> {
@@ -45,6 +56,7 @@ export class Agent extends EventEmitter<EventMap> {
   private readonly _activeSkills: Map<SkillName, AgentSkill>;
   private readonly _messageQueue: string[] = [];
   private _status: AgentStatus = { loading: false, text: '' };
+  private _reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM;
   private _gitIgnore: Set<string>;
 
   public constructor(
@@ -69,6 +81,15 @@ export class Agent extends EventEmitter<EventMap> {
 
   public get taskList(): TaskList {
     return this._taskList;
+  }
+
+  public get reasoningEffort(): ReasoningEffort {
+    return this._reasoningEffort;
+  }
+
+  public set reasoningEffort(effort: ReasoningEffort) {
+    this._reasoningEffort = effort;
+    this.emit('reasoning-effort-change', effort);
   }
 
   public get fileCache(): FileCache {
@@ -184,6 +205,7 @@ export class Agent extends EventEmitter<EventMap> {
         { content: systemPrompt, role: 'system' },
         ...this._modelMessages,
       ],
+      reasoning: this._reasoningEffort,
       tools: this._toolset,
       onStepEnd: step => {
         this.emit('tokens-consumed', {

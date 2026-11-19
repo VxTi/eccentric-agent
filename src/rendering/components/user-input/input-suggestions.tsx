@@ -18,8 +18,7 @@ import {
   SuggestionType,
 } from '../../../lib/input-suggestions';
 import { Position, ellipsize } from '../../../lib/utils/string-utils';
-import { useUserInputField } from '../../context';
-import { useCommandProcessor } from '../../hooks';
+import { useUserInputField, useCommandProcessor } from '../../hooks';
 
 const MAX_SUGGESTION_COUNT = 14;
 

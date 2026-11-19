@@ -7,7 +7,6 @@ import {
   type RefObject,
   type SetStateAction,
   useCallback,
-  useContext,
   useEffect,
   useRef,
   useState,
@@ -24,7 +23,7 @@ import {
 import { type Optional, wrapOptional } from '../../lib/optional';
 import { useAppSelector } from '../../lib/state';
 import { formatReferencedFiles } from '../components/user-input/input-field';
-import { useAgent } from './agent-context';
+import { useAgent } from '../hooks/use-agent';
 
 interface InputRequestState {
   request: UserInputRequest;
@@ -36,7 +35,7 @@ interface InputState {
   value: string;
 }
 
-export interface UserInputContextType {
+export interface UserInputContextInstance {
   input: InputState;
   setInput: Dispatch<SetStateAction<InputState>>;
   inputRequest?: InputRequestState | undefined;
@@ -47,9 +46,9 @@ export interface UserInputContextType {
   setSuggestions: Dispatch<SetStateAction<Suggestions | undefined>>;
 }
 
-const UserInputContext = createContext<UserInputContextType | undefined>(
-  undefined
-);
+export const UserInputContext = createContext<
+  UserInputContextInstance | undefined
+>(undefined);
 
 export function UserInputProvider({ children }: { children: ReactNode }) {
   const inputRef = useRef<DOMElement>(null);
@@ -281,15 +280,4 @@ function findWordBoundary(
   }
 
   return index;
-}
-
-export function useUserInputField(): UserInputContextType {
-  const context = useContext(UserInputContext);
-
-  if (!context) {
-    throw new Error(
-      'useUserInputField must be used within a UserInputContextProvider'
-    );
-  }
-  return context;
 }

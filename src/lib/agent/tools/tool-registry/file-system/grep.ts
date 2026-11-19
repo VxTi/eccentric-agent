@@ -167,7 +167,7 @@ export const grep = createTool({
     const formatted = shown
       .map(
         m =>
-          `${path.relative(cwd, m.filePath)}:\`${m.line}\`: \`${m.lineContent.trim()}\``
+          `${path.relative(cwd, m.filePath)}:\`${m.line}\`: ${m.lineContent.trim()}`
       )
       .join('\n');
 

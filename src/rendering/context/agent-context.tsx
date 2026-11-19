@@ -3,30 +3,40 @@ import {
   createContext,
   type ReactNode,
   useCallback,
-  useContext,
   useEffect,
-  useMemo,
   useState,
 } from 'react';
-import { type Agent, type AgentStatus } from '../../lib/agent/agent';
+import {
+  type Agent,
+  type AgentStatus,
+  type ReasoningEffort,
+} from '../../lib/agent/agent';
 import { emitConsumeTokenEvent } from '../../lib/events/token-usage';
 import { EventName, eventOn } from '../../lib/events/events';
 import { Features } from '../../lib/feaures';
-import { useAppDispatch, useAppSelector, fetchGitInfo } from '../../lib/state';
-import { setMessage, setReasoning } from '../../lib/state/agent';
+import {
+  useAppDispatch,
+  useAppSelector,
+  fetchGitInfo,
+  setMessage,
+  setReasoning,
+} from '../../lib/state';
 import type { Message } from '../../lib/types/messages';
 import { basicHighlightFormatting } from '../terminal-markdown-renderer/markdown-renderer';
 
 const THINKING_TEXT = basicHighlightFormatting('Thinking...');
 
-export interface AgentContextType {
+export interface AgentContextInstance {
   agent: Agent;
   submitMessage: (input: string) => void;
   messages: Message[];
   status: AgentStatus;
+  reasoningEffort: ReasoningEffort;
 }
 
-const AgentContext = createContext<AgentContextType | undefined>(undefined);
+export const AgentContext = createContext<AgentContextInstance | undefined>(
+  undefined
+);
 
 export function AgentProvider({
   children,
@@ -37,6 +47,10 @@ export function AgentProvider({
   const { ignored: gitIgnored } = useAppSelector(state => state.fileSystem.git);
   const agent = useAppSelector(state => state.agent.agent);
   const messages = useAppSelector(state => state.agent.messages);
+
+  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>(
+    agent.reasoningEffort
+  );
 
   const [status, setStatus] = useState<AgentStatus>({
     loading: false,
@@ -83,6 +97,11 @@ export function AgentProvider({
     const onStatus = (next: AgentStatus): void => setStatus(next);
     const onTokens = emitConsumeTokenEvent;
 
+    const onReasoningEffortChange = (effort: ReasoningEffort): void => {
+      setReasoningEffort(effort);
+    };
+
+    agent.on('reasoning-effort-change', onReasoningEffortChange);
     agent.on('message-delta', onMessage);
     agent.on('status-change', onStatus);
     agent.on('tokens-consumed', onTokens);
@@ -109,6 +128,7 @@ export function AgentProvider({
       agent.off('message-delta', onMessage);
       agent.off('status-change', onStatus);
       agent.off('tokens-consumed', onTokens);
+      agent.off('reasoning-effort-change', onReasoningEffortChange);
       offAgentMessage();
       offReasoning();
     };
@@ -121,20 +141,17 @@ export function AgentProvider({
     [agent]
   );
 
-  const value = useMemo<AgentContextType>(
-    () => ({ agent, submitMessage, messages, status }),
-    [agent, submitMessage, messages, status]
-  );
-
   return (
-    <AgentContext.Provider value={value}>{children}</AgentContext.Provider>
+    <AgentContext.Provider
+      value={{
+        reasoningEffort,
+        agent,
+        submitMessage,
+        messages,
+        status,
+      }}
+    >
+      {children}
+    </AgentContext.Provider>
   );
-}
-
-export function useAgent(): AgentContextType {
-  const context = useContext(AgentContext);
-  if (!context) {
-    throw new Error('useAgent must be used within an AgentProvider');
-  }
-  return context;
 }

@@ -1,7 +1,7 @@
 import { isEmptyString, isNonEmptyString } from '@vxti/typed';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Box, Text } from 'ink';
-import { useAgent } from '../context';
+import { useAgent } from '../hooks/use-agent';
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 const SPINNER_INTERVAL_MS = 80;

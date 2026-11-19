@@ -23,6 +23,7 @@ import type { TerminalMarked } from './types';
 
 const DEFAULT_INDENTATION = 2;
 const DEFAULT_LANG = 'plaintext';
+const DEFAULT_SHELL_WIDTH = 80;
 
 const ANSI_REGEXP = ansiRegex();
 const ESC = '\u001b';
@@ -112,7 +113,12 @@ export class TerminalRenderer extends Renderer {
   ) {
     super(markedOptions);
     this.config = { ...defaultOptions, ...options };
-    this.shellWidth = process.stdout.columns;
+    // `columns` is undefined whenever stdout is not a TTY. Without a fallback
+    // the derived column width becomes NaN and every diff cell collapses to the
+    // truncation mark.
+    const { columns } = process.stdout;
+    this.shellWidth =
+      isNotNil(columns) && columns > 0 ? columns : DEFAULT_SHELL_WIDTH;
   }
 
   public textLength(input: string): number {

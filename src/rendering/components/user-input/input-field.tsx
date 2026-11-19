@@ -3,7 +3,7 @@ import { type JSX, type ReactNode, useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import { CURSOR_BLINK_INTERVAL_MS } from '../../../lib/constants';
 import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
-import { useUserInputField } from '../../context';
+import { useUserInputField } from '../../hooks/use-user-input';
 import { Suggestions } from './input-suggestions';
 import { InputRequest } from './user-input-request-dialog';
 
@@ -79,7 +79,7 @@ function InputText(): ReactNode {
 }
 
 function CursorPrefix() {
-  return <Text>› </Text>;
+  return <Text>❯ </Text>;
 }
 
 export function formatReferencedFiles(input: string): string {

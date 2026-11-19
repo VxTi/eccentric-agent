@@ -11,7 +11,7 @@ import {
   type InputOption,
   type UserInputRequest,
 } from '../../../lib/events/events';
-import { useUserInputField } from '../../context';
+import { useUserInputField } from '../../hooks';
 import { parseMarkdown } from '../../terminal-markdown-renderer/markdown-renderer';
 
 export function InputRequest({

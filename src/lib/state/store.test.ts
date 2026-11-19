@@ -6,7 +6,7 @@ import {
   addMessage,
   setMessage,
   clearMessages,
-} from './agent';
+} from './agent-slice';
 import { setGitInfo, setLoading, setCwd } from './file-system';
 import { setController, exit } from './app';
 import { TaskStatus } from '../tasks';

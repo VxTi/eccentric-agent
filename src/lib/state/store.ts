@@ -4,7 +4,7 @@ import {
   useDispatch,
   useSelector,
 } from 'react-redux';
-import { agentSlice } from './agent';
+import { agentSlice } from './agent-slice';
 import { fileSystemSlice } from './file-system';
 import { appSlice } from './app';
 

@@ -1,5 +1,5 @@
 import { isNotNil } from '@vxti/typed';
-import { type Change, diffTrimmedLines } from 'diff';
+import { diffTrimmedLines } from 'diff';
 import {
   DIFF_LANG,
   DIFF_SEPARATOR,
@@ -17,6 +17,24 @@ type SideBySideDiff = [DiffLine, DiffLine];
 
 const DEFAULT_CONTEXT_LINES = 2;
 
+/**
+ * Splits one change part into the lines it covers.
+ *
+ * Apart from the final part, every part of a line diff carries its own trailing
+ * newline, so a plain `split` reports one empty element past the last real line.
+ * Treating that as a line would emit a blank row per part and advance both line
+ * counters once too often.
+ */
+function splitPartLines(value: string): string[] {
+  const lines = value.split('\n');
+
+  if (lines.length > 1 && lines[lines.length - 1] === '') {
+    lines.pop();
+  }
+
+  return lines;
+}
+
 export function generateSideBySideDiff(
   original: string,
   modified: string,
@@ -26,49 +44,78 @@ export function generateSideBySideDiff(
 
   const diffs: SideBySideDiff[] = [];
 
+  // The two halves of a replacement, awaiting pairing into common rows.
+  const removedSide: DiffLine[] = [];
+  const addedSide: DiffLine[] = [];
+
   let originalLineNumber = 1;
   let modifiedLineNumber = 1;
 
-  changes.forEach((part: Change) => {
-    const lines = part.value.split('\n');
+  /**
+   * Emits the buffered replacement as aligned rows.
+   *
+   * The differ reports a changed line as a removed block and an added block.
+   * Rendering those as separate rows would place a changed line's new text on a
+   * row whose left cell is blank, and its old text on a row whose right cell is
+   * blank, so the reader never sees the two variants side by side. Pairing them
+   * keeps each modification on one row, padding whichever half is shorter.
+   */
+  const flushReplacement = (): void => {
+    const height = Math.max(removedSide.length, addedSide.length);
 
-    lines.forEach(line => {
-      if (part.added) {
-        diffs.push([
-          { value: '' },
-          {
-            value: line,
-            added: true,
-            lineNumberModified: modifiedLineNumber,
-          },
-        ]);
-        modifiedLineNumber++;
-      } else if (part.removed) {
-        diffs.push([
-          {
-            value: line,
-            removed: true,
-            lineNumberOriginal: originalLineNumber,
-          },
-          { value: '' },
-        ]);
-        originalLineNumber++;
-      } else {
-        diffs.push([
-          {
-            value: line,
-            lineNumberOriginal: originalLineNumber,
-          },
-          {
-            value: line,
-            lineNumberModified: modifiedLineNumber,
-          },
-        ]);
-        originalLineNumber++;
-        modifiedLineNumber++;
+    for (let i = 0; i < height; i++) {
+      diffs.push([
+        removedSide[i] ?? { value: '' },
+        addedSide[i] ?? { value: '' },
+      ]);
+    }
+
+    removedSide.length = 0;
+    addedSide.length = 0;
+  };
+
+  for (const part of changes) {
+    const lines = splitPartLines(part.value);
+
+    if (part.removed) {
+      for (const line of lines) {
+        removedSide.push({
+          value: line,
+          removed: true,
+          lineNumberOriginal: originalLineNumber++,
+        });
       }
-    });
-  });
+      continue;
+    }
+
+    if (part.added) {
+      for (const line of lines) {
+        addedSide.push({
+          value: line,
+          added: true,
+          lineNumberModified: modifiedLineNumber++,
+        });
+      }
+      continue;
+    }
+
+    flushReplacement();
+
+    for (const line of lines) {
+      diffs.push([
+        {
+          value: line,
+          lineNumberOriginal: originalLineNumber++,
+        },
+        {
+          value: line,
+          lineNumberModified: modifiedLineNumber++,
+        },
+      ]);
+    }
+  }
+
+  flushReplacement();
 
   return collapseUnchangedRegions(diffs, contextLines);
 }
