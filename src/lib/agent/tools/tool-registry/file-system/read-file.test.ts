@@ -44,12 +44,13 @@ describe('read_file', () => {
     // A trailing newline splits into a phantom empty final row — pre-existing
     // behavior, consistent with replace_in_file's own splitting.
     expect(result.ok).toBe(true);
-    const parsed = parseNumberedLines(result.data!.content);
+    if (!result.ok) return;
+
+    const parsed = parseNumberedLines(result.data.content);
     expect(parsed).toEqual([
       ...FIXTURE_LINES.map((line, i) => [i + 1, line] as [number, string]),
       [FIXTURE_LINES.length + 1, ''],
     ]);
-    expect(parsed).toEqual(FIXTURE_LINES.map((line, i) => [i + 1, line]));
   });
 
   it('labels a partial read (fromLineNumber + lineCount) with real line numbers', async () => {
