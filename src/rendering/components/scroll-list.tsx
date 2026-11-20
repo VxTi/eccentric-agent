@@ -1,5 +1,5 @@
 import { Box, type DOMElement, useBoxMetrics } from 'ink';
-import { type RefObject, useRef, useState } from 'react';
+import { type RefObject, useEffect, useRef, useState } from 'react';
 import { useScroll } from '../hooks/use-scroll';
 import { MessageList } from './messages/message-list';
 import { WelcomingText } from './welcome-text';
@@ -15,17 +15,32 @@ export function ScrollList({
   const contentMetrics = useBoxMetrics(contentRef);
 
   const [scrollTop, setScrollTop] = useState<number>(0);
+  // Whether the view is pinned to the bottom. True until the user scrolls
+  // away from the bottom, so streaming content keeps the newest messages
+  // in view without fighting manual scrolling.
+  const isPinnedToBottom = useRef<boolean>(true);
+
+  const maxScroll = Math.max(
+    0,
+    contentMetrics.clientHeight - containerMetrics.clientHeight
+  );
 
   useScroll(dy => {
-    // `scrollTop` is a positive content offset: 0 at the top, growing to
-    // `maxScroll` (content taller than the viewport) as you scroll down.
-    const maxScroll = Math.max(
-      0,
-      contentMetrics.clientHeight - containerMetrics.clientHeight
-    );
-
-    setScrollTop(prev => Math.min(maxScroll, Math.max(prev + dy, 0)));
+    setScrollTop(prev => {
+      const next = Math.min(maxScroll, Math.max(prev + dy, 0));
+      isPinnedToBottom.current = next >= maxScroll;
+      return next;
+    });
   });
+
+  // Follow the content while pinned to the bottom (e.g. as the agent streams
+  // a response); when unpinned, only clamp against the content shrinking.
+  useEffect(() => {
+    setScrollTop(prev =>
+      isPinnedToBottom.current ? maxScroll : Math.min(prev, maxScroll)
+    );
+  }, [maxScroll]);
+
   return (
     <Box
       ref={contentRef}

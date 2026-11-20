@@ -109,7 +109,7 @@ export const delegateTask = createTool({
   description:
     'Delegates concrete, self-contained units of work — above all any work that WRITES — to sub-agents' +
     ' that can read, search, edit files and run shell commands. THIS IS THE DEFAULT TOOL FOR MULTI-STEP' +
-    ' CODE WORK: whenever a request breaks into two or more independent pieces that each involve editing,' +
+    ' CODE/RESEARCH WORK: whenever a request breaks into one or more independent pieces that each involve editing,' +
     ' creating, or verifying files, or running commands, dispatch them here as separate tasks instead of' +
     ' performing them serially in your own loop. Reach for it proactively, not as a last resort —' +
     ' refactors spanning several files, adding a feature across layers, renaming a symbol and updating its' +

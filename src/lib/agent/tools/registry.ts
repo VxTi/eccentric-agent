@@ -39,13 +39,13 @@ export const subAgentTools = [
 ];
 
 export const toolRegistry = [
-  ...subAgentTools,
-  spawnSubAgents,
   delegateTask,
+  spawnSubAgents,
   promptUserOptions,
   shell,
   replaceInFile,
   createFile,
+  ...subAgentTools,
 ];
 
 export type ToolIdentifier = (typeof toolRegistry)[number]['internalName'];

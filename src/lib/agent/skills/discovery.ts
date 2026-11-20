@@ -12,10 +12,10 @@ export async function discoverSkillFiles(): Promise<AgentSkill[]> {
     return [];
   }
 
-  return recursiveDiscovery(directoryPath);
+  return discoverTopLevelSkills(directoryPath);
 }
 
-async function recursiveDiscovery(basePath: string): Promise<AgentSkill[]> {
+async function discoverTopLevelSkills(basePath: string): Promise<AgentSkill[]> {
   const skillFiles = await readdir(basePath).then(res =>
     res.filter(file => file.endsWith('.md'))
   );
