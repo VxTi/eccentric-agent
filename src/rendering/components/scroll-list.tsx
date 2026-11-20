@@ -10,7 +10,6 @@ export function ScrollList({
   containerRef: RefObject<DOMElement | null>;
 }) {
   const contentRef = useRef<DOMElement>(null);
-  const scrollRef = useRef<number>(0);
 
   const containerMetrics = useBoxMetrics(containerRef);
   const contentMetrics = useBoxMetrics(contentRef);
@@ -18,15 +17,14 @@ export function ScrollList({
   const [scrollTop, setScrollTop] = useState<number>(0);
 
   useScroll(dy => {
-    const nextY = scrollRef.current + dy;
-
-    setScrollTop(
-      Math.min(
-        0,
-        nextY,
-        -(contentMetrics.height - containerMetrics.clientHeight)
-      )
+    // `scrollTop` is a positive content offset: 0 at the top, growing to
+    // `maxScroll` (content taller than the viewport) as you scroll down.
+    const maxScroll = Math.max(
+      0,
+      contentMetrics.clientHeight - containerMetrics.clientHeight
     );
+
+    setScrollTop(prev => Math.min(maxScroll, Math.max(prev + dy, 0)));
   });
   return (
     <Box
@@ -34,7 +32,7 @@ export function ScrollList({
       contentOffsetY={scrollTop}
       flexDirection="column"
       alignItems="flex-start"
-      flexGrow={1}
+      flexShrink={0}
     >
       <WelcomingText />
       <MessageList />

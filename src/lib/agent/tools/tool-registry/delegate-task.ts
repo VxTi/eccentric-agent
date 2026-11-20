@@ -114,10 +114,10 @@ export const delegateTask = createTool({
     ' performing them serially in your own loop. Reach for it proactively, not as a last resort —' +
     ' refactors spanning several files, adding a feature across layers, renaming a symbol and updating its' +
     ' callers, scaffolding a module and wiring it into an index, migrating a set of call sites, or running' +
-    ' a build or test suite and repairing what it reports. Boundary with the other tools: use' +
-    ' `spawn_agents` when the pieces are purely read-only (gathering, summarizing, comparing, auditing),' +
-    ' because those sub-agents cannot write; use `create_task_list` when the stages are large, ordered, and' +
-    ' worth tracking visibly. Tasks run sequentially in the order given and share one workspace, so order' +
+    ' a build or test suite and repairing what it reports. Boundary with the other tools: for' +
+    ' purely read-only work (gathering, summarizing, comparing, auditing), search and read inline' +
+    ' with `grep`, `find_in_file`, or `read_file` instead — those are cheaper than a sub-agent;' +
+    ' use `create_task_list` when the stages are large, ordered, and' +
     ' dependent work accordingly. Each task agent receives ONLY the goal you provide, with no access to' +
     ' your conversation history, so make every goal fully self-contained: exact file paths, constraints,' +
     ' and the shape of the expected result. Keep each task small enough for one agent to finish — a batch' +

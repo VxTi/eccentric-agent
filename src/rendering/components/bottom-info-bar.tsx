@@ -1,6 +1,5 @@
 import { Box, Text } from 'ink';
 import { type ReactNode, useEffect, useState } from 'react';
-
 import {
   type ConsumeTokenEvent,
   EventName,

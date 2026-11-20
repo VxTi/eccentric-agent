@@ -30,8 +30,9 @@ export interface IToolDefinition<
   TOut extends object = object,
   TOutMeta = undefined,
   TApprovalOption extends string = string,
+  TInternalName extends string = string,
 > {
-  readonly internalName: string;
+  readonly internalName: TInternalName;
   readonly name: string;
   readonly description: string;
   readonly inputSchema: z.ZodType<TIn>;
@@ -92,8 +93,9 @@ type ToolProps<
   TOut extends object = object,
   TOutMeta = never,
   TApprovalOption extends string = string,
+  TInternalName extends string = string,
 > = MakeOptional<
-  IToolDefinition<TIn, TOut, TOutMeta, TApprovalOption>,
+  IToolDefinition<TIn, TOut, TOutMeta, TApprovalOption, TInternalName>,
   'approvalOptions' | 'requiresApproval' | 'onOptionSelect' | 'formatArguments'
 > & {};
 
@@ -102,9 +104,10 @@ export function createTool<
   TOut extends object = object,
   TOutMeta = never,
   TApprovalOption extends string = string,
+  TInternalName extends string = string,
 >(
-  props: ToolProps<TIn, TOut, TOutMeta, TApprovalOption>
-): IToolDefinition<TIn, TOut, TOutMeta, TApprovalOption> {
+  props: ToolProps<TIn, TOut, TOutMeta, TApprovalOption, TInternalName>
+): IToolDefinition<TIn, TOut, TOutMeta, TApprovalOption, TInternalName> {
   return {
     ...props,
     formatArguments: props.formatArguments ?? (args => JSON.stringify(args)),

@@ -62,7 +62,9 @@ export async function generateText<T>({
 export function getAppropriateModel(complexity: TaskComplexity): LanguageModel {
   switch (complexity) {
     case TaskComplexity.SIMPLE:
+      return 'zai/glm-5.3-flash';
     case TaskComplexity.MEDIUM:
+      return 'zai/glm-5.3-flash';
     case TaskComplexity.COMPLEX:
       return 'alibaba/qwen3.8-omni-flash';
   }

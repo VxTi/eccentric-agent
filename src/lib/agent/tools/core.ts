@@ -43,12 +43,14 @@ function makeTool(
         (message: ToolChannelParams) =>
           emitMessage({
             ...message,
+            // Mark every message from a tool channel so the UI can collapse
+            // consecutive completed tool calls into a single line.
+            toolCall: tool.internalName,
             content: message.content.trim(),
             type: 'generic',
             id: toolCallId,
           })
       );
-
       const requiresApproval = await tool.requiresApproval(input, channel);
 
       channel.notify({

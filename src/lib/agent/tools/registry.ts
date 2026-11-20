@@ -1,4 +1,3 @@
-import type { SomeTool } from './tool-definition';
 import {
   createFile,
   createTaskList,
@@ -22,7 +21,7 @@ import {
 } from './tool-registry';
 import { useSkill } from './tool-registry/skill';
 
-export const subAgentTools: SomeTool[] = [
+export const subAgentTools = [
   findFile,
   findInFile,
   grep,
@@ -37,9 +36,9 @@ export const subAgentTools: SomeTool[] = [
   listMcpTools,
   callMcpTool,
   useSkill,
-] as const;
+];
 
-export const toolRegistry: SomeTool[] = [
+export const toolRegistry = [
   ...subAgentTools,
   spawnSubAgents,
   delegateTask,
@@ -47,4 +46,6 @@ export const toolRegistry: SomeTool[] = [
   shell,
   replaceInFile,
   createFile,
-] as const;
+];
+
+export type ToolIdentifier = (typeof toolRegistry)[number]['internalName'];

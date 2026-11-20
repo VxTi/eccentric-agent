@@ -2,7 +2,7 @@ import { Box, Text } from 'ink';
 
 export function WelcomingText() {
   return (
-    <Box paddingTop={1} paddingBottom={8}>
+    <Box paddingTop={1} paddingBottom={8} justifyContent="center" width="100%">
       <Text bold>{`
                          _        _      
   ___  ___ ___ ___ _ __ | |_ _ __(_) ___ 
