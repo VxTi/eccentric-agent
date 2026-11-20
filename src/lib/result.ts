@@ -3,6 +3,7 @@ import { type MaybePromise } from './types/types';
 export type ErrorResult<T = undefined, TMeta = object> = {
   ok: false;
   error: T;
+  data?: never
   metadata: TMeta;
 };
 export type SuccessResult<T, TMeta = object> = {

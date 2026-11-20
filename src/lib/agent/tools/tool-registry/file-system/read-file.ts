@@ -100,9 +100,8 @@ export const readFile = createTool({
     const content = prefixWithLineNumbers(
       getLines(selection, lines),
       newline,
-      selection?.fromLineNumber
+      selection ? selection.fromLineNumber - 1 : undefined
     );
-
     return Result.Ok({ content, filePath }, { selection });
   },
 
@@ -141,28 +140,27 @@ function isValidSelection(
 function isWithinRange(input: number, min: number, max: number): boolean {
   return input >= min && input <= max;
 }
-
 function getLines(
   selection: z.infer<typeof inputSchema>['selection'],
   lines: string[]
 ): string[] {
   if (isNil(selection)) return lines;
 
+  // `lines` is a 0-based array; `fromLineNumber` is 1-based, so the first
+  // requested line sits at index `fromLineNumber - 1`.
+  const start = selection.fromLineNumber - 1;
+
   const endOffset = isNotNil(selection.lineCount)
-    ? selection.fromLineNumber + selection.lineCount - 1
+    ? start + selection.lineCount
     : undefined;
 
-  return lines.slice(
-    selection.fromLineNumber + MIN_LINE_NUMBER_OFFSET,
-    endOffset
-  );
+  return lines.slice(start, endOffset);
 }
 
 function formatSelection(selection: z.infer<typeof inputSchema>['selection']) {
   if (!selection) return '';
-
   const ending = isNotNil(selection.lineCount)
-    ? selection.fromLineNumber + selection.lineCount
+    ? selection.fromLineNumber + selection.lineCount - 1
     : '...';
 
   return ` (Line \`${selection.fromLineNumber}\` → \`${ending}\`)`;
