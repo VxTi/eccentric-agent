@@ -1,4 +1,3 @@
-import { emitReasoningState } from '../events/reasoning';
 import type { Message } from '../types/messages';
 import type { AgentSkill, SkillName } from './skills/common';
 import { isNonEmptyString } from '@vxti/typed';
@@ -248,7 +247,24 @@ export class Agent extends EventEmitter<EventMap> {
     stream: AsyncIterableStream<TextStreamPart<ToolSet>>
   ): Promise<void> {
     const messages = new Map<string, string>();
+    let reasoning: { id: string; startedAt: number } | undefined;
 
+    // Reasoning is surfaced in the message list: a spinner row while the model
+    // thinks, collapsed to the elapsed time once the block ends.
+    const finishReasoning = (): void => {
+      if (reasoning === undefined) return;
+      const seconds = Math.max(
+        1,
+        Math.round((Date.now() - reasoning.startedAt) / 1000)
+      );
+      this.emit('message-delta', {
+        type: 'generic',
+        id: reasoning.id,
+        loading: false,
+        content: chalk.dim(`Thought for ${seconds}s`),
+      });
+      reasoning = undefined;
+    };
     try {
       for await (const part of stream) {
         switch (part.type) {
@@ -268,15 +284,24 @@ export class Agent extends EventEmitter<EventMap> {
             }
             break;
           }
-          case 'reasoning-start':
-            emitReasoningState({ active: true });
+          case 'reasoning-start': {
+            const id = uuid();
+            reasoning = { id, startedAt: Date.now() };
+            this.emit('message-delta', {
+              type: 'generic',
+              id,
+              loading: true,
+              content: 'Thinking...',
+            });
             break;
+          }
           case 'reasoning-end':
-            emitReasoningState({ active: false });
+            finishReasoning();
             break;
         }
       }
     } catch (err) {
+      finishReasoning();
       this.emit('message-delta', {
         type: 'generic',
         id: uuid(),
