@@ -5,7 +5,7 @@ import { CURSOR_BLINK_INTERVAL_MS } from '../../../lib/constants';
 import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
 import { useUserInputField } from '../../hooks/use-user-input';
 import { Suggestions } from './input-suggestions';
-import { InputRequest } from './user-input-request-dialog';
+import { InputRequestDialog } from './user-input-request-dialog';
 
 const INPUT_PLACEHOLDER = 'Reference files with @, and type commands using / ↵';
 
@@ -16,7 +16,7 @@ export default function InputField(): JSX.Element {
     isNonEmptyArray(inputRequest?.request.options) &&
     inputRequest.request.channelId !== CHANNEL_ID_NONE
   ) {
-    return <InputRequest request={inputRequest.request} />;
+    return <InputRequestDialog request={inputRequest.request} />;
   }
 
   return (

@@ -15,6 +15,7 @@ import {
   EventName,
   eventOn,
   type UserInputRequest,
+  type UserInputRequestEvent,
 } from '../../lib/events/events';
 import {
   getInputSuggestions,
@@ -100,11 +101,13 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
   }, [value, cursorOffset]);
 
   useEffect(() => {
-    return eventOn(EventName.REQUEST_INPUT, ({ detail }) =>
-      setRequestQueue(prev => [
-        ...prev,
-        { request: detail, suggestionIndex: 0 },
-      ])
+    return eventOn(
+      EventName.REQUEST_INPUT,
+      ({ detail }: UserInputRequestEvent<string>) =>
+        setRequestQueue(prev => [
+          ...prev,
+          { request: detail, suggestionIndex: 0 },
+        ])
     );
   }, []);
 

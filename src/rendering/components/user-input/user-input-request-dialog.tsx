@@ -8,25 +8,67 @@ import { type ReactNode, useMemo, useState } from 'react';
 import {
   emitEvent,
   EventName,
+  FREE_TEXT_INPUT_ID,
   type InputOption,
   type UserInputRequest,
 } from '../../../lib/events/events';
 import { useUserInputField } from '../../hooks';
 import { parseMarkdown } from '../../terminal-markdown-renderer/markdown-renderer';
 
-export function InputRequest({
-  request,
-}: {
+interface Props {
   request: UserInputRequest;
-}): ReactNode {
+}
+
+export function InputRequestDialog({ request }: Props): ReactNode {
   const { setInputRequest } = useUserInputField();
   const [userSelectedInputIndex, setUserSelectedInputIndex] =
     useState<number>(0);
   const [activeIndices, setActiveIndices] = useState<number[]>([]);
+  const [textValue, setTextValue] = useState<string>('');
 
-  const { allowMultiple, options, title } = request;
+  const { allowMultiple, allowTextInput, options, title } = request;
+
+  // The optional free-text row lives right after the predefined options and is
+  // navigated with the same highlight index.
+  const rowCount = options.length + (allowTextInput ? 1 : 0);
+  const isTextInputRow =
+    allowTextInput === true && userSelectedInputIndex === options.length;
+
+  const submit = (response: NonEmptyArray<InputOption>) => {
+    emitEvent(EventName.INPUT_RESPONSE, response, request.channelId);
+
+    setInputRequest(undefined);
+    setUserSelectedInputIndex(-1);
+  };
 
   useInput((char, key) => {
+    if (isTextInputRow) {
+      if (key.upArrow) {
+        setUserSelectedInputIndex(prev => (prev + rowCount - 1) % rowCount);
+        return;
+      }
+      if (key.downArrow) {
+        setUserSelectedInputIndex(prev => (prev + rowCount + 1) % rowCount);
+        return;
+      }
+      if (key.return || key.tab) {
+        if (isNonEmptyString(textValue)) {
+          submit([
+            { value: FREE_TEXT_INPUT_ID, label: textValue },
+          ] as NonEmptyArray<InputOption>);
+        }
+        return;
+      }
+      if (key.backspace || key.delete) {
+        setTextValue(prev => prev.slice(0, Math.max(0, prev.length - 1)));
+        return;
+      }
+      if (!key.ctrl && !key.meta && !key.escape && char.length === 1) {
+        setTextValue(prev => prev + char);
+      }
+      return;
+    }
+
     if (char === ' ') {
       setActiveIndices(indices => {
         // If selected,
@@ -47,15 +89,11 @@ export function InputRequest({
     }
 
     if (key.upArrow) {
-      setUserSelectedInputIndex(
-        prev => (prev + options.length - 1) % options.length
-      );
+      setUserSelectedInputIndex(prev => (prev + rowCount - 1) % rowCount);
       return;
     }
     if (key.downArrow) {
-      setUserSelectedInputIndex(
-        prev => (prev + options.length + 1) % options.length
-      );
+      setUserSelectedInputIndex(prev => (prev + rowCount + 1) % rowCount);
       return;
     }
     if (key.return || key.tab) {
@@ -63,14 +101,9 @@ export function InputRequest({
         ? activeIndices
         : [userSelectedInputIndex];
 
-      emitEvent(
-        EventName.INPUT_RESPONSE,
-        indices.map(idx => request.options[idx]) as NonEmptyArray<InputOption>,
-        request.channelId
+      submit(
+        indices.map(idx => request.options[idx]) as NonEmptyArray<InputOption>
       );
-
-      setInputRequest(undefined);
-      setUserSelectedInputIndex(-1);
     }
   });
 
@@ -107,7 +140,9 @@ export function InputRequest({
       </Box>
       <Box marginTop={1} marginLeft={1} flexDirection="column">
         <Text italic color="gray">
-          Press space to select one and enter to submit
+          {allowTextInput
+            ? 'Press space to select one, enter to submit, or highlight the input row to type your own'
+            : 'Press space to select one and enter to submit'}
         </Text>
         {options.map((option, i) => (
           <InputOption
@@ -117,6 +152,17 @@ export function InputRequest({
             label={option.label}
           />
         ))}
+        {allowTextInput && (
+          <InputOption
+            selected={false}
+            highlighted={isTextInputRow}
+            label={
+              isNonEmptyString(textValue)
+                ? `❯ ${textValue}`
+                : '❯ Type your own input…'
+            }
+          />
+        )}
       </Box>
     </Box>
   );

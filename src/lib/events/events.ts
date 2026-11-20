@@ -1,5 +1,5 @@
 import { type NonEmptyArray } from '@vxti/typed';
-import { type Message } from '../types/messages';
+import type { Message } from '../types/messages';
 
 export const eventTarget = new EventTarget();
 
@@ -11,29 +11,42 @@ export const enum EventName {
   CONSUME_TOKENS = 'consume-tokens',
 }
 
-export interface InputOption {
-  id: string;
+export interface InputOption<T = string> {
   label: string;
+  value: T;
 }
-export interface UserInputRequest {
+
+/**
+ * Reserved `InputOption.id` for free-text answers typed into the input dialog.
+ * When a request sets `allowTextInput`, a free-text submission resolves as a
+ * single option carrying this id and the typed text as its label. Request
+ * authors must not define an option with this id.
+ */
+export const FREE_TEXT_INPUT_ID = 'free-text';
+
+export interface UserInputRequest<T = string> {
   title?: string;
   description?: string;
-  options: NonEmptyArray<InputOption>;
+  options: InputOption<T>[];
   allowMultiple?: boolean;
+  /** When true, the dialog offers a row to type a custom free-text answer. */
+  allowTextInput?: boolean;
   channelId: string;
 }
 
-export class UserInputRequestEvent extends CustomEvent<UserInputRequest> {
-  constructor(request: UserInputRequest) {
+export class UserInputRequestEvent<T = any> extends CustomEvent<
+  UserInputRequest<T>
+> {
+  constructor(request: UserInputRequest<T>) {
     super(EventName.REQUEST_INPUT, { detail: request });
   }
 }
 
-export class UserInputResponseEvent extends CustomEvent<{
-  options: NonEmptyArray<InputOption>;
+export class UserInputResponseEvent<T = string> extends CustomEvent<{
+  options: NonEmptyArray<InputOption<T>>;
   channelId: string;
 }> {
-  constructor(options: NonEmptyArray<InputOption>, channelId: string) {
+  constructor(options: NonEmptyArray<InputOption<T>>, channelId: string) {
     super(EventName.INPUT_RESPONSE, { detail: { options, channelId } });
   }
 }

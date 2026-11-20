@@ -1,12 +1,11 @@
-import { isEmptyArray, type NonEmptyArray } from '@vxti/typed';
+import { isEmptyArray } from '@vxti/typed';
 import * as z from 'zod';
-import { type InputOption } from '../../../events/events';
 import { requestUserInput } from '../../../events/user-input';
 import { Result } from '../../../result';
 import { createTool } from '../tool-definition';
 
 const optionSchema = z.object({
-  id: z
+  value: z
     .string()
     .min(1)
     .describe(
@@ -72,6 +71,9 @@ export const promptUserOptions = createTool({
     ' stable `id` (used by you to read the answer) and a human-readable `label` (shown to the' +
     ' user). Always include a catch-all option (e.g. `other`) so the user is never boxed in. The' +
     ' tool blocks until the user picks one, then returns the chosen `id` and `label`.\n\n' +
+    'The user may also type a free-form answer instead of picking an option. Such answers are' +
+    ' returned with the reserved id `free-text` and the typed text as `label`; treat the `label`' +
+    " as the user's literal answer.\n\n" +
     'The ONLY exception: do not use this tool for questions you can answer yourself from context,' +
     ' the codebase, or sensible defaults. Prefer making a reasonable choice and stating your' +
     ' assumption when the question would be pedantic. But once you have decided a question is' +
@@ -82,31 +84,32 @@ export const promptUserOptions = createTool({
   async handle({ options, question, selectMultiple }) {
     const ids = new Set<string>();
     options.forEach(option => {
-      if (ids.has(option.id)) {
+      if (ids.has(option.value)) {
         throw new Error(
-          `Duplicate option id "${option.id}". Each option must have a unique id.`
+          `Duplicate option id "${option.value}". Each option must have a unique id.`
         );
       }
-      ids.add(option.id);
+      ids.add(option.value);
     });
 
     const chosen = await requestUserInput({
       title: 'Your attention is needed',
       description: question,
-      options: options as NonEmptyArray<InputOption>,
+      options,
       allowMultiple: selectMultiple,
+      allowTextInput: true,
     });
 
     if (isEmptyArray(chosen)) {
       return Result.Error(
-        `User selected an unrecognised option(s) id "${chosen.map(({ id }) => id).join(', ')}". Expected one of:` +
-          ` ${options.map(option => option.id).join(', ')}.`
+        `User selected an unrecognised option(s) id "${chosen.map(({ value }) => value).join(', ')}". Expected one of:` +
+          ` ${options.map(option => option.value).join(', ')}.`
       );
     }
 
     return Result.Ok({
       selectedOptions: chosen.map(match => ({
-        selectedId: match.id,
+        selectedId: match.value,
         selectedLabel: match.label,
       })),
     });

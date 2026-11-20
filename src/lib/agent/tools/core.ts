@@ -1,5 +1,3 @@
-import type { NonEmptyArray } from '@vxti/typed';
-import type { InputOption } from '../../events/events';
 import type { Notifier } from '../../events/notifier';
 import { tool as createTool, type Tool, type ToolSet } from 'ai';
 import chalk from 'chalk';
@@ -66,13 +64,13 @@ function makeTool(
           description: `Tool \`${tool.name}\` requires approval:\n\n${tool.formatArguments(input)}`,
           options: options.map(opt => ({
             label: opt.text,
-            id: opt.option,
-          })) as NonEmptyArray<InputOption>,
+            value: opt.option,
+          })),
           allowMultiple: false,
         });
         const selectionOption = await tool.onOptionSelect(
           input,
-          chosen.id,
+          chosen.value,
           channel
         );
 

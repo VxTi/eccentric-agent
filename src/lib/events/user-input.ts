@@ -12,12 +12,12 @@ import {
 
 export const CHANNEL_ID_NONE = 'channel$none';
 
-export function requestUserInput(
-  props: Omit<UserInputRequest, 'channelId'>
-): Promise<NonEmptyArray<InputOption>> {
+export function requestUserInput<T = string>(
+  props: Omit<UserInputRequest<T>, 'channelId'>
+): Promise<NonEmptyArray<InputOption<T>>> {
   const channelId = uuid();
   return new Promise(resolve => {
-    const handler = (event: UserInputResponseEvent) => {
+    const handler = (event: UserInputResponseEvent<any>) => {
       // Ensure we don't accept an approval event of another channel
       if (event.detail.channelId !== channelId) return;
 

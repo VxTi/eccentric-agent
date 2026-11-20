@@ -13,12 +13,13 @@ import {
   useState,
 } from 'react';
 import { Box, type DOMElement, Text, useBoxMetrics, useInput } from 'ink';
+import { processCommand } from '../../../lib/commands';
 import {
   type Suggestion,
   SuggestionType,
 } from '../../../lib/input-suggestions';
 import { Position, ellipsize } from '../../../lib/utils/string-utils';
-import { useUserInputField, useCommandProcessor } from '../../hooks';
+import { useUserInputField } from '../../hooks';
 
 const MAX_SUGGESTION_COUNT = 14;
 
@@ -34,7 +35,6 @@ export function Suggestions(): ReactNode {
   const containerSize = useBoxMetrics(containerRef);
 
   const [suggestionIndex, setSuggestionIndex] = useState<number>(0);
-  const { processCommand } = useCommandProcessor();
 
   // Any edit to the input resets the highlighted row back to the top. A new
   // suggestion list is recomputed from the input in the context, so keying this
@@ -71,7 +71,7 @@ export function Suggestions(): ReactNode {
         }
       }
     },
-    [cursorOffset, processCommand, setInput, value]
+    [cursorOffset, setInput, value]
   );
 
   useInput(
