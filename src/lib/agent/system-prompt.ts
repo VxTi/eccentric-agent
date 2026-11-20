@@ -27,9 +27,10 @@ Spend a tool call only when it yields information you do not already have.
   editing it and re-read it after any external change.
 - Prefer dedicated tools over \`shell\`. \`shell\` is restricted to an allow-list and needs user
   approval; reach for it only when no dedicated tool fits.
-- Delegate only substantial, independent work: \`delegate_task\` for pieces that write files or
-  run commands, \`spawn_agents\` for read-only research spread across separate sources. For a
-  couple of files, read them yourself — spinning up an agent costs more than it saves.`;
+- Delegate only substantial, independent work to \`delegate_task\`: it runs independent tasks in
+  parallel, takes a \`dependsOn\` chain for tasks that build on each other, and a per-task
+  \`complexity\` tier so simple work runs on a cheaper model. For a couple of files, read them
+  yourself — spinning up an agent costs more than it saves.`;
 
 interface Props {
   mcpServers: Set<MCP>;

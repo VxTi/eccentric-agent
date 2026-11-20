@@ -8,4 +8,3 @@ export * from './prompt-user-options';
 export * from './shell';
 export * from './web-fetch';
 export * from './web-search';
-export * from './spawn-agent';

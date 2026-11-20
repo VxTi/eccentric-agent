@@ -11,7 +11,6 @@ import {
   readFile,
   replaceInFile,
   shell,
-  spawnSubAgents,
   updateTaskList,
   webFetch,
   webSearch,
@@ -40,7 +39,6 @@ export const subAgentTools = [
 
 export const toolRegistry = [
   delegateTask,
-  spawnSubAgents,
   promptUserOptions,
   shell,
   replaceInFile,

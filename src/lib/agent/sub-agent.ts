@@ -27,6 +27,12 @@ export interface SubAgentOptions {
   readonly channel: NotifierChannel<ToolChannelParams>;
   /** Tools the sub-agent may use. Defaults to the read-only research set. */
   readonly tools?: SomeTool[];
+  /**
+   * Complexity tier for model selection. Lets callers route cheap tasks to a
+   * smaller model and reserve the larger model for genuinely hard work.
+   * Defaults to {@link TaskComplexity.MEDIUM}.
+   */
+  readonly complexity?: TaskComplexity;
 }
 
 export class SubAgent {
@@ -42,6 +48,7 @@ export class SubAgent {
   private readonly signal: AbortSignal;
   private readonly channel: NotifierChannel<ToolChannelParams>;
   private readonly tools: SomeTool[];
+  private readonly complexity: TaskComplexity;
 
   constructor(options: SubAgentOptions) {
     this.goal = options.goal;
@@ -50,6 +57,7 @@ export class SubAgent {
     this.signal = options.signal;
     this.channel = options.channel;
     this.tools = options.tools ?? subAgentTools;
+    this.complexity = options.complexity ?? TaskComplexity.MEDIUM;
 
     this.toolset = this.constructToolset();
     this.messages = [
@@ -82,7 +90,7 @@ ${message.content}`,
       const result = streamText({
         tools: this.toolset,
         allowSystemInMessages: true,
-        model: getAppropriateModel(TaskComplexity.MEDIUM),
+        model: getAppropriateModel(this.complexity),
         messages: this.messages,
         abortSignal: this.signal,
         reasoning: 'medium',

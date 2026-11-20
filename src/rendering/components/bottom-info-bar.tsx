@@ -46,7 +46,7 @@ export function BottomInfoBar(): ReactNode {
       <Text color="gray">
         ↑ {formatTokenCount(input)} • ↓ {formatTokenCount(output)}
       </Text>
-      <Text color={autoApprove ? 'green' : 'gray'}>
+      <Text color={autoApprove ? 'yellow' : 'gray'}>
         ⏭ auto <Text dimColor>(ctrl+a)</Text>
       </Text>
     </Box>
