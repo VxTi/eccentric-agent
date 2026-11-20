@@ -50,6 +50,7 @@ export const createFile = createTool({
   inputSchema,
   outputSchema,
   requiresApproval: () => true,
+  formatArguments: ({ path: filePath }) => `Writing file \`${filePath}\``,
   handle: createFileImpl,
   inputToString: ({ path: filePath }) => `Writing file \`${filePath}\``,
   outputToString(_, __, { newContent, filePath }) {

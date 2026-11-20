@@ -50,8 +50,8 @@ const taskSpecSchema = z.object({
   name: z
     .string()
     .describe(
-      'A short, unique label for this task (e.g. `rename-helper`,' +
-        ' `add-export`). Used to identify its result and to let other tasks' +
+      'A short, unique label for this task (e.g. `Some research task`,' +
+        ' `Looking for this and that`). Used to identify its result and to let other tasks' +
         ' declare a dependency on it, so it must be unique within the batch.'
     ),
   goal: z

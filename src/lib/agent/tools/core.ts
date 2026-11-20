@@ -95,6 +95,12 @@ function makeTool(
             id: toolCallId,
           })
       );
+
+      channel.notify({
+        loading: true,
+        content: tool.inputToString(input, channel),
+      });
+
       const approved = await approveToolUse(tool, input, channel);
       if (!approved) {
         notifier.unsubscribe(toolCallId);

@@ -4,6 +4,14 @@ import { stat } from 'fs/promises';
 export type FilePath = string & {};
 export type MutationTimestampMs = number & {};
 
+export interface FileCacheEntry {
+  path: FilePath;
+  content: string;
+  mutationTimestampMs: MutationTimestampMs;
+}
+
+// const FILE_CACHE_DURATION_MS = 1000 * 60 * 5; // 5 minutes
+
 export class FileCache {
   constructor(
     private readonly cache: Map<FilePath, MutationTimestampMs> = new Map()

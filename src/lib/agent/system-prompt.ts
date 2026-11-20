@@ -63,12 +63,6 @@ export async function constructSystemPrompt({
     )
   ).join('\n');
 
-  const skillsSummary = skills
-    .values()
-    .map(skill => `- Name: ${skill.name}.\nDescription:\n${skill.description}`)
-    .toArray()
-    .join('\n---');
-
   const taskFragment = constructTaskListSystemPromptFragment(taskList);
 
   return compact([
@@ -79,16 +73,38 @@ export async function constructSystemPrompt({
     `- The current user is ${process.env.USER ?? process.env.USERNAME}.`,
     `- The current date is ${new Date().toLocaleString()}.\n`,
     OPERATING_GUIDE,
-    'You have access to the following skills, which are described by `name` and `description`. Use the \`use_skill\`' +
-      ' tool to invoke them if the current context relates to the description:',
-    skillsSummary,
-    'You possess the following skills, which you must obey / utilise:\n',
-    Array.from(activeSkills.entries())
-      .map(([skillName, skill]) => ` ${skillName}:    ${skill.content}`)
-      .join('\n\n'),
+    constructSkillsSystemPromptFragment(skills),
+    constructActiveSkillsSystemPromptFragment(activeSkills),
     `The following MCP servers are available:\n${mcpServerNames}\nUse 'list_mcp_tools' to discover tools (no 'toolName' → name+description list; with a specific 'toolName' → that tool's full input/output schema). Always fetch the schema for a specific tool before invoking it via 'call_mcp_tool'.`,
     taskFragment,
   ]).join('\n\n');
+}
+
+function constructActiveSkillsSystemPromptFragment(
+  activeSkills: Map<SkillName, AgentSkill>
+): string | undefined {
+  if (activeSkills.size === 0) return undefined;
+
+  return Array.from(activeSkills.entries())
+    .map(([, skill]) => skill.content)
+    .join('\n\n---');
+}
+
+function constructSkillsSystemPromptFragment(
+  skills: Map<SkillName, AgentSkill>
+): string | undefined {
+  if (skills.size === 0) return undefined;
+
+  const skillsSummary = skills
+    .values()
+    .map(skill => `- Name: ${skill.name}.\nDescription:\n${skill.description}`)
+    .toArray()
+    .join('\n---');
+  return [
+    'You have access to the following skills, which are described by `name` and `description`. Use the \`use_skill\`' +
+      ' tool to invoke them if the current context relates to the description:',
+    skillsSummary,
+  ].join('\n\n');
 }
 
 function constructTaskListSystemPromptFragment(

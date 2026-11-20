@@ -9,9 +9,12 @@ import {
 import * as z from 'zod';
 import { sleepFor } from '../utils/async-util';
 import { getAppropriateModel, TaskComplexity } from './inference';
-import { subAgentTools, type ToolChannelParams, type SomeTool } from './tools';
-import { emitConsumeTokenEvent } from '../events/token-usage';
-import { TokenSource } from '../events/events';
+import {
+  approveToolUse,
+  subAgentTools,
+  type ToolChannelParams,
+  type SomeTool,
+} from './tools';
 import { type NotifierChannel } from '../events/notifier';
 import { Result } from '../result';
 
@@ -71,9 +74,7 @@ export class SubAgent {
     // tool resolves, leaving the aggregated message spinning forever.
     this.channel.addInterceptor(message => ({
       ...message,
-      content: `\`${this.summary}\`
-
-${message.content}`,
+      content: `\`${this.summary}\` • ${message.content}`,
     }));
 
     this.process()
@@ -97,13 +98,6 @@ ${message.content}`,
         onError: ({ error }) => {
           this.channel.notify({
             content: `An error occurred in agent task - ${String(error)}`,
-          });
-        },
-        onStepEnd: step => {
-          emitConsumeTokenEvent({
-            input: step.usage.inputTokens ?? 0,
-            output: step.usage.outputTokens ?? 0,
-            source: TokenSource.SECONDARY,
           });
         },
         stopWhen: isLoopFinished(),
@@ -165,6 +159,16 @@ ${message.content}`,
         this.channel.notify({
           content: tool.inputToString(input, this.channel),
         });
+
+        // Sub-agents share the primary agent's approval flow, so delegated
+        // tools are gated by the same prompts as inline ones.
+        const approved = await approveToolUse(tool, input, this.channel);
+        if (!approved) {
+          return Result.Error(
+            `User denied permission to run tool "${tool.internalName}".`
+          );
+        }
+
         const output = await Result.trySafe(() =>
           tool.handle(input, this.channel, this.signal)
         );
