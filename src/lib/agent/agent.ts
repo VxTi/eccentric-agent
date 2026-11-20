@@ -4,7 +4,6 @@ import { isNonEmptyString } from '@vxti/typed';
 import {
   type AsyncIterableStream,
   isLoopFinished,
-  type ModelMessage,
   streamText,
   type TextStreamPart,
   type ToolSet,
@@ -13,7 +12,9 @@ import chalk from 'chalk';
 import { EventEmitter } from 'node:events';
 import { v7 as uuid } from 'uuid';
 import { type TokenConsumeProps, TokenSource } from '../events/events';
+import { emitContextUsageEvent } from '../events/token-usage';
 import { Notifier } from '../events/notifier';
+import { ContextStore } from './context-store';
 import { getAppropriateModel, TaskComplexity } from './inference';
 import { loadMcpConfig, type MCP } from './mcp/mcp';
 import { FileCache } from '../file-cache';
@@ -53,7 +54,7 @@ interface EventMap {
 export class Agent extends EventEmitter<EventMap> {
   private readonly _taskList: TaskList;
   private readonly _fileCache: FileCache;
-  private readonly _modelMessages: ModelMessage[] = [];
+  private readonly _context: ContextStore;
   private readonly _mcpServers: Set<MCP>;
   private readonly _notifier: Notifier;
   private readonly _toolset: ToolSet;
@@ -72,6 +73,7 @@ export class Agent extends EventEmitter<EventMap> {
     super();
     this._taskList = new TaskList();
     this._fileCache = new FileCache();
+    this._context = new ContextStore(this._cwd);
     this._activeSkills = new Map();
     this._skills = new Map();
     this._notifier = new Notifier();
@@ -188,7 +190,7 @@ export class Agent extends EventEmitter<EventMap> {
    * the UI layer and cleared separately.
    */
   public clear(): void {
-    this._modelMessages.length = 0;
+    this._context.clear();
     this._messageQueue.length = 0;
     this.setStatus({ loading: false, text: '' });
   }
@@ -202,7 +204,7 @@ export class Agent extends EventEmitter<EventMap> {
     }
 
     this.emit('message-delta', { id: uuid(), type: 'user', content: message });
-    this._modelMessages.push({ role: 'user', content: message });
+    this._context.pushUser(message);
     await this.processRequest();
 
     const next = this._messageQueue.shift();
@@ -227,7 +229,7 @@ export class Agent extends EventEmitter<EventMap> {
       model: getAppropriateModel(TaskComplexity.MEDIUM),
       messages: [
         { content: systemPrompt, role: 'system' },
-        ...this._modelMessages,
+        ...this._context.materialize(),
       ],
       reasoning: this._reasoningEffort,
       tools: this._toolset,
@@ -253,7 +255,16 @@ export class Agent extends EventEmitter<EventMap> {
       await this.handleResponseStream(result.stream);
 
       const finalStep = await result.finalStep;
-      this._modelMessages.push(...finalStep.response.messages);
+      this._context.pushResponse(finalStep.response.messages);
+
+      // Occupancy of the window going into the next turn: the full prompt the
+      // model just received plus the reply now appended to it. This is an
+      // absolute snapshot, not a per-step delta, so it is reported separately
+      // from billed usage and reflects any compaction already applied.
+      emitContextUsageEvent({
+        input: finalStep.usage.inputTokens ?? 0,
+        output: finalStep.usage.outputTokens ?? 0,
+      });
     } catch (err: unknown) {
       this.emit('message-delta', {
         type: 'generic',

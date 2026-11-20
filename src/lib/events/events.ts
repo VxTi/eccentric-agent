@@ -9,6 +9,7 @@ export const enum EventName {
   AGENT_MESSAGE = 'agent-message',
   AGENT_REASONING = 'agent-reasoning',
   CONSUME_TOKENS = 'consume-tokens',
+  CONTEXT_USAGE = 'context-usage',
 }
 
 export interface InputOption<T = string> {
@@ -88,12 +89,32 @@ export class ConsumeTokenEvent extends CustomEvent<TokenConsumeProps> {
   }
 }
 
+/**
+ * The absolute occupancy of the primary context window after the latest turn:
+ * `input` is the size of the prompt last sent (system + conversation), `output`
+ * the size of the reply that was appended to it. Unlike {@link TokenConsumeProps}
+ * these are a running snapshot to be *replaced*, not summed — each request
+ * re-sends the whole context, so summing per-request figures would multiply the
+ * same tokens. Sub-agent (SECONDARY) work never contributes here; it does not
+ * occupy the main window.
+ */
+export interface ContextUsageProps {
+  input: number;
+  output: number;
+}
+export class ContextUsageEvent extends CustomEvent<ContextUsageProps> {
+  constructor(detail: ContextUsageProps) {
+    super(EventName.CONTEXT_USAGE, { detail });
+  }
+}
+
 const EventConstructorRegistry = {
   [EventName.REQUEST_INPUT]: UserInputRequestEvent,
   [EventName.INPUT_RESPONSE]: UserInputResponseEvent,
   [EventName.AGENT_MESSAGE]: AgentMessageEvent,
   [EventName.AGENT_REASONING]: AgentReasoningEvent,
   [EventName.CONSUME_TOKENS]: ConsumeTokenEvent,
+  [EventName.CONTEXT_USAGE]: ContextUsageEvent,
 } as const satisfies Record<EventName, any>;
 
 type EventRegistry = {
@@ -102,6 +123,7 @@ type EventRegistry = {
   [EventName.AGENT_MESSAGE]: AgentMessageEvent;
   [EventName.AGENT_REASONING]: AgentReasoningEvent;
   [EventName.CONSUME_TOKENS]: ConsumeTokenEvent;
+  [EventName.CONTEXT_USAGE]: ContextUsageEvent;
 };
 
 export function subscribeEvent<TEventName extends EventName>(

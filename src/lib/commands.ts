@@ -2,7 +2,10 @@ import { isNil } from '@vxti/typed';
 import { ReasoningEffort } from './agent/agent';
 import { TokenSource } from './events/events';
 import { emitMessage } from './events/messaging';
-import { emitConsumeTokenEvent } from './events/token-usage';
+import {
+  emitConsumeTokenEvent,
+  emitContextUsageEvent,
+} from './events/token-usage';
 import { requestUserInput } from './events/user-input';
 import type { Suggestion } from './input-suggestions';
 import { app, clearMessages, store } from './state';
@@ -51,6 +54,7 @@ export function processCommand(command: string) {
         reset: true,
         source: TokenSource.PRIMARY,
       });
+      emitContextUsageEvent({ input: 0, output: 0 });
       break;
     }
     case 'effort': {
