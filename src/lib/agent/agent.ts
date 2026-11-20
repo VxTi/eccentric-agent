@@ -20,7 +20,12 @@ import { FileCache } from '../file-cache';
 import { TaskList } from '../tasks';
 import { discoverSkillFiles } from './skills/discovery';
 import { constructSystemPrompt } from './system-prompt';
-import { makeToolSet, toolRegistry } from './tools';
+import {
+  isAutoApproveEnabled,
+  makeToolSet,
+  setAutoApproveEnabled,
+  toolRegistry,
+} from './tools';
 
 export interface AgentStatus {
   loading: boolean;
@@ -42,6 +47,7 @@ interface EventMap {
   'tokens-consumed': [TokenConsumeProps];
   'status-change': [AgentStatus];
   'reasoning-effort-change': [ReasoningEffort];
+  'auto-mode-change': [boolean];
 }
 
 export class Agent extends EventEmitter<EventMap> {
@@ -89,6 +95,25 @@ export class Agent extends EventEmitter<EventMap> {
   public set reasoningEffort(effort: ReasoningEffort) {
     this._reasoningEffort = effort;
     this.emit('reasoning-effort-change', effort);
+  }
+
+  /**
+   * Auto mode: unlisted shell commands are vetted by a decision model and run
+   * without prompting when it clears them. The enforcement flag lives with the
+   * shell tool; this is the user-facing toggle that keeps it in sync.
+   */
+  public get autoApprove(): boolean {
+    return isAutoApproveEnabled();
+  }
+
+  public set autoApprove(enabled: boolean) {
+    setAutoApproveEnabled(enabled);
+    this.emit('auto-mode-change', enabled);
+  }
+
+  public toggleAutoApprove(): boolean {
+    this.autoApprove = !this.autoApprove;
+    return this.autoApprove;
   }
 
   public get fileCache(): FileCache {

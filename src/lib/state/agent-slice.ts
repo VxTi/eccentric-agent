@@ -17,6 +17,10 @@ export interface AgentState {
   /** Whether the model is currently reasoning, mirrored from the agent's
    *  reasoning lifecycle events. Drives the UI's thinking indicator. */
   reasoning: ReasoningState;
+  /** Whether Auto mode is enabled, mirrored from the agent's auto-mode events.
+   *  In Auto mode, shell commands cleared by the decision model run without a
+   *  manual approval prompt. */
+  autoApprove: boolean;
   /** The agent instance that owns all inference state (model messages, tasks,
    *  skills, MCP servers, file cache, status). It is the single source of truth
    *  for the agent; the UI only integrates with this instance. */
@@ -26,6 +30,7 @@ export interface AgentState {
 const initialState: AgentState = {
   messages: [],
   reasoning: { active: false },
+  autoApprove: false,
   agent: new Agent(defaultController.signal, process.cwd()),
 };
 
@@ -51,6 +56,9 @@ export const agentSlice = createSlice({
     setReasoning: (state, action: PayloadAction<ReasoningState>) => {
       state.reasoning = action.payload;
     },
+    setAutoApprove: (state, action: PayloadAction<boolean>) => {
+      state.autoApprove = action.payload;
+    },
     clearMessages: state => {
       state.messages = [];
     },
@@ -62,6 +70,7 @@ export const {
   addMessage,
   setMessage,
   setReasoning,
+  setAutoApprove,
   clearMessages,
 } = agentSlice.actions;
 

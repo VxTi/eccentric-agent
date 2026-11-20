@@ -2,6 +2,8 @@ import { isNonEmptyArray, isNotNil } from '@vxti/typed';
 import { exec } from 'child_process';
 import { type ExecException } from 'node:child_process';
 import * as z from 'zod';
+import { TokenSource } from '../../../events/events';
+import { generateText, TaskComplexity } from '../../inference';
 import { Result } from '../../../result';
 import { ellipsize, Position } from '../../../utils/string-utils';
 import { createTool, ToolSelectionOption } from '../tool-definition';
@@ -67,6 +69,69 @@ export function isAllowedCommand(command: string): boolean {
   return ALLOWED_COMMAND_PATTERNS.some(pattern => pattern.test(trimmed));
 }
 
+/**
+ * Auto mode: when enabled, commands that are not on the static allow-list are
+ * run through a decision model and executed without prompting if the model
+ * deems them safe. Kept as module state (like {@link ALLOWED_COMMAND_PATTERNS})
+ * so the standalone tool can read it; the Agent owns the user-facing toggle.
+ */
+let autoApproveEnabled = false;
+
+export function isAutoApproveEnabled(): boolean {
+  return autoApproveEnabled;
+}
+
+export function setAutoApproveEnabled(enabled: boolean): void {
+  autoApproveEnabled = enabled;
+}
+
+/** Decision model used to classify command safety in Auto mode. */
+const DECISION_MODEL = 'typesafe-ai/jev-1.14.0';
+const DECISION_TIMEOUT_MS = 10_000;
+
+const safetySchema = z.object({
+  safe: z
+    .boolean()
+    .describe(
+      'True only if the command is read-only or otherwise non-destructive and ' +
+        'safe to run without user confirmation. False for anything that writes, ' +
+        'deletes, installs, sends data over the network, or changes system state.'
+    ),
+});
+
+/**
+ * Asks the decision model whether `command` is safe to run unattended. Fails
+ * safe: any error, timeout, or abort is treated as "not safe" so the user is
+ * still prompted rather than silently running an unvetted command.
+ */
+async function isCommandSafe(command: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DECISION_TIMEOUT_MS);
+  try {
+    const { safe } = await generateText({
+      model: DECISION_MODEL,
+      complexity: TaskComplexity.SIMPLE,
+      schema: safetySchema,
+      source: TokenSource.SECONDARY,
+      signal: controller.signal,
+      systemPrompt:
+        'You are a security gate for a developer shell. Decide whether a shell ' +
+        'command is safe to execute automatically, without a human reviewing it ' +
+        'first. Only inspection and read-only commands are safe. Treat anything ' +
+        'that modifies files, deletes data, installs or removes software, ' +
+        'changes configuration, transfers data over the network, or escalates ' +
+        'privileges as unsafe.',
+      prompt: `Command:\n${command}`,
+    });
+    return safe;
+  } catch {
+    // Fail safe: an unavailable or slow decision model must not auto-approve.
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -126,12 +191,13 @@ export const shell = createTool({
     }
   },
 
-  requiresApproval: ({ command }) => {
-    // Allow-listed commands are known-safe and run without prompting; anything
-    // else must be approved by the user.
+  async requiresApproval({ command }) {
+    // Allow-listed commands are known-safe and run without prompting.
     if (isAllowedCommand(command)) return false;
 
-    //  TODO: Add decision model to determine whether to approve command
+    // In Auto mode, defer the decision to the safety model; everything it does
+    // not clear as safe still falls through to a manual approval prompt.
+    if (autoApproveEnabled && (await isCommandSafe(command))) return false;
 
     return true;
   },

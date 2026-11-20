@@ -21,6 +21,12 @@ interface GenerateTextProps<T> {
   systemPrompt: string;
   signal?: AbortSignal;
   source: TokenSource;
+  /**
+   * Overrides the complexity-based model selection. Use when a task needs a
+   * specific model regardless of its complexity tier (e.g. a dedicated
+   * decision model).
+   */
+  model?: LanguageModel;
 }
 
 export async function generateText<T>({
@@ -30,6 +36,7 @@ export async function generateText<T>({
   systemPrompt,
   signal,
   source,
+  model,
 }: GenerateTextProps<T>): Promise<T> {
   const {
     output,
@@ -41,7 +48,7 @@ export async function generateText<T>({
       role: 'system',
       content: systemPrompt,
     },
-    model: getAppropriateModel(complexity),
+    model: model ?? getAppropriateModel(complexity),
     abortSignal: signal,
   });
   if (

@@ -84,7 +84,7 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
   const { value, cursorOffset } = input;
 
   const { controller } = useAppSelector(state => state.app);
-  const { submitMessage } = useAgent();
+  const { submitMessage, toggleAutoApprove } = useAgent();
 
   useEffect(() => {
     let cancelled = false;
@@ -130,6 +130,12 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
     (inputChar, key) => {
       if (key.ctrl && inputChar === 'c') {
         controller.abort();
+      }
+
+      // Ctrl+A toggles Auto mode (auto-approve safe shell commands).
+      if (key.ctrl && inputChar === 'a') {
+        toggleAutoApprove();
+        return;
       }
 
       // When suggestions are open, Enter/Tab belong to the suggestion list (it

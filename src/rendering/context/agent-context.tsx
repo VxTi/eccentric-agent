@@ -18,6 +18,7 @@ import {
   useAppDispatch,
   useAppSelector,
   fetchGitInfo,
+  setAutoApprove,
   setMessage,
   setReasoning,
 } from '../../lib/state';
@@ -32,6 +33,8 @@ export interface AgentContextInstance {
   messages: Message[];
   status: AgentStatus;
   reasoningEffort: ReasoningEffort;
+  autoApprove: boolean;
+  toggleAutoApprove: () => void;
 }
 
 export const AgentContext = createContext<AgentContextInstance | undefined>(
@@ -47,6 +50,7 @@ export function AgentProvider({
   const { ignored: gitIgnored } = useAppSelector(state => state.fileSystem.git);
   const agent = useAppSelector(state => state.agent.agent);
   const messages = useAppSelector(state => state.agent.messages);
+  const autoApprove = useAppSelector(state => state.agent.autoApprove);
 
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>(
     agent.reasoningEffort
@@ -101,7 +105,12 @@ export function AgentProvider({
       setReasoningEffort(effort);
     };
 
+    const onAutoModeChange = (enabled: boolean): void => {
+      dispatch(setAutoApprove(enabled));
+    };
+
     agent.on('reasoning-effort-change', onReasoningEffortChange);
+    agent.on('auto-mode-change', onAutoModeChange);
     agent.on('message-delta', onMessage);
     agent.on('status-change', onStatus);
     agent.on('tokens-consumed', onTokens);
@@ -129,6 +138,7 @@ export function AgentProvider({
       agent.off('status-change', onStatus);
       agent.off('tokens-consumed', onTokens);
       agent.off('reasoning-effort-change', onReasoningEffortChange);
+      agent.off('auto-mode-change', onAutoModeChange);
       offAgentMessage();
       offReasoning();
     };
@@ -141,6 +151,10 @@ export function AgentProvider({
     [agent]
   );
 
+  const toggleAutoApprove = useCallback(() => {
+    agent.toggleAutoApprove();
+  }, [agent]);
+
   return (
     <AgentContext.Provider
       value={{
@@ -149,6 +163,8 @@ export function AgentProvider({
         submitMessage,
         messages,
         status,
+        autoApprove,
+        toggleAutoApprove,
       }}
     >
       {children}
