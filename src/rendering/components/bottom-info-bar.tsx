@@ -72,23 +72,18 @@ export function BottomInfoBar(): ReactNode {
       flexWrap="wrap"
       justifyContent="flex-start"
     >
-      <Text color="gray">
-        ctx ↑ {formatTokenCount(occupancy.input)} ↓{' '}
-        {formatTokenCount(occupancy.output)}
-      </Text>
-      <Text color="gray">
-        billed ↑ {formatTokenCount(primary.input)} ↓{' '}
-        {formatTokenCount(primary.output)}
-      </Text>
+      <Text color="gray">{formatTokenUsage('ctx', occupancy)}</Text>
+      <Text color="gray">{formatTokenUsage('billed', primary)}</Text>
       {hasSecondary && (
-        <Text color="gray">
-          sub ↑ {formatTokenCount(secondary.input)} ↓{' '}
-          {formatTokenCount(secondary.output)}
-        </Text>
+        <Text color="gray">{formatTokenUsage('sub', secondary)}</Text>
       )}
       <Text color={autoApprove ? 'yellow' : 'gray'}>
         ⏭ auto <Text dimColor>(ctrl+a)</Text>
       </Text>
     </Box>
   );
+}
+
+function formatTokenUsage(title: string, usage: Usage): string {
+  return `${title} ↑ ${formatTokenCount(usage.input)} ↓ ${formatTokenCount(usage.output)}`;
 }
