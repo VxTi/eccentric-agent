@@ -49,10 +49,13 @@ export const createFile = createTool({
     ' file, prefer `replace_in_file` instead.',
   inputSchema,
   outputSchema,
-  requiresApproval: () => true,
-  formatArguments: ({ path: filePath }) => `Writing file \`${filePath}\``,
+
+  formatArguments: ({ path: filePath }) => `Creating a file at \`${filePath}\``,
+
   handle: createFileImpl,
+
   inputToString: ({ path: filePath }) => `Writing file \`${filePath}\``,
+
   outputToString(_, __, { newContent, filePath }) {
     return `Wrote to \`${filePath}\`\n\n${formatDiffMd('', newContent)}`;
   },

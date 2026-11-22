@@ -1,4 +1,9 @@
-import { isNil, isNonEmptyArray } from '@vxti/typed';
+import {
+  isEmptyString,
+  isNil,
+  isNonEmptyArray,
+  isNonEmptyString,
+} from '@vxti/typed';
 import { type DOMElement, type Key, useInput, usePaste } from 'ink';
 import {
   createContext,
@@ -84,8 +89,13 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
   const { value, cursorOffset } = input;
 
   const { controller } = useAppSelector(state => state.app);
+  const historyEntries = useAppSelector(state => state.chatHistory.entries);
   const { submitMessage, toggleAutoApprove } = useAgent();
 
+  // Position within `historyEntries` while recalling past prompts with the
+  // arrows; `null` means history mode is off. Kept in a ref because the
+  // recalled text itself lives in `input` and must not re-render through here.
+  const historyIndex = useRef<number | null>(null);
   useEffect(() => {
     let cancelled = false;
     getInputSuggestions(value, cursorOffset)
@@ -113,7 +123,53 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
 
   const handleSubmitMessage = () => {
     submitMessage(formatReferencedFiles(value));
+    historyIndex.current = null;
     setInput({ value: '', cursorOffset: 0 });
+  };
+
+  /**
+   * Recalls previously submitted prompts with the arrow keys. Up enters
+   * history mode from an empty input and steps towards older entries; Down
+   * steps back towards newer ones and leaves history mode once past the
+   * newest, restoring the empty input. Any typed edit exits history mode.
+   */
+  const browseHistory = (older: boolean): void => {
+    if (!isNonEmptyArray(historyEntries)) return;
+
+    if (older) {
+      // Recall only starts from an empty input; once browsing, an emptied
+      // input (e.g. after a suggestion command) restarts from the newest.
+      if (historyIndex.current === null && !isEmptyString(value)) return;
+
+      const index =
+        historyIndex.current === null || isEmptyString(value)
+          ? historyEntries.length - 1
+          : Math.max(0, historyIndex.current - 1);
+      historyIndex.current = index;
+      const valueAtIndex = historyEntries[index];
+      if (!isNonEmptyString(valueAtIndex)) return;
+      setInput({
+        value: valueAtIndex,
+        cursorOffset: valueAtIndex.length,
+      });
+      return;
+    }
+
+    if (historyIndex.current === null) return;
+
+    const index = historyIndex.current + 1;
+    historyIndex.current = index < historyEntries.length ? index : null;
+
+    const valueAtIndex = historyEntries[index];
+    if (!isNonEmptyString(valueAtIndex)) return;
+    setInput(
+      index < historyEntries.length
+        ? {
+            value: valueAtIndex,
+            cursorOffset: valueAtIndex.length,
+          }
+        : { value: '', cursorOffset: 0 }
+    );
   };
 
   usePaste(text => {
@@ -151,10 +207,26 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // History recall owns the arrows when no suggestion list is open; the
+      // list navigates its entries with Up/Down while it is visible.
+      if (
+        !isNonEmptyArray(suggestions?.values) &&
+        (key.upArrow || key.downArrow)
+      ) {
+        browseHistory(key.upArrow);
+        return;
+      }
+
       const change = handleInput(inputChar, value, cursorOffset, key);
 
       if (change.hasValue) {
         const { offset, value } = change.value();
+
+        // Editing the text abandons history recall; a pure cursor move (no
+        // new value) keeps the position so Up/Down can resume where they were.
+        if (value !== undefined) {
+          historyIndex.current = null;
+        }
 
         setInput(prev => ({
           cursorOffset: offset,

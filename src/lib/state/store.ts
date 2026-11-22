@@ -5,6 +5,7 @@ import {
   useSelector,
 } from 'react-redux';
 import { agentSlice } from './agent-slice';
+import { chatHistorySlice } from './chat-history-slice';
 import { fileSystemSlice } from './file-system';
 import { appSlice } from './app';
 
@@ -14,6 +15,7 @@ export const makeStore = () => {
       agent: agentSlice.reducer,
       fileSystem: fileSystemSlice.reducer,
       app: appSlice.reducer,
+      chatHistory: chatHistorySlice.reducer,
     },
     middleware: getDefaultMiddleware =>
       getDefaultMiddleware({

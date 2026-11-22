@@ -7,6 +7,7 @@ import {
 import type * as z from 'zod';
 import { type TokenSource } from '../events/events';
 import { emitConsumeTokenEvent } from '../events/token-usage';
+import { experimental_decide } from 'ai';
 
 export enum TaskComplexity {
   SIMPLE = 'simple',
@@ -64,6 +65,10 @@ export async function generateText<T>({
   }
 
   return output;
+}
+
+export function decide(...args: Parameters<typeof experimental_decide>) {
+  return experimental_decide(...args);
 }
 
 export function getAppropriateModel(complexity: TaskComplexity): LanguageModel {

@@ -1,9 +1,8 @@
 import { isNonEmptyArray, isNotNil } from '@vxti/typed';
+import { experimental_decide } from 'ai';
 import { exec } from 'child_process';
 import { type ExecException } from 'node:child_process';
 import * as z from 'zod';
-import { TokenSource } from '../../../events/events';
-import { generateText, TaskComplexity } from '../../inference';
 import { Result } from '../../../result';
 import { ellipsize, Position } from '../../../utils/string-utils';
 import { createTool, ToolSelectionOption } from '../tool-definition';
@@ -40,24 +39,6 @@ const outputSchema = z.object({
 const MAX_SHOWN_OUTPUT_LINES = 5;
 const MAX_BUFFER_10_MB = 10 * 1024 * 1024;
 
-export const ALLOWED_COMMAND_PATTERNS: RegExp[] = [
-  /^ls(\s|$)/,
-  /^pwd(\s|$)/,
-  /^echo(\s|$)/,
-  /^cat\s+[^|;&`$()<>]+$/,
-  /^head\s+[^|;&`$()<>]+$/,
-  /^tail\s+[^|;&`$()<>]+$/,
-  /^wc\s+[^|;&`$()<>]+$/,
-  /^grep\s+[^|;&`$()<>]+$/,
-  /(^find$)|(^find\s+(?!.*-exec\s)([^|;&`$()<>])+?$)/,
-  /^which\s+\S+$/,
-  /^node\s+--version$/,
-  /^npm\s+(list|ls|view|outdated|run\s+\S+)(\s|$)/,
-  /^pnpm\s+(list|ls|view|outdated|run\s+\S+|test|build)(\s|$)/,
-  /^git\s+(status|log|diff|show|branch|remote|config\s+--get)(\s|$)/,
-  /^tsc\s+--noEmit(\s|$)/,
-];
-
 const enum Option {
   APPROVE = 'approve',
   DENY = 'deny',
@@ -66,15 +47,9 @@ const enum Option {
 
 export function isAllowedCommand(command: string): boolean {
   const trimmed = command.trim();
-  return ALLOWED_COMMAND_PATTERNS.some(pattern => pattern.test(trimmed));
+  return ALLOWED_COMMAND_PATTERNS.some(allowedCmd => allowedCmd === trimmed);
 }
 
-/**
- * Auto mode: when enabled, commands that are not on the static allow-list are
- * run through a decision model and executed without prompting if the model
- * deems them safe. Kept as module state (like {@link ALLOWED_COMMAND_PATTERNS})
- * so the standalone tool can read it; the Agent owns the user-facing toggle.
- */
 let autoApproveEnabled = false;
 
 export function isAutoApproveEnabled(): boolean {
@@ -89,15 +64,9 @@ export function setAutoApproveEnabled(enabled: boolean): void {
 const DECISION_MODEL = 'typesafe-ai/jev-1.14.0';
 const DECISION_TIMEOUT_MS = 10_000;
 
-const safetySchema = z.object({
-  safe: z
-    .boolean()
-    .describe(
-      'True only if the command is read-only or otherwise non-destructive and ' +
-        'safe to run without user confirmation. False for anything that writes, ' +
-        'deletes, installs, sends data over the network, or changes system state.'
-    ),
-});
+const COMMAND_CONFIDENCE_THRESHOLD = 0.5;
+
+const ALLOWED_COMMAND_PATTERNS: string[] = [];
 
 /**
  * Asks the decision model whether `command` is safe to run unattended. Fails
@@ -105,35 +74,25 @@ const safetySchema = z.object({
  * still prompted rather than silently running an unvetted command.
  */
 async function isCommandSafe(command: string): Promise<boolean> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), DECISION_TIMEOUT_MS);
-  try {
-    const { safe } = await generateText({
-      model: DECISION_MODEL,
-      complexity: TaskComplexity.SIMPLE,
-      schema: safetySchema,
-      source: TokenSource.SECONDARY,
-      signal: controller.signal,
-      systemPrompt:
-        'You are a security gate for a developer shell. Decide whether a shell ' +
-        'command is safe to execute automatically, without a human reviewing it ' +
-        'first. Only inspection and read-only commands are safe. Treat anything ' +
-        'that modifies files, deletes data, installs or removes software, ' +
-        'changes configuration, transfers data over the network, or escalates ' +
-        'privileges as unsafe.',
-      prompt: `Command:\n${command}`,
-    });
-    return safe;
-  } catch {
-    // Fail safe: an unavailable or slow decision model must not auto-approve.
-    return false;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return await experimental_decide({
+    model: DECISION_MODEL,
+    state: command,
+    questions: {
+      safe: {
+        type: 'boolean',
+        instructions:
+          'A score indicating how safe the command is to run unattended. ' +
+          'A score of 0 means the command is definitely unsafe, and a score of 1 means ' +
+          'the command is definitely safe. Scores between 0 and 1 indicate varying degrees of safety.',
+      },
+    },
+    abortSignal: AbortSignal.timeout(DECISION_TIMEOUT_MS),
+    providerOptions: {
+      gateway: { zeroDataRetention: true },
+    },
+  })
+    .then(res => res.answers.safe.probability >= COMMAND_CONFIDENCE_THRESHOLD)
+    .catch(() => false);
 }
 
 type Metadata = { command: string };
@@ -192,14 +151,12 @@ export const shell = createTool({
   },
 
   async requiresApproval({ command }) {
-    // Allow-listed commands are known-safe and run without prompting.
     if (isAllowedCommand(command)) return false;
 
-    // In Auto mode, defer the decision to the safety model; everything it does
-    // not clear as safe still falls through to a manual approval prompt.
-    if (autoApproveEnabled && (await isCommandSafe(command))) return false;
+    if (!autoApproveEnabled) return true;
 
-    return true;
+    const safe = await isCommandSafe(command);
+    return !safe;
   },
 
   onOptionSelect({ command }, option: Option) {
@@ -209,9 +166,7 @@ export const shell = createTool({
       // Trust only this exact command: escape regex metacharacters and anchor,
       // so e.g. trusting `ls foo.txt` does not also allow unrelated commands via
       // substring or wildcard matching.
-      ALLOWED_COMMAND_PATTERNS.push(
-        new RegExp(`^${escapeRegExp(command.trim())}$`)
-      );
+      ALLOWED_COMMAND_PATTERNS.push(command.trim());
     }
 
     return ToolSelectionOption.ALLOW;

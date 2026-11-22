@@ -20,6 +20,7 @@ import { loadMcpConfig, type MCP } from './mcp/mcp';
 import { FileCache } from '../file-cache';
 import { TaskList } from '../tasks';
 import { discoverSkillFiles } from './skills/discovery';
+import { pushEntry, store } from '../state';
 import { constructSystemPrompt } from './system-prompt';
 import {
   isAutoApproveEnabled,
@@ -202,9 +203,9 @@ export class Agent extends EventEmitter<EventMap> {
       this._messageQueue.push(message);
       return;
     }
-
     this.emit('message-delta', { id: uuid(), type: 'user', content: message });
     this._context.pushUser(message);
+    store.dispatch(pushEntry(message));
     await this.processRequest();
 
     const next = this._messageQueue.shift();
