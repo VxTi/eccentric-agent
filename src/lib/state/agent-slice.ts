@@ -48,10 +48,11 @@ export const agentSlice = createSlice({
       const i = state.messages.findIndex(m => m.id === action.payload.id);
       if (i < 0) {
         state.messages.push(action.payload);
+        collapseCompletedToolCalls(state as never, state.messages.length - 1);
       } else {
         state.messages[i] = action.payload;
+        collapseCompletedToolCalls(state as never, i);
       }
-      collapseCompletedToolCalls(state as never, i);
     },
     setReasoning: (state, action: PayloadAction<ReasoningState>) => {
       state.reasoning = action.payload;
@@ -90,6 +91,7 @@ const TOOL_COLLAPSE_SUMMARIES: Partial<
   shell: count => `ran ${count} ${count === 1 ? 'command' : 'commands'}`,
   create_file: count => `created ${count} ${count === 1 ? 'file' : 'files'}`,
   find_file: count => `looked for ${count} ${count === 1 ? 'file' : 'files'}`,
+  replace_in_file: count => `${count} file ${count === 1 ? 'update' : 'updates'}`,
   find_in_file: count =>
     `looked for ${count} ${count === 1 ? 'pattern' : 'patterns'} in files`,
   web_fetch: count => `read ${count} web${count === 1 ? 'page' : 'pages'}`,

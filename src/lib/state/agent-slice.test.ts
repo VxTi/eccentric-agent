@@ -56,8 +56,8 @@ describe('agentSlice setMessage tool-call collapsing', () => {
     expect((state.messages[1] as GenericMessage).loading).toBe(true);
 
     state = dispatchSetMessage(state, toolMessage('b', 'grep'));
-    expect(state.messages).toHaveLength(2);
-    const collapsed = state.messages[1] as GenericMessage;
+    expect(state.messages).toHaveLength(1);
+    const collapsed = state.messages[0] as GenericMessage;
     expect(collapsed.collapsed?.count).toBe(2);
     expect(collapsed.content).toContain('looked for 2 patterns');
   });
@@ -89,13 +89,13 @@ describe('agentSlice setMessage tool-call collapsing', () => {
   });
 
   it('falls back to a name ×count summary for tools without a phrase', () => {
-    let state = stateWith([toolMessage('a', 'shell')]);
+    let state = stateWith([toolMessage('a', 'delegate_task')]);
 
-    state = dispatchSetMessage(state, toolMessage('b', 'shell'));
+    state = dispatchSetMessage(state, toolMessage('b', 'delegate_task'));
 
-    const collapsed = state.messages[1] as GenericMessage;
-    expect(collapsed.collapsed?.tools).toEqual({ shell: 2 });
-    expect(collapsed.content).toContain('shell ×2');
+    const collapsed = state.messages.at(-1) as GenericMessage;
+    expect(collapsed.collapsed?.tools).toEqual({ delegate_task: 2 });
+    expect(collapsed.content).toContain('delegate_task ×2');
   });
 
   it('continues growing an existing collapsed group', () => {
@@ -104,7 +104,7 @@ describe('agentSlice setMessage tool-call collapsing', () => {
     state = dispatchSetMessage(state, toolMessage('b', 'grep'));
     state = dispatchSetMessage(state, toolMessage('c', 'read_file'));
 
-    const collapsed = state.messages[1] as GenericMessage;
+    const collapsed = state.messages.at(-1) as GenericMessage;
     expect(collapsed.collapsed).toEqual({
       count: 3,
       tools: { read_file: 2, grep: 1 },
