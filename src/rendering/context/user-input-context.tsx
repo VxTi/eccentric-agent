@@ -90,7 +90,7 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
 
   const { controller } = useAppSelector(state => state.app);
   const historyEntries = useAppSelector(state => state.chatHistory.entries);
-  const { submitMessage, toggleAutoApprove } = useAgent();
+  const { submitMessage, toggleAutoApprove, agent } = useAgent();
 
   // Position within `historyEntries` while recalling past prompts with the
   // arrows; `null` means history mode is off. Kept in a ref because the
@@ -184,8 +184,15 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
 
   useInput(
     (inputChar, key) => {
+      // Ctrl+C interrupts an in-flight turn so the user can redirect the agent
+      // with a follow-up message; only once the agent is idle does it quit.
       if (key.ctrl && inputChar === 'c') {
+        if (agent.status.loading) {
+          agent.cancel();
+          return;
+        }
         controller.abort();
+        return;
       }
 
       // Ctrl+A toggles Auto mode (auto-approve safe shell commands).

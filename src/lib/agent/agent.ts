@@ -62,6 +62,9 @@ export class Agent extends EventEmitter<EventMap> {
   private readonly _skills: Map<SkillName, AgentSkill>;
   private readonly _activeSkills: Map<SkillName, AgentSkill>;
   private readonly _messageQueue: string[] = [];
+  // Per-turn abort signal: lets the UI interrupt the active request without
+  // tearing down the process, which the app-lifetime signal does.
+  private _requestController?: AbortController;
   private _status: AgentStatus = { loading: false, text: '' };
   private _reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM;
   private _gitIgnore: Set<string>;
@@ -81,6 +84,14 @@ export class Agent extends EventEmitter<EventMap> {
     this._mcpServers = new Set<MCP>();
     this._gitIgnore = gitIgnore;
     this._toolset = makeToolSet(toolRegistry, this._notifier, this.signal);
+    // A teardown of the whole app also interrupts the active request.
+    this.signal.addEventListener(
+      'abort',
+      () => this._requestController?.abort(),
+      {
+        once: true,
+      }
+    );
   }
 
   public get status(): AgentStatus {
@@ -196,6 +207,14 @@ export class Agent extends EventEmitter<EventMap> {
     this.setStatus({ loading: false, text: '' });
   }
 
+  /**
+   * Interrupts the in-flight turn, if any. The partial response is discarded
+   * and the agent returns to idle, ready for the next message.
+   */
+  public cancel(): void {
+    this._requestController?.abort();
+  }
+
   public async submitMessage(message: string): Promise<void> {
     // A turn is already running: queue the message and let the active turn
     // drain it once it finishes, preserving submission order.
@@ -220,40 +239,52 @@ export class Agent extends EventEmitter<EventMap> {
   }
 
   private async processRequest(): Promise<void> {
+    // Created before the loading flag flips so a `cancel()` racing in right
+    // after the status change still finds a controller to abort.
+    const request = new AbortController();
+    this._requestController = request;
     this.setStatus({ loading: true, text: '' });
 
-    const systemPrompt = await this.buildSystemPrompt();
-
-    const result = streamText({
-      allowSystemInMessages: true,
-      abortSignal: this.signal,
-      model: getAppropriateModel(TaskComplexity.MEDIUM),
-      messages: [
-        { content: systemPrompt, role: 'system' },
-        ...this._context.materialize(),
-      ],
-      reasoning: this._reasoningEffort,
-      tools: this._toolset,
-      onStepEnd: step => {
-        this.emit('tokens-consumed', {
-          input: step.usage.inputTokens ?? 0,
-          output: step.usage.outputTokens ?? 0,
-          source: TokenSource.PRIMARY,
-        });
-      },
-      onStepStart: () => {},
-      stopWhen: isLoopFinished(),
-      onError: ({ error }) => {
-        this.emit('message-delta', {
-          id: uuid(),
-          type: 'assistant',
-          content: String(error),
-        });
-      },
-    });
-
     try {
+      const systemPrompt = await this.buildSystemPrompt();
+
+      const result = streamText({
+        allowSystemInMessages: true,
+        abortSignal: request.signal,
+        model: getAppropriateModel(TaskComplexity.MEDIUM),
+        messages: [
+          { content: systemPrompt, role: 'system' },
+          ...this._context.materialize(),
+        ],
+        reasoning: this._reasoningEffort,
+        tools: this._toolset,
+        onStepEnd: step => {
+          this.emit('tokens-consumed', {
+            input: step.usage.inputTokens ?? 0,
+            output: step.usage.outputTokens ?? 0,
+            source: TokenSource.PRIMARY,
+          });
+        },
+        onStepStart: () => {},
+        stopWhen: isLoopFinished(),
+        onError: ({ error }) => {
+          if (request.signal.aborted) return;
+          this.emit('message-delta', {
+            id: uuid(),
+            type: 'assistant',
+            content: String(error),
+          });
+        },
+      });
+
       await this.handleResponseStream(result.stream);
+
+      // Interrupted: the partial turn is discarded rather than committed to
+      // the context, so the next message starts from the last full response.
+      if (request.signal.aborted) {
+        this.finishInterruptedTurn();
+        return;
+      }
 
       const finalStep = await result.finalStep;
       this._context.pushResponse(finalStep.response.messages);
@@ -267,6 +298,11 @@ export class Agent extends EventEmitter<EventMap> {
         output: finalStep.usage.outputTokens ?? 0,
       });
     } catch (err: unknown) {
+      if (request.signal.aborted) {
+        this.finishInterruptedTurn();
+        return;
+      }
+
       this.emit('message-delta', {
         type: 'generic',
         id: uuid(),
@@ -275,8 +311,19 @@ export class Agent extends EventEmitter<EventMap> {
       });
       this.setStatus({ loading: false, text: chalk.red('Fatal error') });
       return;
+    } finally {
+      this._requestController = undefined;
     }
 
+    this.setStatus({ loading: false, text: '' });
+  }
+
+  private finishInterruptedTurn(): void {
+    this.emit('message-delta', {
+      type: 'generic',
+      id: uuid(),
+      content: chalk.dim('Interrupted'),
+    });
     this.setStatus({ loading: false, text: '' });
   }
 
@@ -350,6 +397,8 @@ export class Agent extends EventEmitter<EventMap> {
       }
     } catch (err) {
       finishReasoning();
+      // An interrupted turn is not an error; `processRequest` reports it.
+      if (this._requestController?.signal.aborted) return;
       this.emit('message-delta', {
         type: 'generic',
         id: uuid(),

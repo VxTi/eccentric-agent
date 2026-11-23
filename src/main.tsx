@@ -45,7 +45,9 @@ async function main(): Promise<void> {
       kittyKeyboard: { mode: 'enabled' },
       stdout,
       stdin: createInkStdin(stdin),
-      exitOnCtrlC: true,
+      // Ctrl+C is handled in the app: it first interrupts an in-flight agent
+      // turn and only exits once the agent is idle (see UserInputProvider).
+      exitOnCtrlC: false,
       patchConsole: true,
       maxFps: 60,
       incrementalRendering: true,

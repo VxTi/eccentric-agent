@@ -6,7 +6,7 @@
   "scripts": {
     "lint": "eslint --fix \"./src/**/*.{ts,tsx}\"",
     "lint:ci": "eslint --fix \"./src/**/*.{ts,tsx}\" --max-warnings 0",
-    "test": "vitest",
+    "test": "vitest run -u",
     "check:types": "tsc --noEmit",
     "start": "vite-node src/main.tsx",
     "build": "esbuild src/main.tsx --bundle --packages=external --minify --platform=node --format=esm --outfile=./dist/index.js"

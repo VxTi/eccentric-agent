@@ -8,9 +8,11 @@ export interface AppState {
   };
 }
 
-// Shared across the app: ctrl+C (user input) and the `exit`/`quit` commands
-// abort this controller, and the agent runs its inference against its signal so
-// those actions interrupt an in-flight turn.
+// Shared across the app: the `exit`/`quit` commands abort this controller, and
+// the agent runs its inference against its signal so they interrupt an
+// in-flight turn as the app winds down. Ctrl+C only aborts it when the agent
+// is idle; while a turn is streaming it interrupts the request instead (see
+// `Agent.cancel`).
 export const defaultController = new AbortController();
 const initialState: AppState = {
   controller: defaultController,
