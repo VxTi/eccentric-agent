@@ -1,4 +1,3 @@
-import { isNil } from '@vxti/typed';
 import {
   type LanguageModel,
   generateText as aisdkGenerateText,
@@ -6,8 +5,6 @@ import {
   experimental_decide,
 } from 'ai';
 import type * as z from 'zod';
-import { type TokenSource } from '../events/events';
-import { emitConsumeTokenEvent } from '../events/token-usage';
 
 export enum TaskComplexity {
   SIMPLE = 'simple',
@@ -21,7 +18,6 @@ interface GenerateTextProps<T> {
   prompt: string;
   systemPrompt: string;
   signal?: AbortSignal;
-  source: TokenSource;
   /**
    * Overrides the complexity-based model selection. Use when a task needs a
    * specific model regardless of its complexity tier (e.g. a dedicated
@@ -36,13 +32,9 @@ export async function generateText<T>({
   prompt,
   systemPrompt,
   signal,
-  source,
   model,
 }: GenerateTextProps<T>): Promise<T> {
-  const {
-    output,
-    usage: { inputTokens, outputTokens },
-  } = await aisdkGenerateText({
+  const { output } = await aisdkGenerateText({
     prompt,
     output: Output.object({ schema }),
     instructions: {
@@ -52,17 +44,6 @@ export async function generateText<T>({
     model: model ?? getAppropriateModel(complexity),
     abortSignal: signal,
   });
-  if (
-    !isNil(inputTokens) &&
-    !isNil(outputTokens) &&
-    (inputTokens > 0 || outputTokens > 0)
-  ) {
-    emitConsumeTokenEvent({
-      input: inputTokens,
-      output: outputTokens,
-      source,
-    });
-  }
 
   return output;
 }

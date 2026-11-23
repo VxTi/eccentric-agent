@@ -194,7 +194,7 @@ export const grep = createTool({
         m =>
           `${path.relative(cwd, m.filePath)}:\`${m.line}\`: ${m.lineContent.trim()}`
       )
-      .join('\n');
+      .join('\n\n');
 
     return `Found ${matches.length} match${matches.length === 1 ? '' : 'es'} for pattern \`${pattern}\`:\n\n${formatted}\n${
       limitVisible ? `\n... and ${matches.length - MAX_SHOWN_MATCHES} more` : ''

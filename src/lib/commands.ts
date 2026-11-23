@@ -1,10 +1,9 @@
 import { isNil } from '@vxti/typed';
 import { ReasoningEffort } from './agent/agent';
 import { SkillInclusion } from './agent/skills/model';
-import { TokenSource } from './events/events';
 import { emitMessage } from './events/messaging';
 import {
-  emitConsumeTokenEvent,
+  emitResponseTokensEvent,
   emitContextUsageEvent,
 } from './events/token-usage';
 import { requestUserInput } from './events/user-input';
@@ -57,12 +56,7 @@ export function processCommand(command: string) {
     case 'clear': {
       agent.clear();
       dispatch(clearMessages());
-      emitConsumeTokenEvent({
-        input: 0,
-        output: 0,
-        reset: true,
-        source: TokenSource.PRIMARY,
-      });
+      emitResponseTokensEvent({ output: 0, reset: true });
       emitContextUsageEvent({ input: 0, output: 0 });
       break;
     }

@@ -15,7 +15,7 @@ import {
 import chalk from 'chalk';
 import { EventEmitter } from 'node:events';
 import { v7 as uuid } from 'uuid';
-import { type TokenConsumeProps, TokenSource } from '../events/events';
+import { type ResponseTokensProps } from '../events/events';
 import { emitContextUsageEvent } from '../events/token-usage';
 import { Notifier } from '../events/notifier';
 import { ContextStore } from './context-store';
@@ -50,7 +50,7 @@ export enum ReasoningEffort {
 
 interface EventMap {
   'message-delta': [Message];
-  'tokens-consumed': [TokenConsumeProps];
+  'response-tokens': [ResponseTokensProps];
   'status-change': [AgentStatus];
   'reasoning-effort-change': [ReasoningEffort];
   'auto-mode-change': [boolean];
@@ -265,10 +265,8 @@ export class Agent extends EventEmitter<EventMap> {
         reasoning: this._reasoningEffort,
         tools: this._toolset,
         onStepEnd: step => {
-          this.emit('tokens-consumed', {
-            input: step.usage.inputTokens ?? 0,
+          this.emit('response-tokens', {
             output: step.usage.outputTokens ?? 0,
-            source: TokenSource.PRIMARY,
           });
         },
         onStepStart: () => {},
@@ -298,7 +296,7 @@ export class Agent extends EventEmitter<EventMap> {
       // Occupancy of the window going into the next turn: the full prompt the
       // model just received plus the reply now appended to it. This is an
       // absolute snapshot, not a per-step delta, so it is reported separately
-      // from billed usage and reflects any compaction already applied.
+      // from per-step response tokens and reflects any compaction applied.
       emitContextUsageEvent({
         input: finalStep.usage.inputTokens ?? 0,
         output: finalStep.usage.outputTokens ?? 0,

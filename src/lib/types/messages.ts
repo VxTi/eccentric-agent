@@ -22,7 +22,7 @@ export interface GenericMessage extends IMessage {
   /** Present when the message was emitted by a tool execution; the tool's
    *  internal name. Absent for other generic messages (debug output, agent
    *  failures, command feedback), which must never participate in collapsing. */
-  toolCall?: string;
+  toolCall?: ToolIdentifier;
   /** Present on messages that aggregate (collapse) consecutive completed tool
    *  calls into a single line. */
   collapsed?: CollapsedToolCalls;

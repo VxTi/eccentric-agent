@@ -16,6 +16,7 @@ import {
   type SomeTool,
 } from './tools';
 import { type NotifierChannel } from '../events/notifier';
+import { emitResponseTokensEvent } from '../events/token-usage';
 import { Result } from '../result';
 
 const AGENT_MAX_LOOP_ITERATIONS = 200;
@@ -99,6 +100,9 @@ export class SubAgent {
         messages: this.messages,
         abortSignal: this.signal,
         reasoning: 'medium',
+        onStepEnd: step => {
+          emitResponseTokensEvent({ output: step.usage.outputTokens ?? 0 });
+        },
         onError: ({ error }) => {
           this.channel.notify({
             content: `An error occurred in agent task - ${String(error)}`,

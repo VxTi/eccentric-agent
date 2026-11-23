@@ -8,7 +8,7 @@ export const enum EventName {
   INPUT_RESPONSE = 'user-input-response',
   AGENT_MESSAGE = 'agent-message',
   AGENT_REASONING = 'agent-reasoning',
-  CONSUME_TOKENS = 'consume-tokens',
+  RESPONSE_TOKENS = 'response-tokens',
   CONTEXT_USAGE = 'context-usage',
 }
 
@@ -72,31 +72,28 @@ export class AgentReasoningEvent extends CustomEvent<ReasoningState> {
   }
 }
 
-export const enum TokenSource {
-  PRIMARY = 'primary',
-  // Secondary tasks are those that don't fill the main context window (e.g., sub agents)
-  SECONDARY = 'secondary',
-}
-export interface TokenConsumeProps {
-  input: number;
+/**
+ * Response tokens produced since the last reset, summed across every agent
+ * (primary and sub-agents). Cumulative — consumers add to their running total;
+ * `reset` zeroes it.
+ */
+export interface ResponseTokensProps {
   output: number;
   reset?: boolean;
-  source: TokenSource;
 }
-export class ConsumeTokenEvent extends CustomEvent<TokenConsumeProps> {
-  constructor(detail: TokenConsumeProps) {
-    super(EventName.CONSUME_TOKENS, { detail });
+export class ResponseTokensEvent extends CustomEvent<ResponseTokensProps> {
+  constructor(detail: ResponseTokensProps) {
+    super(EventName.RESPONSE_TOKENS, { detail });
   }
 }
 
 /**
  * The absolute occupancy of the primary context window after the latest turn:
  * `input` is the size of the prompt last sent (system + conversation), `output`
- * the size of the reply that was appended to it. Unlike {@link TokenConsumeProps}
- * these are a running snapshot to be *replaced*, not summed — each request
- * re-sends the whole context, so summing per-request figures would multiply the
- * same tokens. Sub-agent (SECONDARY) work never contributes here; it does not
- * occupy the main window.
+ * the size of the reply that was appended to it. These are a running snapshot
+ * to be *replaced*, not summed — each request re-sends the whole context, so
+ * summing per-request figures would multiply the same tokens. Sub-agent work
+ * never contributes here; it does not occupy the main window.
  */
 export interface ContextUsageProps {
   input: number;
@@ -113,7 +110,7 @@ const EventConstructorRegistry = {
   [EventName.INPUT_RESPONSE]: UserInputResponseEvent,
   [EventName.AGENT_MESSAGE]: AgentMessageEvent,
   [EventName.AGENT_REASONING]: AgentReasoningEvent,
-  [EventName.CONSUME_TOKENS]: ConsumeTokenEvent,
+  [EventName.RESPONSE_TOKENS]: ResponseTokensEvent,
   [EventName.CONTEXT_USAGE]: ContextUsageEvent,
 } as const satisfies Record<EventName, any>;
 
@@ -122,7 +119,7 @@ type EventRegistry = {
   [EventName.INPUT_RESPONSE]: UserInputResponseEvent;
   [EventName.AGENT_MESSAGE]: AgentMessageEvent;
   [EventName.AGENT_REASONING]: AgentReasoningEvent;
-  [EventName.CONSUME_TOKENS]: ConsumeTokenEvent;
+  [EventName.RESPONSE_TOKENS]: ResponseTokensEvent;
   [EventName.CONTEXT_USAGE]: ContextUsageEvent;
 };
 

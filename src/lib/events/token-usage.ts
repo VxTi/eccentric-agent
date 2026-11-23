@@ -2,12 +2,12 @@ import {
   emitEvent,
   EventName,
   type ContextUsageProps,
-  type TokenConsumeProps,
+  type ResponseTokensProps,
 } from './events';
 
-/** Reports billed token usage, summed per {@link TokenConsumeProps.source}. */
-export function emitConsumeTokenEvent(props: TokenConsumeProps): void {
-  emitEvent(EventName.CONSUME_TOKENS, props);
+/** Reports response tokens produced since the last reset, as a running sum. */
+export function emitResponseTokensEvent(props: ResponseTokensProps): void {
+  emitEvent(EventName.RESPONSE_TOKENS, props);
 }
 
 /**

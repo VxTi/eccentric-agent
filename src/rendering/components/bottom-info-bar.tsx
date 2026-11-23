@@ -1,53 +1,40 @@
 import { Box, Text } from 'ink';
 import { type ReactNode, useEffect, useState } from 'react';
 import {
-  type ConsumeTokenEvent,
   type ContextUsageEvent,
   EventName,
   eventOn,
-  TokenSource,
+  type ResponseTokensEvent,
 } from '../../lib/events/events';
 import { useAppSelector } from '../../lib/state';
 import { formatTokenCount } from '../../lib/text-formatting';
 
-interface Usage {
+interface Occupancy {
   input: number;
   output: number;
 }
 
-const ZERO: Usage = { input: 0, output: 0 };
+const ZERO: Occupancy = { input: 0, output: 0 };
 
 /**
- * Two distinct token readings:
+ * A single metric pair:
  *
- * - **ctx** — live occupancy of the primary context window (the last prompt's
- *   size and its reply), replaced each turn. Shrinks when ContextStore elides
- *   redundant file reads. Sub-agent work is excluded; it does not occupy the
- *   main window.
- * - **billed / sub** — cumulative tokens charged over the session, summed and
- *   split between the primary agent and secondary (sub-agent) work.
+ * - **↑** — occupancy of the primary context window: the size of the prompt
+ *   last sent, replaced each turn. Shrinks when ContextStore elides redundant
+ *   file reads. Sub-agent work is excluded; it does not occupy the main window.
+ * - **↓** — response tokens produced across the session, summed over every
+ *   agent (primary and sub-agents). Reset by `/clear`.
  */
 export function BottomInfoBar(): ReactNode {
   const autoApprove = useAppSelector(state => state.agent.autoApprove);
-  const [occupancy, setOccupancy] = useState<Usage>(ZERO);
-  const [primary, setPrimary] = useState<Usage>(ZERO);
-  const [secondary, setSecondary] = useState<Usage>(ZERO);
+  const [occupancy, setOccupancy] = useState<Occupancy>(ZERO);
+  const [responseTokens, setResponseTokens] = useState(0);
 
   useEffect(() => {
     return eventOn(
-      EventName.CONSUME_TOKENS,
-      ({ detail: { input, output, reset, source } }: ConsumeTokenEvent) => {
-        if (reset) {
-          setPrimary(ZERO);
-          setSecondary(ZERO);
-          return;
-        }
-        const add = (prev: Usage): Usage => ({
-          input: prev.input + input,
-          output: prev.output + output,
-        });
-        if (source === TokenSource.SECONDARY) setSecondary(add);
-        else setPrimary(add);
+      EventName.RESPONSE_TOKENS,
+      ({ detail: { output, reset } }: ResponseTokensEvent) => {
+        setResponseTokens(prev => (reset ? 0 : prev + output));
       }
     );
   }, []);
@@ -61,8 +48,6 @@ export function BottomInfoBar(): ReactNode {
     );
   }, []);
 
-  const hasSecondary = secondary.input > 0 || secondary.output > 0;
-
   return (
     <Box
       flexDirection="row"
@@ -72,18 +57,12 @@ export function BottomInfoBar(): ReactNode {
       flexWrap="wrap"
       justifyContent="flex-start"
     >
-      <Text color="gray">{formatTokenUsage('ctx', occupancy)}</Text>
-      <Text color="gray">{formatTokenUsage('billed', primary)}</Text>
-      {hasSecondary && (
-        <Text color="gray">{formatTokenUsage('sub', secondary)}</Text>
-      )}
+      <Text color="gray">
+        {`↑ ${formatTokenCount(occupancy.input)} ↓ ${formatTokenCount(responseTokens)}`}
+      </Text>
       <Text color={autoApprove ? 'yellow' : 'gray'}>
         ⏭ auto <Text dimColor>(ctrl+a)</Text>
       </Text>
     </Box>
   );
-}
-
-function formatTokenUsage(title: string, usage: Usage): string {
-  return `${title} ↑ ${formatTokenCount(usage.input)} ↓ ${formatTokenCount(usage.output)}`;
 }

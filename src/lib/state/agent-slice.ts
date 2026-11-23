@@ -99,6 +99,15 @@ const TOOL_COLLAPSE_SUMMARIES: Partial<
   web_search: count => `searched ${count} ${count === 1 ? 'site' : 'sites'}`,
 };
 
+function isCollapsableTool(tool: ToolIdentifier) {
+  switch (tool) {
+    case 'prompt_user_options':
+      return false;
+    default:
+      return true;
+  }
+}
+
 function isCompletedToolCall(
   message: Message | undefined
 ): message is GenericMessage & { toolCall: string } {
@@ -125,7 +134,7 @@ function collapseCompletedToolCalls(state: AgentState, index: number): void {
 
   const failure = previous.failure === true || message.failure === true;
 
-  if (failure) return;
+  if (failure || !isCollapsableTool(message.toolCall)) return;
 
   const prevCall = previous.toolCall;
   const msgCall = message.toolCall;

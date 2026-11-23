@@ -6,7 +6,6 @@ import {
   isNotNil,
 } from '@vxti/typed';
 import * as z from 'zod';
-import { TokenSource } from '../../../../events/events';
 import { Result } from '../../../../result';
 import { generateText, TaskComplexity } from '../../../inference';
 import { getMCPServer, type McpTool } from '../../../mcp/mcp';
@@ -128,7 +127,6 @@ export const discoverMcpTool = createTool({
 
     const { toolName, reasoning } = await generateText({
       complexity: TaskComplexity.SIMPLE,
-      source: TokenSource.SECONDARY,
       schema: selectionSchema,
       signal,
       systemPrompt:
