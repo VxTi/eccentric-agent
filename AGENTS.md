@@ -114,3 +114,10 @@ explicitly:
 - **Precision & anti-assumption rules**: Treat every tool call as a contract. Verify or ask for every required
   parameter; never infer or guess. Report missing/ambiguous arguments and await clarification. If a tool call
   returns unexpected results, report to the user instead of retrying with new parameters.
+
+--- Coding guidelines
+
+If a task demands you to write code, try to recycle as many utility functions as possible.
+Instead of writing `if (<something> === undefined)`, use `if (isNotNil(...))` instead.
+Also, use as little comments as possible. Code should be self-explanatory. Comments should
+only ever serve as a last resort if the task is not trivial.

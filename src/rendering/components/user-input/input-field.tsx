@@ -3,8 +3,8 @@ import { type JSX, type ReactNode, useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import { CURSOR_BLINK_INTERVAL_MS } from '../../../lib/constants';
 import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
-import { useUserInputField }      from '../../hooks/use-user-input';
-import { InputSuggestions }       from './input-suggestions';
+import { useUserInputField } from '../../hooks';
+import { InputSuggestions } from './input-suggestions';
 import { UserInputRequestDialog } from './user-input-request-dialog';
 
 const INPUT_PLACEHOLDER = 'Reference files with @, and type commands using / ↵';

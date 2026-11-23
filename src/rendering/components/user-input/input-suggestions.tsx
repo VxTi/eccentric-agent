@@ -1,9 +1,4 @@
-import {
-  isEmptyString,
-  isNil,
-  isNonEmptyArray,
-  isNonEmptyString,
-} from '@vxti/typed';
+import { isNil, isNonEmptyArray, isNonEmptyString } from '@vxti/typed';
 import {
   type ReactNode,
   useCallback,
@@ -22,6 +17,21 @@ import { Position, ellipsize } from '../../../lib/utils/string-utils';
 import { useUserInputField } from '../../hooks';
 
 const MAX_SUGGESTION_COUNT = 14;
+// Breathing room between the suggestion list and the right edge of the
+// container, subtracted when sizing the command/description columns.
+const EDGE_MARGIN = 6;
+// Horizontal gap between the command and description columns (Box `gap`).
+const COLUMN_GAP = 2;
+// Match the '@<partial path>' token immediately before the cursor, so picking
+// a file replaces the token instead of appending to the half-typed query.
+const FILE_TOKEN_PATTERN = /@[\w./_-]*$/;
+
+interface SuggestionWindowState {
+  offsetIndex: number;
+  shown: Suggestion[];
+  itemsAfter: number;
+  commandWidth: number;
+}
 
 export function InputSuggestions(): ReactNode {
   const {
@@ -34,7 +44,8 @@ export function InputSuggestions(): ReactNode {
   const containerRef = useRef<DOMElement>(null);
   const containerSize = useBoxMetrics(containerRef);
 
-  const [suggestionIndex, setSuggestionIndex] = useState<number>(0);
+  const [suggestionIndex, setSuggestionIndex] = useState(0);
+  const maxWidth = containerSize.width - EDGE_MARGIN;
 
   // Any edit to the input resets the highlighted row back to the top. A new
   // suggestion list is recomputed from the input in the context, so keying this
@@ -45,15 +56,11 @@ export function InputSuggestions(): ReactNode {
 
   const handlePickSuggestion = useCallback(
     (type: SuggestionType, suggestion: string) => {
-      if (isEmptyString(suggestion)) return;
-
       switch (type) {
         case SuggestionType.FILE: {
           const beforeCursor = value.slice(0, cursorOffset);
           const afterCursor = value.slice(cursorOffset);
-          // Replace the '@<partial>' token immediately before the cursor with
-          // the full path rather than appending to the half-typed query.
-          const tokenStart = beforeCursor.search(/@[\w./_-]*$/);
+          const tokenStart = FILE_TOKEN_PATTERN.exec(beforeCursor)?.index ?? -1;
           const prefix =
             tokenStart >= 0 ? beforeCursor.slice(0, tokenStart) : beforeCursor;
           const insertion = `@${suggestion} `;
@@ -77,6 +84,7 @@ export function InputSuggestions(): ReactNode {
   useInput(
     (_, key) => {
       if (!isNonEmptyArray(suggestions?.values)) return;
+
       const { values } = suggestions;
       const direction = key.upArrow ? -1 : key.downArrow ? 1 : 0;
 
@@ -96,46 +104,42 @@ export function InputSuggestions(): ReactNode {
 
       const value = values[suggestionIndex]?.value;
 
-      if (isNil(value)) return;
+      if (isNil(value) || (!key.tab && !key.return)) return;
 
-      if (key.tab || key.return) {
-        handlePickSuggestion(suggestions.type, value);
-        return;
-      }
+      handlePickSuggestion(suggestions.type, value);
     },
     {
       isActive: isNil(inputRequest) && isNonEmptyArray(suggestions?.values),
     }
   );
 
-  const state = useMemo(() => {
+  const state = useMemo<SuggestionWindowState | undefined>(() => {
     if (!isNonEmptyArray(suggestions?.values)) return undefined;
 
     const { values } = suggestions;
-
-    if (values.length <= MAX_SUGGESTION_COUNT) {
-      return {
-        shown: values,
-        itemsAfter: 0,
-        itemsBefore: 0,
-        offsetIndex: 0,
-      };
-    }
-
     const halfWindow = Math.floor(MAX_SUGGESTION_COUNT / 2);
     const maxOffset = values.length - MAX_SUGGESTION_COUNT;
 
-    const targetOffset = suggestionIndex - halfWindow;
-
-    const offsetIndex = Math.max(0, Math.min(maxOffset, targetOffset));
+    // With fewer entries than the window, maxOffset is negative and the clamp
+    // collapses to a full list from the top.
+    const offsetIndex = Math.max(
+      0,
+      Math.min(maxOffset, suggestionIndex - halfWindow)
+    );
     const offsetUpperBound = offsetIndex + MAX_SUGGESTION_COUNT;
+    const shown = values.slice(offsetIndex, offsetUpperBound);
 
     return {
       offsetIndex,
-      shown: values.slice(offsetIndex, offsetUpperBound),
-      itemsAfter: values.length - offsetUpperBound,
+      shown,
+      itemsAfter: Math.max(0, values.length - offsetUpperBound),
+      commandWidth: Math.max(
+        ...shown.map(
+          ({ value }) => ellipsize(value, maxWidth, Position.END).length
+        )
+      ),
     };
-  }, [suggestions, suggestionIndex]);
+  }, [suggestions, suggestionIndex, maxWidth]);
 
   if (!state) return;
 
@@ -147,7 +151,8 @@ export function InputSuggestions(): ReactNode {
         <SuggestionText
           key={i}
           selected={suggestionIndex === i + offsetIndex}
-          containerWidth={containerSize.width}
+          commandWidth={state.commandWidth}
+          maxWidth={maxWidth}
         >
           {suggestion}
         </SuggestionText>
@@ -162,26 +167,33 @@ export function InputSuggestions(): ReactNode {
 interface SuggestionTextProps {
   children: Suggestion;
   selected: boolean;
-  containerWidth: number;
+  // Width of the command column, shared across all rows so the description
+  // column starts at the same x position in every row.
+  commandWidth: number;
+  // Total width available for command + gap + description.
+  maxWidth: number;
 }
 
 function SuggestionText({
   children: { value, description },
   selected,
-  containerWidth,
+  commandWidth,
+  maxWidth,
 }: SuggestionTextProps): ReactNode {
-  const edgeMargin = 6;
-  const text = ellipsize(value, containerWidth - edgeMargin, Position.START);
+  const suggestion = ellipsize(value, maxWidth, Position.START).padEnd(
+    commandWidth
+  );
+  const descriptionWidth = maxWidth - commandWidth - COLUMN_GAP;
 
   return (
-    <Box flexShrink={0} gap={2}>
+    <Box flexShrink={0} gap={COLUMN_GAP}>
       <Text color={selected ? 'redBright' : 'white'}>
         {selected ? '▶ ' : '  '}
-        {text}
+        {suggestion}
       </Text>
-      {isNonEmptyString(description, true) && (
+      {isNonEmptyString(description, true) && descriptionWidth > 0 && (
         <Text color="gray" italic>
-          {description}
+          {ellipsize(description, descriptionWidth, Position.END)}
         </Text>
       )}
     </Box>
