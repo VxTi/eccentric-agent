@@ -38,7 +38,7 @@ export function UserInputRequestDialog({ request }: Props): ReactNode {
     emitEvent(EventName.INPUT_RESPONSE, response, request.channelId);
 
     setInputRequest(undefined);
-    setUserSelectedInputIndex(-1);
+    setUserSelectedInputIndex(0);
   };
 
   useInput((char, key) => {

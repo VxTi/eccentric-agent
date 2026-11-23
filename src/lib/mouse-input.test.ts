@@ -1,11 +1,10 @@
 import { PassThrough } from 'node:stream';
 import { describe, expect, it } from 'vitest';
+import { type MouseListener, type WheelListener } from '../rendering/hooks';
 import {
   createInkStdin,
   type MouseEvent,
   mouseEventEmitter,
-  type MouseListener,
-  type WheelListener,
 } from './mouse-input';
 
 function createFakeStdin(): {

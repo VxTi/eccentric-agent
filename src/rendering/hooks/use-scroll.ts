@@ -17,6 +17,16 @@ export interface ScrollEvent {
 export type WheelListener = (event: WheelEvent) => void;
 export type ScrollCallback = (params: ScrollEvent) => void;
 
+/**
+ * Subscribes to wheel events and reports velocity-smoothed scroll deltas.
+ *
+ * Each wheel event produces a `scrollDy` whose magnitude scales with the time since the
+ * previous event (fast scrolling yields larger deltas), normalized against a 70 ms interval
+ * and capped so that pauses longer than 70 ms still count as a single step.
+ *
+ * @param callback - Invoked for each wheel event with the computed {@link ScrollEvent}.
+ * @param deps - Extra dependencies; when they change, the callback is resubscribed.
+ */
 export function useScroll(callback: ScrollCallback, deps?: DependencyList) {
   const lastScrollTimeMs = useRef<number>(-1);
 

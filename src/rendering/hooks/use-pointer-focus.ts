@@ -3,6 +3,16 @@ import { type DOMElement, measureElement } from 'ink';
 import { type RefObject, useState } from 'react';
 import { useMouse } from './use-mouse';
 
+/**
+ * Tracks whether the mouse pointer is currently inside the bounds of the referenced element.
+ *
+ * Reports focus changes on mouse-move events only, comparing the pointer position against
+ * the element's measured bounds.
+ *
+ * @param ref - Reference to the element whose bounds define the focus area.
+ * @param callback - Invoked whenever focus state changes; receives `true` on enter, `false` on leave.
+ * @returns `true` while the pointer hovers over the element, `false` otherwise.
+ */
 export function usePointerFocus(
   ref: RefObject<Nullable<DOMElement>>,
   callback?: (hasFocus: boolean) => any
