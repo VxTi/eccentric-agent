@@ -3,9 +3,9 @@ import { type JSX, type ReactNode, useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import { CURSOR_BLINK_INTERVAL_MS } from '../../../lib/constants';
 import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
-import { useUserInputField } from '../../hooks/use-user-input';
-import { Suggestions } from './input-suggestions';
-import { InputRequestDialog } from './user-input-request-dialog';
+import { useUserInputField }      from '../../hooks/use-user-input';
+import { InputSuggestions }       from './input-suggestions';
+import { UserInputRequestDialog } from './user-input-request-dialog';
 
 const INPUT_PLACEHOLDER = 'Reference files with @, and type commands using / ↵';
 
@@ -16,7 +16,7 @@ export default function InputField(): JSX.Element {
     isNonEmptyArray(inputRequest?.request.options) &&
     inputRequest.request.channelId !== CHANNEL_ID_NONE
   ) {
-    return <InputRequestDialog request={inputRequest.request} />;
+    return <UserInputRequestDialog request={inputRequest.request} />;
   }
 
   return (
@@ -30,7 +30,7 @@ export default function InputField(): JSX.Element {
       <Box borderColor="gray" borderStyle="round" flexDirection="column">
         <InputText />
       </Box>
-      <Suggestions />
+      <InputSuggestions />
     </Box>
   );
 }

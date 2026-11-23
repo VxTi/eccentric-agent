@@ -1,5 +1,6 @@
 import { isEmptyString } from '@vxti/typed';
 import { Box, Text } from 'ink';
+import { useMemo } from 'react';
 import { parseMarkdown } from '../../terminal-markdown-renderer/markdown-renderer';
 
 interface MarkdownViewProps {
@@ -8,7 +9,8 @@ interface MarkdownViewProps {
 }
 
 export function ChatMessageContent({ content, uid }: MarkdownViewProps) {
-  const parsedContent = parseMarkdown(content.trim()).trim();
+  const parsedContent = useMemo(() => parseMarkdown(content).trim(), [content]);
+
   if (isEmptyString(parsedContent)) {
     return;
   }

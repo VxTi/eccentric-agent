@@ -1,7 +1,8 @@
-import { isEmptyString, isNotNil } from '@vxti/typed';
+import { isEmptyString, isNil, isNotNil, type Nullable } from '@vxti/typed';
 import fs from 'node:fs';
 import { getCommandSuggestions } from './commands';
 import { store } from './state';
+import { type MaybePromise } from './types/types';
 
 // Match the '@<partial path>' token immediately before the cursor. The path
 // chars include '/' so typing into a nested path keeps the suggestions open,
@@ -31,51 +32,77 @@ export interface Suggestions {
 export async function getInputSuggestions(
   input: string,
   cursorOffset: number
-): Promise<Suggestions | undefined> {
+): Promise<Nullable<Suggestions>> {
+  const preCursorInput = input.slice(0, cursorOffset);
+
+  return await resolveInputSuggestions(
+    preCursorInput,
+    resolveFileSuggestions,
+    resolveCommandSuggestion
+  );
+}
+
+async function resolveInputSuggestions(
+  preCursorInput: string,
+  ...callbacks: ((
+    preCursorInput: string
+  ) => MaybePromise<Nullable<Suggestions>>)[]
+): Promise<Nullable<Suggestions>> {
+  for (const callback of callbacks) {
+    const result = await callback(preCursorInput);
+
+    if (isNotNil(result)) return result;
+  }
+
+  return undefined;
+}
+
+async function resolveFileSuggestions(preCursorInput: string) {
   const {
     cwd,
     git: { ignored },
   } = store.getState().fileSystem;
+  const filePath = getFilePath(preCursorInput);
 
-  const preCursorInput = input.slice(0, cursorOffset);
+  if (isNil(filePath)) return;
 
-  let matches: RegExpExecArray | null;
+  return await Array.fromAsync(
+    fs.promises.glob('**/*', {
+      exclude: Array.from(ignored),
+      cwd,
+    })
+  )
+    .then(files => ({
+      type: SuggestionType.FILE,
+      values: filterSuggestions(
+        files.map(f => ({ value: f })),
+        filePath
+      ),
+    }))
+    .catch(() => undefined);
+}
 
-  if (
-    isNotNil((matches = FILE_SUGGESTION_PATTERN.exec(preCursorInput))) &&
-    isNotNil(matches[1])
-  ) {
-    const filePath = matches[1];
+function resolveCommandSuggestion(
+  preCursorInput: string
+): Nullable<Suggestions> {
+  const command = getCommand(preCursorInput);
 
-    return await Array.fromAsync(
-      fs.promises.glob('**/*', {
-        exclude: Array.from(ignored),
-        cwd,
-      })
-    )
-      .then(files => ({
-        type: SuggestionType.FILE,
-        values: filterSuggestions(
-          files.map(f => ({ value: f })),
-          filePath
-        ),
-      }))
-      .catch(() => undefined);
-  }
+  if (isNil(command)) return;
 
-  if (
-    (matches = COMMAND_PATTERN.exec(preCursorInput)) !== null &&
-    isNotNil(matches[1])
-  ) {
-    const command = matches[1];
+  return {
+    type: SuggestionType.COMMAND,
+    values: filterSuggestions(getCommandSuggestions(), command),
+  };
+}
 
-    return {
-      type: SuggestionType.COMMAND,
-      values: filterSuggestions(getCommandSuggestions(), command),
-    };
-  }
+function getFilePath(preCursorInput: string): string | undefined {
+  const matches = FILE_SUGGESTION_PATTERN.exec(preCursorInput);
+  return matches?.[1];
+}
 
-  return undefined;
+function getCommand(preCursorInput: string): string | undefined {
+  const matches = COMMAND_PATTERN.exec(preCursorInput);
+  return matches?.[1];
 }
 
 function filterSuggestions(

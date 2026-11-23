@@ -19,7 +19,7 @@ interface Props {
   request: UserInputRequest;
 }
 
-export function InputRequestDialog({ request }: Props): ReactNode {
+export function UserInputRequestDialog({ request }: Props): ReactNode {
   const { setInputRequest } = useUserInputField();
   const [userSelectedInputIndex, setUserSelectedInputIndex] =
     useState<number>(0);

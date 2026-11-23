@@ -5,15 +5,13 @@ import { marked } from 'marked';
 import { stdin, stdout } from 'node:process';
 import { render } from 'ink';
 import { Provider } from 'react-redux';
-import { store } from './lib/state';
+import { defaultController, store } from './lib/state';
 import { AgentProvider } from './rendering/context/agent-context';
 import { UserInputProvider } from './rendering/context/user-input-context';
 import { App } from './rendering/components/App';
 import { terminalRenderer } from './rendering/terminal-markdown-renderer/markdown-renderer';
 import { createInkStdin } from './lib/mouse-input';
 import chalk from 'chalk';
-
-const controller = new AbortController();
 
 // Ink never asks the terminal to report mouse events, so we opt in ourselves:
 // decset 1000 selects button press/release events, decset 1006 requests the SGR
@@ -31,7 +29,7 @@ async function main(): Promise<void> {
   if (!stdin.isTTY) {
     throw new Error('stdin not a TTY. CLI need interactive terminal.\n');
   }
-  controller.signal.addEventListener('abort', () => handleExit());
+  defaultController.signal.addEventListener('abort', () => handleExit());
 
   const { waitUntilExit } = render(
     <Provider store={store}>
@@ -66,10 +64,10 @@ async function main(): Promise<void> {
 }
 
 process.on('SIGINT', () => {
-  controller.abort();
+  defaultController.abort();
 });
 process.on('SIGTERM', () => {
-  controller.abort();
+  defaultController.abort();
 });
 
 main()

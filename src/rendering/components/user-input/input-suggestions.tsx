@@ -23,7 +23,7 @@ import { useUserInputField } from '../../hooks';
 
 const MAX_SUGGESTION_COUNT = 14;
 
-export function Suggestions(): ReactNode {
+export function InputSuggestions(): ReactNode {
   const {
     input: { value, cursorOffset },
     setInput,
@@ -94,11 +94,12 @@ export function Suggestions(): ReactNode {
         return;
       }
 
+      const value = values[suggestionIndex]?.value;
+
+      if (isNil(value)) return;
+
       if (key.tab || key.return) {
-        handlePickSuggestion(
-          suggestions.type,
-          values[suggestionIndex]?.value ?? ''
-        );
+        handlePickSuggestion(suggestions.type, value);
         return;
       }
     },

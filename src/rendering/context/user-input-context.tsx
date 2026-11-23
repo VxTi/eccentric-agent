@@ -3,6 +3,7 @@ import {
   isNil,
   isNonEmptyArray,
   isNonEmptyString,
+  type Nullable,
 } from '@vxti/typed';
 import { type DOMElement, type Key, useInput, usePaste } from 'ink';
 import {
@@ -48,8 +49,8 @@ export interface UserInputContextInstance {
   setInputRequest: Dispatch<SetStateAction<InputRequestState | undefined>>;
   inputRef: RefObject<DOMElement | null>;
 
-  suggestions?: Suggestions;
-  setSuggestions: Dispatch<SetStateAction<Suggestions | undefined>>;
+  suggestions: Nullable<Suggestions>;
+  setSuggestions: Dispatch<SetStateAction<Nullable<Suggestions>>>;
 }
 
 export const UserInputContext = createContext<
@@ -59,7 +60,7 @@ export const UserInputContext = createContext<
 export function UserInputProvider({ children }: { children: ReactNode }) {
   const inputRef = useRef<DOMElement>(null);
 
-  const [suggestions, setSuggestions] = useState<Suggestions>();
+  const [suggestions, setSuggestions] = useState<Nullable<Suggestions>>();
 
   // Pending input requests are served one at a time, oldest first. New requests
   // are appended to the tail; the head is the one currently shown. Without this

@@ -16,22 +16,24 @@ const inputSchema = z.object({
   pattern: z
     .string()
     .describe(
-      'The substring or regular expression pattern to search for within file contents'
+      'The JavaScript regular expression (or, with `isRegex: false`, literal substring) to search for' +
+        ' within file contents'
     ),
   filePattern: z
     .string()
     .optional()
     .describe(
       'An optional glob pattern (relative to `directoryPath`) restricting which files are searched, using' +
-        ' glob syntax: `**/` for recursive descent, `*` for wildcard, `{a,b,c}` for alternatives. Examples:' +
-        ' `**/*.{ts,tsx}` (TypeScript files anywhere), `src/**/*.test.ts` (test files under src). Defaults to' +
-        ' `**/*` (every file in the tree).'
+        ' glob syntax: `**/` for recursive descent, `*` for wildcard, `{a,b,c}` for alternatives. A pattern' +
+        ' without `/` matches file names at any depth, so `*.{ts,tsx}` means TypeScript files anywhere;' +
+        ' `src/**/*.test.ts` means test files under src. Defaults to every file in the tree.'
     ),
   isRegex: z
     .boolean()
     .optional()
     .describe(
-      'Whether to interpret `pattern` as a regular expression. Defaults to false (literal substring match).'
+      'Whether to interpret `pattern` as a regular expression. Defaults to true, like `grep -E` / `rg`.' +
+        ' Set to false to match `pattern` as a literal substring (no escaping needed).'
     ),
   caseSensitive: z
     .boolean()
@@ -68,16 +70,28 @@ const outputSchema = z.object({
     ),
 });
 
-function isIgnored(relativePath: string): boolean {
-  const segments = relativePath.split(path.sep);
-  return segments.some(segment => DEFAULT_IGNORED_DIRS.includes(segment));
+function isIgnored(entryPath: string): boolean {
+  return DEFAULT_IGNORED_DIRS.includes(path.basename(entryPath));
+}
+
+function escapeRegex(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Mirrors `rg -g` / `grep --include`: a pattern naming no directory matches
+ * file names at any depth instead of only at the search root.
+ */
+function toRecursiveGlob(filePattern: string): string {
+  return filePattern.includes('/') ? filePattern : `**/${filePattern}`;
 }
 
 export const grep = createTool({
   internalName: 'grep',
   name: 'Grep',
   description:
-    'Searches the contents of files under a directory for a substring or regular expression and returns each' +
+    'Searches the contents of files under a directory for a regular expression (or literal substring with' +
+    ' `isRegex: false`) and returns each' +
     ' match with its file path, line number, column, the matched text, and the full line of context. This is' +
     ' the preferred tool for searching across many files by content — PREFER IT over invoking `Shell` with' +
     ' `grep`, `rg`, or similar commands, which require approval and are less structured. Use `find_file` when' +
@@ -96,21 +110,32 @@ export const grep = createTool({
     const cwd = path.resolve(process.cwd(), directoryPath);
 
     const flags = caseSensitive === false ? 'gi' : 'g';
-    const regex = isRegex
-      ? new RegExp(pattern, flags)
-      : new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+    let regex: RegExp;
+    try {
+      regex = new RegExp(
+        isRegex === false ? escapeRegex(pattern) : pattern,
+        flags
+      );
+    } catch (error) {
+      return Result.Error(
+        `${String(error)}. Escape the special characters, or pass \`isRegex: false\` to search for` +
+          ' the pattern as a literal substring.'
+      );
+    }
 
     const limit = maxResults ?? Infinity;
     const matches: GrepMatch[] = [];
 
-    const files = fs.promises.glob(filePattern ?? DEFAULT_FILE_PATTERN, {
-      cwd,
-    });
+    const files = fs.promises.glob(
+      filePattern !== undefined
+        ? toRecursiveGlob(filePattern)
+        : DEFAULT_FILE_PATTERN,
+      { cwd, exclude: isIgnored }
+    );
 
     for await (const relativePath of files) {
       if (signal.aborted) break;
       if (matches.length >= limit) break;
-      if (isIgnored(relativePath)) continue;
 
       const absolutePath = path.resolve(cwd, relativePath);
 
