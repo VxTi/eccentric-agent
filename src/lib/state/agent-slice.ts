@@ -123,6 +123,10 @@ function collapseCompletedToolCalls(state: AgentState, index: number): void {
   const previous = state.messages[index - 1];
   if (!isCompletedToolCall(previous)) return;
 
+  const failure = previous.failure === true || message.failure === true;
+
+  if (failure) return;
+
   const prevCall = previous.toolCall;
   const msgCall = message.toolCall;
 
@@ -131,16 +135,12 @@ function collapseCompletedToolCalls(state: AgentState, index: number): void {
   };
   tools[msgCall] = (tools[msgCall] ?? 0) + 1;
   const count = (previous.collapsed?.count ?? 1) + 1;
-  const failure =
-    (previous.collapsed?.failure ?? previous.failure === true) ||
-    message.failure === true;
 
-  const collapsed: CollapsedToolCalls = { count, tools, failure };
+  const collapsed: CollapsedToolCalls = { count, tools };
   state.messages[index - 1] = {
     id: previous.id,
     type: 'generic',
     loading: false,
-    failure,
     toolCall: msgCall,
     collapsed,
     content: formatCollapsedToolCalls(collapsed),
@@ -161,6 +161,5 @@ function formatCollapsedToolCalls(collapsed: CollapsedToolCalls): string {
 
   const parts = [label];
   if (isNonEmptyString(summary, true)) parts.push(summary);
-  if (collapsed.failure) parts.push('with failures');
   return chalk.dim(parts.join(' — '));
 }
