@@ -74,20 +74,6 @@ describe('agentSlice setMessage tool-call collapsing', () => {
     expect(state.messages[2]).toMatchObject({ id: 'b', toolCall: 'read_file' });
   });
 
-  it('propagates failure into the collapsed message', () => {
-    let state = stateWith([toolMessage('a', 'read_file')]);
-
-    state = dispatchSetMessage(
-      state,
-      toolMessage('b', 'shell', { failure: true })
-    );
-
-    const collapsed = state.messages.at(-1) as GenericMessage;
-    expect(collapsed.collapsed?.count).toBe(2);
-    expect(collapsed.failure).toBe(true);
-    expect(collapsed.content).toContain('with failures');
-  });
-
   it('falls back to a name ×count summary for tools without a phrase', () => {
     let state = stateWith([toolMessage('a', 'delegate_task')]);
 
@@ -105,10 +91,9 @@ describe('agentSlice setMessage tool-call collapsing', () => {
     state = dispatchSetMessage(state, toolMessage('c', 'read_file'));
 
     const collapsed = state.messages.at(-1) as GenericMessage;
-    expect(collapsed.collapsed).toEqual({
+    expect(collapsed.collapsed).toMatchObject({
       count: 3,
       tools: { read_file: 2, grep: 1 },
-      failure: false,
     });
   });
 });

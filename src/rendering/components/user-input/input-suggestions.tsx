@@ -26,7 +26,7 @@ import {
   SuggestionType,
 } from '../../../lib/input-suggestions';
 import { Position, ellipsize } from '../../../lib/utils/string-utils';
-import { onMouse, onWheel } from '../../../lib/mouse-input';
+import { isWithinBounds, onMouse, onWheel } from '../../../lib/mouse-input';
 import { useUserInputField } from '../../hooks';
 
 const MAX_SUGGESTION_COUNT = 14;
@@ -192,7 +192,13 @@ export function InputSuggestions(): ReactNode {
 
     const { length } = suggestions.values;
 
-    return onWheel(direction => {
+    return onWheel((direction, x, y) => {
+      const container = containerRef.current;
+
+      if (!container || !isWithinBounds(x, y, measureElement(container))) {
+        return;
+      }
+
       setSuggestionIndex(prev => (prev + length - direction) % length);
     });
   }, [suggestions, inputRequest]);

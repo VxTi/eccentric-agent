@@ -192,7 +192,7 @@ describe('ContextStore', () => {
     );
     context.materialize();
     // Raw history still holds the original content, not a stub.
-    expect(contentAt([...context.raw], 0)).toContain('1\tline 1');
+    expect(contentAt([...context.messages], 0)).toContain('1\tline 1');
   });
 
   it('clear() empties the history', () => {

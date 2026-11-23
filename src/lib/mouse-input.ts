@@ -1,4 +1,4 @@
-import { hasArrayLength } from '@vxti/typed';
+import { isNotNil } from '@vxti/typed';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 
@@ -32,8 +32,24 @@ export interface MouseReport {
 }
 
 export type WheelDirection = 1 | -1;
-export type WheelListener = (direction: WheelDirection) => void;
+export type WheelListener = (direction: WheelDirection, x: number, y: number) => void;
 export type MouseListener = (event: MouseReport) => void;
+
+export interface Bounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export function isWithinBounds(x: number, y: number, bounds: Bounds): boolean {
+  return (
+    x >= bounds.x &&
+    x < bounds.x + bounds.width &&
+    y >= bounds.y &&
+    y < bounds.y + bounds.height
+  );
+}
 
 const emitter = new EventEmitter();
 // One listener per mounted scroll view; don't warn as views come and go.
@@ -44,19 +60,21 @@ function emitMouseEvents(buffer: string): string {
   let consumedUpTo = 0;
   let match: RegExpExecArray | null;
 
-  while (hasArrayLength((match = MOUSE_SEQUENCE.exec(buffer)), 4)) {
-    const code = Number.parseInt(match[1], 10);
-    const x = Number.parseInt(match[2], 10) - 1;
-    const y = Number.parseInt(match[3], 10) - 1;
+  // `match` is a RegExpExecArray (full match plus one entry per group), not a
+  // fixed-length tuple; an exact-length guard would never pass.
+  while (isNotNil((match = MOUSE_SEQUENCE.exec(buffer)))) {
+    const code = Number.parseInt(match[1]!, 10);
+    const x = Number.parseInt(match[2]!, 10) - 1;
+    const y = Number.parseInt(match[3]!, 10) - 1;
 
     const isScrolling = (code & WHEEL_FLAG) !== 0;
 
     if (isScrolling) {
       // Wheel reports have no press/release split, so any final byte maps.
       if (code === WHEEL_FLAG) {
-        emitter.emit('wheel', 1);
+        emitter.emit('wheel', 1, x, y);
       } else if (code === WHEEL_FLAG + 1) {
-        emitter.emit('wheel', -1);
+        emitter.emit('wheel', -1, x, y);
       }
     } else {
       const kind: MouseEventKind =

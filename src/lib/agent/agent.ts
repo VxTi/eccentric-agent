@@ -20,7 +20,7 @@ import { loadMcpConfig, type MCP } from './mcp/mcp';
 import { FileCache } from '../file-cache';
 import { TaskList } from '../tasks';
 import { discoverSkillFiles } from './skills/discovery';
-import { pushEntry, store } from '../state';
+import { pushEntry, setMessages, store } from '../state';
 import { constructSystemPrompt } from './system-prompt';
 import {
   isAutoApproveEnabled,
@@ -325,6 +325,14 @@ export class Agent extends EventEmitter<EventMap> {
       content: chalk.dim('Interrupted'),
     });
     this.setStatus({ loading: false, text: '' });
+
+    const messages: Message[] = store
+      .getState()
+      .agent.messages.map(m =>
+        m.type === 'generic' ? { ...m, loading: false } : m
+      );
+
+    store.dispatch(setMessages(messages));
   }
 
   private async handleResponseStream(

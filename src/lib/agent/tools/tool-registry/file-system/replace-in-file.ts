@@ -1,4 +1,4 @@
-import { isEmptyString, isNonEmptyArray } from '@vxti/typed';
+import { isEmptyString, isNil, isNonEmptyArray, isNotNil } from '@vxti/typed';
 import { readFile, writeFile } from 'fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
@@ -62,17 +62,19 @@ export const replaceInFile = createTool({
   name: 'Replace in file',
   description:
     'Replaces a contiguous range of lines in `filePath` with `replacement`. The range' +
-    ' starts at the line whose content equals `range.anchor` (near `range.lineNumber`)' +
-    ' and spans `range.count` lines (inclusive).\n\n' +
+    ' starts at the line matching `range.anchor` (exactly, or ignoring surrounding' +
+    ' whitespace) near `range.lineNumber`, and spans `range.count` lines (inclusive).\n\n' +
     'Use this tool when changing one or more consecutive lines in a file. To insert new' +
     ' lines without losing existing content, replace a line at the insertion point with' +
     ' `replacement` set to that same line plus the new lines.\n\n' +
     'Rules:\n' +
     '  • `lineNumber` is 1-based; `count` must be >= 1.\n' +
     '  • `anchor` must be the current content of the first replaced line. If that line' +
-    '    moved (e.g. after an earlier edit), the nearest line matching `anchor` is used and' +
-    '    reported as `startLine`. The edit is rejected if no line matches, or if two' +
-    '    matches are equally near.\n' +
+    '    moved (e.g. after an earlier edit), the nearest matching line is used and' +
+    '    reported as `startLine`: matching is exact first, then ignoring surrounding' +
+    '    whitespace, with the hinted line preferred when it matches either way. The' +
+    '    edit is rejected if no line matches, or if several lines match equally near.\n' +
+    '  • A whitespace-only `anchor` matches only at the hinted line; it is never relocated.\n' +
     '  • The anchored range must not extend past the end of the file.\n' +
     '  • `replacement` may span multiple lines separated by `\\n`, or be empty to delete' +
     '    the range. A trailing `\\n` in `replacement` is a separator and is dropped.\n' +
@@ -142,7 +144,7 @@ async function handleReplaceInFile({
   const hadTrailingNewline = original.endsWith(newline);
   if (hadTrailingNewline) lines.pop();
 
-  const anchored = resolveAnchor(lines, lineNumber, anchor);
+  const anchored = resolveAnchorLineNumber(lines, lineNumber, anchor);
   if (!anchored.ok) return Result.Error(anchored.error);
   const startLine = anchored.data;
 
@@ -202,20 +204,26 @@ async function handleReplaceInFile({
  * surrounding whitespace, so that edits made after earlier edits (which shift
  * line numbers) still land on the intended line instead of on stale positions.
  */
-function resolveAnchor(
+function resolveAnchorLineNumber(
   lines: string[],
-  hintLine: number,
+  lineNumber: number,
   anchor: string
 ): Result<number> {
-  if (lines[hintLine - 1] === anchor) return Result.Ok(hintLine);
+  const line = lines[lineNumber - 1];
+  // If the anchor matches the hinted line, the line number matches the anchor's line number.
+  if (line === anchor) return Result.Ok(lineNumber);
 
   const trimmedAnchor = anchor.trim();
   // A blank anchor matches every blank line; relocating it would be a guess.
   if (isEmptyString(trimmedAnchor)) {
     return Result.Error(
-      `Line ${hintLine} does not match the blank \`anchor\`, and a blank anchor cannot be` +
+      `Line ${lineNumber} does not match the blank \`anchor\`, and a blank anchor cannot be` +
         ' relocated. Re-read the file and anchor on a non-blank line.'
     );
+  }
+
+  if (line?.trim() === trimmedAnchor) {
+    return Result.Ok(lineNumber);
   }
 
   const matchers: Array<(line: string) => boolean> = [
@@ -224,22 +232,20 @@ function resolveAnchor(
   ];
 
   for (const matches of matchers) {
-    const nearest = findNearestMatches(lines, hintLine, matches);
+    const nearest = findNearestMatches(lines, lineNumber, matches);
     if (nearest.length > 1) {
       return Result.Error(
-        `\`anchor\` is ambiguous: lines ${nearest.join(' and ')} match and are equally` +
-          ` near line ${hintLine}. Re-read the file and retry with the correct \`lineNumber\`.`
+        `\`anchor\` is ambiguous: lines ${nearest.join(', ')} match and are equally` +
+          ` near line ${lineNumber}. Re-read the file and retry with the correct \`lineNumber\`.`
       );
     }
     const [match] = nearest;
-    if (match !== undefined) return Result.Ok(match);
+    if (isNotNil(match)) return Result.Ok(match);
   }
 
-  const actual = lines[hintLine - 1];
-  const found =
-    actual === undefined
-      ? `the file has only ${lines.length} line(s)`
-      : `line ${hintLine} is \`${actual}\``;
+  const found = isNil(line)
+    ? `the file has only ${lines.length} line(s)`
+    : `line ${lineNumber} is \`${line}\``;
   return Result.Error(
     `No line matches \`anchor\` (${found}). The file may have changed; re-read it and retry.`
   );

@@ -22,31 +22,31 @@ import type { ModelMessage } from 'ai';
  * elided only from the point where that happens.
  */
 export class ContextStore {
-  private readonly messages: ModelMessage[] = [];
+  private readonly _messages: ModelMessage[] = [];
 
   /** @param cwd Working directory used to normalise tool paths before matching. */
   public constructor(private readonly cwd: string) {}
 
   public pushUser(content: string): void {
-    this.messages.push({ role: 'user', content });
+    this._messages.push({ role: 'user', content });
   }
 
   public pushResponse(messages: readonly ModelMessage[]): void {
-    this.messages.push(...messages);
+    this._messages.push(...messages);
   }
 
   public clear(): void {
-    this.messages.length = 0;
+    this._messages.length = 0;
   }
 
   /** Number of stored messages. */
   public get size(): number {
-    return this.messages.length;
+    return this._messages.length;
   }
 
   /** The raw, uncompacted history. Exposed for inspection and testing. */
-  public get raw(): readonly ModelMessage[] {
-    return this.messages;
+  public get messages(): readonly ModelMessage[] {
+    return this._messages;
   }
 
   /**
@@ -59,7 +59,7 @@ export class ContextStore {
     const mutations: MutationRef[] = [];
     const callInputs = this.collectCallInputs();
 
-    this.messages.forEach((message, messageIndex) => {
+    this._messages.forEach((message, messageIndex) => {
       if (message.role !== 'tool' || !Array.isArray(message.content)) return;
 
       message.content.forEach((part, partIndex) => {
@@ -88,14 +88,14 @@ export class ContextStore {
     });
 
     const toElide = this.selectElidableReads(reads, mutations);
-    if (toElide.length === 0) return [...this.messages];
+    if (toElide.length === 0) return [...this._messages];
 
     return this.withStubs(toElide);
   }
 
   private collectCallInputs(): Map<string, unknown> {
     const inputs = new Map<string, unknown>();
-    for (const message of this.messages) {
+    for (const message of this._messages) {
       if (message.role !== 'assistant' || !Array.isArray(message.content)) {
         continue;
       }
@@ -145,7 +145,7 @@ export class ContextStore {
   }
 
   private withStubs(toElide: Elision[]): ModelMessage[] {
-    const result = [...this.messages];
+    const result = [...this._messages];
     const cloned = new Set<number>();
 
     for (const { read: ref, reason } of toElide) {

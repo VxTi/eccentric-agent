@@ -69,12 +69,12 @@ describe('createInkStdin mouse reports', () => {
     const wheel: number[] = [];
     const forwarded: string[] = [];
     stdin.on('data', chunk => forwarded.push(String(chunk)));
-    const off = onWheel(direction => wheel.push(direction));
+    const off = onWheel((direction, x, y) => wheel.push(direction, x, y));
 
     write('\u001b[<64;1;1M\u001b[<65;1;1M');
 
     off();
-    expect(wheel).toEqual([1, -1]);
+    expect(wheel).toEqual([1, 0, 0, -1, 0, 0]);
     expect(forwarded.join('')).toBe('\u001b[<64;1;1M\u001b[<65;1;1M');
   });
 
