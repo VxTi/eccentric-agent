@@ -1,5 +1,9 @@
 import type { Message } from '../types/messages';
-import type { AgentSkill, SkillName } from './skills/common';
+import {
+  type AgentSkill,
+  SkillInclusion,
+  type SkillName,
+} from './skills/model';
 import { isNonEmptyString } from '@vxti/typed';
 import {
   type AsyncIterableStream,
@@ -152,6 +156,8 @@ export class Agent extends EventEmitter<EventMap> {
 
   public loadSkill(skill: AgentSkill): void {
     this._skills.set(skill.name, skill);
+
+    if (skill.inclusion === SkillInclusion.ALWAYS) this.activateSkill(skill);
   }
 
   public activateSkill(skill: AgentSkill): void {

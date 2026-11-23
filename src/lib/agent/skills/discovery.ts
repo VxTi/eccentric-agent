@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { getSkillsRootDirPath } from '../config-discovery';
-import type { AgentSkill } from './common';
+import type { AgentSkill } from './model';
 import { readSkillFile } from './parser';
 
 export async function discoverSkillFiles(): Promise<AgentSkill[]> {

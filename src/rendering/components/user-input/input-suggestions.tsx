@@ -30,7 +30,7 @@ import {
   useMouse,
   usePointerFocus,
   useScroll,
-  useUserInputField,
+  useInputArea,
 } from '../../hooks';
 
 const MAX_SUGGESTION_COUNT = 14;
@@ -57,7 +57,7 @@ export function InputSuggestions(): ReactNode {
     suggestions,
     setSuggestions,
     inputRequest,
-  } = useUserInputField();
+  } = useInputArea();
   const containerRef = useRef<DOMElement>(null);
   const containerSize = useBoxMetrics(containerRef);
 

@@ -1,6 +1,6 @@
 import { isNil } from '@vxti/typed';
 import fs from 'node:fs/promises';
-import { type AgentSkill, FrontMatterSchema } from './common';
+import { type AgentSkill, FrontMatterSchema } from './model';
 import { fromMarkdown } from 'mdast-util-from-markdown';
 import { frontmatter } from 'micromark-extension-frontmatter';
 import { frontmatterFromMarkdown } from 'mdast-util-frontmatter';

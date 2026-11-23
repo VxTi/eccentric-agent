@@ -12,7 +12,7 @@ import {
   type InputOption,
   type UserInputRequest,
 } from '../../../lib/events/events';
-import { useUserInputField } from '../../hooks';
+import { useInputArea } from '../../hooks';
 import { parseMarkdown } from '../../terminal-markdown-renderer/markdown-renderer';
 
 interface Props {
@@ -20,7 +20,7 @@ interface Props {
 }
 
 export function UserInputRequestDialog({ request }: Props): ReactNode {
-  const { setInputRequest } = useUserInputField();
+  const { setInputRequest } = useInputArea();
   const [userSelectedInputIndex, setUserSelectedInputIndex] =
     useState<number>(0);
   const [activeIndices, setActiveIndices] = useState<number[]>([]);
@@ -39,6 +39,8 @@ export function UserInputRequestDialog({ request }: Props): ReactNode {
 
     setInputRequest(undefined);
     setUserSelectedInputIndex(0);
+    setActiveIndices([]);
+    setTextValue('');
   };
 
   useInput((char, key) => {
@@ -166,15 +168,13 @@ export function UserInputRequestDialog({ request }: Props): ReactNode {
   );
 }
 
-function InputOption({
-  highlighted,
-  selected,
-  label,
-}: {
+interface InputOptionProps {
   highlighted: boolean;
   selected: boolean;
   label: string;
-}) {
+}
+
+function InputOption({ highlighted, selected, label }: InputOptionProps) {
   return (
     <Box>
       <Text color={selected ? 'redBright' : 'white'}>

@@ -1,22 +1,23 @@
-import { isEmptyString, isNonEmptyArray, isNotNil } from '@vxti/typed';
+import { isEmptyString, isNotNil } from '@vxti/typed';
 import { type JSX, type ReactNode, useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import { CURSOR_BLINK_INTERVAL_MS } from '../../../lib/constants';
-import { CHANNEL_ID_NONE } from '../../../lib/events/user-input';
-import { useUserInputField } from '../../hooks';
+import { hasActiveInputRequest, useInputArea } from '../../hooks';
 import { InputSuggestions } from './input-suggestions';
 import { UserInputRequestDialog } from './user-input-request-dialog';
 
 const INPUT_PLACEHOLDER = 'Reference files with @, and type commands using / ↵';
 
 export default function InputField(): JSX.Element {
-  const { inputRequest } = useUserInputField();
+  const { inputRequest } = useInputArea();
 
-  if (
-    isNonEmptyArray(inputRequest?.request.options) &&
-    inputRequest.request.channelId !== CHANNEL_ID_NONE
-  ) {
-    return <UserInputRequestDialog request={inputRequest.request} />;
+  if (hasActiveInputRequest(inputRequest)) {
+    return (
+      <UserInputRequestDialog
+        key={inputRequest.id}
+        request={inputRequest.request}
+      />
+    );
   }
 
   return (
@@ -38,7 +39,7 @@ export default function InputField(): JSX.Element {
 function InputText(): ReactNode {
   const {
     input: { value, cursorOffset },
-  } = useUserInputField();
+  } = useInputArea();
   const safeCursor = Math.max(0, Math.min(cursorOffset, value.length));
 
   const [blinkState, setBlinkState] = useState<boolean>(false);

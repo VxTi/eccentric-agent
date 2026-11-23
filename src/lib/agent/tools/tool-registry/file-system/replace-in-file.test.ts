@@ -412,5 +412,85 @@ describe('replace_in_file', () => {
 
       expect(result.ok).toBe(false);
     });
+
+    it('ignores a copied read_file line-number prefix in the anchor', async () => {
+      const filePath = await prepareFixture();
+
+      const result = await replaceInFile.handle(
+        {
+          filePath,
+          range: { lineNumber: 5, anchor: ' 5\tline 5', count: 1 },
+          replacement: 'FIVE',
+        },
+        channel,
+        signal
+      );
+
+      expect(result.ok).toBe(true);
+      expect((await readLines(filePath))[4]).toBe('FIVE');
+    });
+
+    it('anchors on the first line of a multi-line anchor', async () => {
+      const filePath = await prepareFixture();
+
+      const result = await replaceInFile.handle(
+        {
+          filePath,
+          range: { lineNumber: 3, anchor: 'line 5\nline 6', count: 2 },
+          replacement: 'FIVE\nSIX',
+        },
+        channel,
+        signal
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.startLine).toBe(5);
+    });
+
+    it('matches a blank anchor against a whitespace-only hinted line', async () => {
+      const filePath = path.join(tmpDir, `fixture-${++counter}.txt`);
+      await fs.writeFile(filePath, 'a\n    \nb\n', 'utf-8');
+
+      const result = await replaceInFile.handle(
+        {
+          filePath,
+          range: { lineNumber: 2, anchor: '', count: 1 },
+          replacement: 'X',
+        },
+        channel,
+        signal
+      );
+
+      expect(result.ok).toBe(true);
+      expect(await fs.readFile(filePath, 'utf-8')).toBe('a\nX\nb\n');
+    });
+
+    it('numbers lines like read_file in files with mixed line endings', async () => {
+      const filePath = path.join(tmpDir, `fixture-${++counter}.txt`);
+      await fs.writeFile(filePath, 'one\r\ntwo\nthree\nfour\r\n', 'utf-8');
+
+      const read = await readFile.handle({ filePath }, channel, signal);
+      expect(read.ok).toBe(true);
+      if (!read.ok) return;
+      expect(read.data.content).toContain('3\tthree');
+
+      const result = await replaceInFile.handle(
+        {
+          filePath,
+          range: { lineNumber: 3, anchor: 'three', count: 1 },
+          replacement: 'THREE',
+        },
+        channel,
+        signal
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.startLine).toBe(3);
+      expect(await fs.readFile(filePath, 'utf-8')).toBe(
+        'one\r\ntwo\r\nTHREE\r\nfour\r\n'
+      );
+    });
   });
 });

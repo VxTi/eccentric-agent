@@ -1,5 +1,9 @@
 import type { MCP } from './mcp/mcp';
-import type { AgentSkill, SkillName } from './skills/common';
+import {
+  type AgentSkill,
+  SkillInclusion,
+  type SkillName,
+} from './skills/model';
 import type { FileCache } from '../file-cache';
 import { type TaskList, TaskStatus } from '../tasks';
 import { type Nullable, isNil } from '@vxti/typed';
@@ -97,12 +101,14 @@ function constructSkillsSystemPromptFragment(
 
   const skillsSummary = skills
     .values()
+    // Exclude always-included skills, as these are already included in the agent's system prompt
+    .filter(skill => skill.inclusion !== SkillInclusion.ALWAYS)
     .map(skill => `- Name: ${skill.name}.\nDescription:\n${skill.description}`)
     .toArray()
-    .join('\n---');
+    .join('\n---\n');
   return [
     'You have access to the following skills, which are described by `name` and `description`. Use the \`use_skill\`' +
-      ' tool to invoke them if the current context relates to the description:',
+      ' tool to invoke them if the current context relates to the description, or when the user asks to use it:',
     skillsSummary,
   ].join('\n\n');
 }

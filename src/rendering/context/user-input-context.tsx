@@ -30,9 +30,11 @@ import {
 import { type Optional, wrapOptional } from '../../lib/optional';
 import { useAppSelector } from '../../lib/state';
 import { formatReferencedFiles } from '../components/user-input/input-field';
-import { useAgent } from '../hooks/use-agent';
+import { useAgent } from '../hooks';
+import { v7 as uuid } from 'uuid';
 
-interface InputRequestState {
+export interface InputRequestState {
+  id: string;
   request: UserInputRequest;
   suggestionIndex: number;
 }
@@ -42,7 +44,7 @@ interface InputState {
   value: string;
 }
 
-export interface UserInputContextInstance {
+export interface InputAreaContextInstance {
   input: InputState;
   setInput: Dispatch<SetStateAction<InputState>>;
   inputRequest?: InputRequestState | undefined;
@@ -54,7 +56,7 @@ export interface UserInputContextInstance {
 }
 
 export const UserInputContext = createContext<
-  UserInputContextInstance | undefined
+  InputAreaContextInstance | undefined
 >(undefined);
 
 export function UserInputProvider({ children }: { children: ReactNode }) {
@@ -114,11 +116,12 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     return eventOn(
       EventName.REQUEST_INPUT,
-      ({ detail }: UserInputRequestEvent<string>) =>
+      ({ detail }: UserInputRequestEvent<string>) => {
         setRequestQueue(prev => [
           ...prev,
-          { request: detail, suggestionIndex: 0 },
-        ])
+          { id: uuid(), request: detail, suggestionIndex: 0 },
+        ]);
+      }
     );
   }, []);
 
@@ -134,44 +137,47 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
    * steps back towards newer ones and leaves history mode once past the
    * newest, restoring the empty input. Any typed edit exits history mode.
    */
-  const browseHistory = (older: boolean): void => {
-    if (!isNonEmptyArray(historyEntries)) return;
+  const browseHistory = useCallback(
+    (older: boolean): void => {
+      if (!isNonEmptyArray(historyEntries)) return;
 
-    if (older) {
-      // Recall only starts from an empty input; once browsing, an emptied
-      // input (e.g. after a suggestion command) restarts from the newest.
-      if (historyIndex.current === null && !isEmptyString(value)) return;
+      if (older) {
+        // Recall only starts from an empty input; once browsing, an emptied
+        // input (e.g. after a suggestion command) restarts from the newest.
+        if (historyIndex.current === null && !isEmptyString(value)) return;
 
-      const index =
-        historyIndex.current === null || isEmptyString(value)
-          ? historyEntries.length - 1
-          : Math.max(0, historyIndex.current - 1);
-      historyIndex.current = index;
+        const index =
+          historyIndex.current === null || isEmptyString(value)
+            ? historyEntries.length - 1
+            : Math.max(0, historyIndex.current - 1);
+        historyIndex.current = index;
+        const valueAtIndex = historyEntries[index];
+        if (!isNonEmptyString(valueAtIndex)) return;
+        setInput({
+          value: valueAtIndex,
+          cursorOffset: valueAtIndex.length,
+        });
+        return;
+      }
+
+      if (historyIndex.current === null) return;
+
+      const index = historyIndex.current + 1;
+      historyIndex.current = index < historyEntries.length ? index : null;
+
       const valueAtIndex = historyEntries[index];
       if (!isNonEmptyString(valueAtIndex)) return;
-      setInput({
-        value: valueAtIndex,
-        cursorOffset: valueAtIndex.length,
-      });
-      return;
-    }
-
-    if (historyIndex.current === null) return;
-
-    const index = historyIndex.current + 1;
-    historyIndex.current = index < historyEntries.length ? index : null;
-
-    const valueAtIndex = historyEntries[index];
-    if (!isNonEmptyString(valueAtIndex)) return;
-    setInput(
-      index < historyEntries.length
-        ? {
-            value: valueAtIndex,
-            cursorOffset: valueAtIndex.length,
-          }
-        : { value: '', cursorOffset: 0 }
-    );
-  };
+      setInput(
+        index < historyEntries.length
+          ? {
+              value: valueAtIndex,
+              cursorOffset: valueAtIndex.length,
+            }
+          : { value: '', cursorOffset: 0 }
+      );
+    },
+    [historyEntries, value]
+  );
 
   usePaste(text => {
     setInput(prev => ({

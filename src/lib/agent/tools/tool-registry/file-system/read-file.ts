@@ -4,6 +4,7 @@ import * as fs from 'node:fs/promises';
 import * as z from 'zod';
 import { Result } from '../../../../result';
 import { store } from '../../../../state';
+import { detectLineEnding, LINE_BREAK } from '../../../../utils/string-utils';
 import { createTool } from '../../tool-definition';
 
 const MIN_LINE_NUMBER_OFFSET = 1;
@@ -90,8 +91,8 @@ export const readFile = createTool({
 
     fileCache.set(absolutePath, stats.mtimeMs);
 
-    const newline = raw.match(/\r?\n/)?.[0] ?? '\n';
-    const lines = raw.split(newline);
+    const newline = detectLineEnding(raw);
+    const lines = raw.split(LINE_BREAK);
 
     if (!isValidSelection(selection, lines.length)) {
       return Result.Error(`Invalid selection, line count: ${lines.length}`);

@@ -1,5 +1,10 @@
 import * as z from 'zod';
 
+export enum SkillInclusion {
+  ALWAYS = 'always',
+  AUTO = 'auto',
+}
+
 /**
  * See  [Specification](https://agentskills.io/specification)
  */
@@ -16,6 +21,7 @@ export const FrontMatterSchema = z.object({
   license: z.optional(z.string()),
   compatibility: z.optional(z.string().min(1).max(500)),
   metadata: z.optional(z.record(z.string(), z.string())),
+  inclusion: z.enum(SkillInclusion).default(SkillInclusion.AUTO),
 });
 
 export type SkillName = string & {};

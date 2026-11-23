@@ -6,6 +6,7 @@ import { Result } from '../../../../result';
 import { store } from '../../../../state';
 import { formatDiffMd } from '../../../../utils/diff-utils';
 import { existsAsync } from '../../../../utils/fs';
+import { detectLineEnding, LINE_BREAK } from '../../../../utils/string-utils';
 import { createTool } from '../../tool-definition';
 
 const inputSchema = z.object({
@@ -56,6 +57,7 @@ const outputSchema = z.object({
 });
 
 const MAX_SHOWN_LINES = 5;
+const TRAILING_LINE_BREAK = /\r?\n$/;
 
 export const replaceInFile = createTool({
   internalName: 'replace_in_file',
@@ -75,6 +77,8 @@ export const replaceInFile = createTool({
     '    whitespace, with the hinted line preferred when it matches either way. The' +
     '    edit is rejected if no line matches, or if several lines match equally near.\n' +
     '  • A whitespace-only `anchor` matches only at the hinted line; it is never relocated.\n' +
+    '  • Only the first line of `anchor` is used, and a copied `read_file` prefix' +
+    '    (`<lineNumber>\\t`) is ignored.\n' +
     '  • The anchored range must not extend past the end of the file.\n' +
     '  • `replacement` may span multiple lines separated by `\\n`, or be empty to delete' +
     '    the range. A trailing `\\n` in `replacement` is a separator and is dropped.\n' +
@@ -138,15 +142,14 @@ async function handleReplaceInFile({
   }
 
   const original = await readFile(absolutePath, 'utf-8');
-  const newline = original.match(/\r?\n/)?.[0] ?? '\n';
-  const lines = original.split(newline);
-
-  const hadTrailingNewline = original.endsWith(newline);
+  const newline = detectLineEnding(original);
+  const hadTrailingNewline = TRAILING_LINE_BREAK.test(original);
+  const lines = original.split(LINE_BREAK);
   if (hadTrailingNewline) lines.pop();
 
-  const anchored = resolveAnchorLineNumber(lines, lineNumber, anchor);
-  if (!anchored.ok) return Result.Error(anchored.error);
-  const startLine = anchored.data;
+  const located = locateRangeStart(lines, lineNumber, anchor);
+  if (!located.ok) return Result.Error(located.error);
+  const startLine = located.data;
 
   const endLine = startLine + count - 1;
   if (endLine > lines.length) {
@@ -156,24 +159,14 @@ async function handleReplaceInFile({
     );
   }
 
-  const replacementLines = isEmptyString(replacement)
-    ? []
-    : replacement.split(/\r?\n/);
-  if (
-    replacementLines.length > 1 &&
-    replacementLines[replacementLines.length - 1] === ''
-  ) {
-    replacementLines.pop();
-  }
-
-  const repaired = repairSeamDuplication(
+  const trimmed = trimDuplicatedSeams(
     lines,
     startLine,
     endLine,
-    replacementLines
+    splitReplacement(replacement)
   );
 
-  lines.splice(startLine - 1, count, ...repaired.replacementLines);
+  lines.splice(startLine - 1, count, ...trimmed.replacementLines);
 
   let updated = lines.join(newline);
   if (hadTrailingNewline && isNonEmptyArray(lines)) {
@@ -187,8 +180,8 @@ async function handleReplaceInFile({
       bytesWritten: Buffer.byteLength(updated, 'utf-8'),
       startLine,
       linesRemoved: count,
-      linesInserted: repaired.replacementLines.length,
-      duplicatesRemoved: repaired.duplicatesRemoved,
+      linesInserted: trimmed.replacementLines.length,
+      duplicatesRemoved: trimmed.duplicatesRemoved,
       filePath,
     },
     {
@@ -198,32 +191,36 @@ async function handleReplaceInFile({
   );
 }
 
+function splitReplacement(replacement: string): string[] {
+  if (isEmptyString(replacement)) return [];
+
+  const lines = replacement.split(LINE_BREAK);
+  if (lines.length > 1 && lines.at(-1) === '') lines.pop();
+  return lines;
+}
+
 /**
- * Locates the 1-based start line of the range. The hinted line wins when it
- * matches; otherwise the nearest exact match, then the nearest match ignoring
- * surrounding whitespace, so that edits made after earlier edits (which shift
- * line numbers) still land on the intended line instead of on stale positions.
+ * The hinted line wins when it matches; otherwise the nearest exact match,
+ * then the nearest whitespace-insensitive match, so that edits planned from a
+ * read made before earlier edits still land on the intended line.
  */
-function resolveAnchorLineNumber(
+function locateRangeStart(
   lines: string[],
   lineNumber: number,
-  anchor: string
+  rawAnchor: string
 ): Result<number> {
-  const line = lines[lineNumber - 1];
-  // If the anchor matches the hinted line, the line number matches the anchor's line number.
-  if (line === anchor) return Result.Ok(lineNumber);
+  const hintedLine = lines[lineNumber - 1];
+  if (hintedLine === rawAnchor) return Result.Ok(lineNumber);
 
+  const anchor = normalizeAnchor(rawAnchor, lineNumber);
   const trimmedAnchor = anchor.trim();
-  // A blank anchor matches every blank line; relocating it would be a guess.
+  if (hintedLine?.trim() === trimmedAnchor) return Result.Ok(lineNumber);
+
   if (isEmptyString(trimmedAnchor)) {
     return Result.Error(
       `Line ${lineNumber} does not match the blank \`anchor\`, and a blank anchor cannot be` +
         ' relocated. Re-read the file and anchor on a non-blank line.'
     );
-  }
-
-  if (line?.trim() === trimmedAnchor) {
-    return Result.Ok(lineNumber);
   }
 
   const matchers: Array<(line: string) => boolean> = [
@@ -232,7 +229,7 @@ function resolveAnchorLineNumber(
   ];
 
   for (const matches of matchers) {
-    const nearest = findNearestMatches(lines, lineNumber, matches);
+    const nearest = findNearestMatchingLines(lines, lineNumber, matches);
     if (nearest.length > 1) {
       return Result.Error(
         `\`anchor\` is ambiguous: lines ${nearest.join(', ')} match and are equally` +
@@ -243,47 +240,61 @@ function resolveAnchorLineNumber(
     if (isNotNil(match)) return Result.Ok(match);
   }
 
-  const found = isNil(line)
+  const found = isNil(hintedLine)
     ? `the file has only ${lines.length} line(s)`
-    : `line ${lineNumber} is \`${line}\``;
+    : `line ${lineNumber} is \`${hintedLine}\``;
   return Result.Error(
     `No line matches \`anchor\` (${found}). The file may have changed; re-read it and retry.`
   );
 }
 
+/**
+ * Models often paste several lines, or the `<n>\t` prefix `read_file` prints,
+ * as the anchor; neither can ever equal a single file line.
+ */
+function normalizeAnchor(anchor: string, lineNumber: number): string {
+  const [firstLine = ''] = anchor.split(LINE_BREAK);
+  const readFilePrefix = `${lineNumber}\t`;
+  const unpadded = firstLine.trimStart();
+
+  return unpadded.startsWith(readFilePrefix)
+    ? unpadded.slice(readFilePrefix.length)
+    : firstLine;
+}
+
 /** All matching 1-based line numbers at the minimum distance from `hintLine`. */
-function findNearestMatches(
+function findNearestMatchingLines(
   lines: string[],
   hintLine: number,
   matches: (line: string) => boolean
 ): number[] {
-  let best: number[] = [];
-  let bestDistance = Infinity;
+  let nearest: number[] = [];
+  let nearestDistance = Infinity;
 
   lines.forEach((line, index) => {
     if (!matches(line)) return;
     const lineNumber = index + 1;
     const distance = Math.abs(lineNumber - hintLine);
-    if (distance < bestDistance) {
-      best = [lineNumber];
-      bestDistance = distance;
-    } else if (distance === bestDistance) {
-      best.push(lineNumber);
+    if (distance < nearestDistance) {
+      nearest = [lineNumber];
+      nearestDistance = distance;
+    } else if (distance === nearestDistance) {
+      nearest.push(lineNumber);
     }
   });
 
-  return best;
+  return nearest;
 }
 
 /**
- * Trims leading/trailing replacement lines that repeat the file lines just
+ * Drops leading/trailing replacement lines that repeat the file lines just
  * outside the replaced range, as happens when a model sends a diff-style hunk
- * with context. Only seams containing a significant line count: a lone `}` or
+ * with context. Only seams containing a letter or digit count: a lone `}` or
  * blank line matching its neighbour is as likely intentional as accidental.
- * If trimming would consume the whole replacement, nothing is trimmed, since
- * that would silently turn the edit into a deletion.
+ * Nothing is trimmed if that would empty the replacement, since that would
+ * silently turn the edit into a deletion.
  */
-function repairSeamDuplication(
+function trimDuplicatedSeams(
   lines: string[],
   startLine: number,
   endLine: number,
@@ -292,19 +303,21 @@ function repairSeamDuplication(
   const linesAbove = lines.slice(0, startLine - 1);
   const linesBelow = lines.slice(endLine);
 
-  const leading = longestSeam(replacementLines.length, linesAbove.length, k =>
-    linesEqual(replacementLines.slice(0, k), linesAbove.slice(-k))
+  const leading = findLongestSeam(
+    replacementLines.length,
+    linesAbove.length,
+    k => linesEqual(replacementLines.slice(0, k), linesAbove.slice(-k))
   );
-  const trailing = longestSeam(replacementLines.length, linesBelow.length, k =>
-    linesEqual(replacementLines.slice(-k), linesBelow.slice(0, k))
+  const trailing = findLongestSeam(
+    replacementLines.length,
+    linesBelow.length,
+    k => linesEqual(replacementLines.slice(-k), linesBelow.slice(0, k))
   );
 
-  const isSignificant = (seam: string[]) =>
-    seam.some(line => /[\p{L}\p{N}]/u.test(line));
-  const leadingTrim = isSignificant(replacementLines.slice(0, leading))
+  const leadingTrim = isSignificantSeam(replacementLines.slice(0, leading))
     ? leading
     : 0;
-  const trailingTrim = isSignificant(
+  const trailingTrim = isSignificantSeam(
     replacementLines.slice(replacementLines.length - trailing)
   )
     ? trailing
@@ -323,13 +336,21 @@ function repairSeamDuplication(
   };
 }
 
-function longestSeam(
+function isSignificantSeam(seam: string[]): boolean {
+  return seam.some(line => /[\p{L}\p{N}]/u.test(line));
+}
+
+function findLongestSeam(
   replacementLength: number,
   contextLength: number,
-  matchesAt: (k: number) => boolean
+  matchesAt: (seamLength: number) => boolean
 ): number {
-  for (let k = Math.min(replacementLength, contextLength); k > 0; k--) {
-    if (matchesAt(k)) return k;
+  for (
+    let seamLength = Math.min(replacementLength, contextLength);
+    seamLength > 0;
+    seamLength--
+  ) {
+    if (matchesAt(seamLength)) return seamLength;
   }
   return 0;
 }

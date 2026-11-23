@@ -21,3 +21,9 @@ export function ellipsize(
       return `${input.slice(0, length - 3)}...`;
   }
 }
+
+export const LINE_BREAK = /\r?\n/;
+
+export function detectLineEnding(content: string): string {
+  return content.match(LINE_BREAK)?.[0] ?? '\n';
+}
