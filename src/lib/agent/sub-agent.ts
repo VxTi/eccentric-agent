@@ -192,13 +192,13 @@ export class SubAgent {
         // so a cancelled task can never hang on a user who never answers.
         // An unanswered prompt also settles via the 1-minute default timeout,
         // surfacing to the sub-agent as a denial it can report and work around.
-        const approvalResult = await approveToolUse(
+        const approvalResult = await approveToolUse({
           tool,
           input,
-          this.channel,
-          this.signal,
-          APPROVAL_TIMEOUT_MS
-        );
+          channel: this.channel,
+          signal: this.signal,
+          timeoutMs: APPROVAL_TIMEOUT_MS,
+        });
         if (!approvalResult.approved) {
           return Result.Error(approvalResult.reason);
         }

@@ -53,9 +53,7 @@ export function InputRequestDialog({ request }: Props): ReactNode {
       }
       if (key.return || key.tab) {
         if (isNonEmptyString(textValue)) {
-          submit([
-            { value: FREE_TEXT_INPUT_ID, label: textValue },
-          ] as NonEmptyArray<InputOption>);
+          submit([{ value: FREE_TEXT_INPUT_ID, label: textValue }]);
         }
         return;
       }

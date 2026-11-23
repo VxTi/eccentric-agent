@@ -24,6 +24,14 @@ interface ToolRejection {
 
 export type ToolApprovalResult = ToolApproval | ToolRejection;
 
+interface ApproveToolUseProps {
+  tool: SomeTool;
+  input: unknown;
+  channel: NotifierChannel<ToolChannelParams>;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
 /**
  * Runs the approval flow for a single tool invocation: consults the tool's
  * `requiresApproval`, prompts the user when needed, and applies the chosen
@@ -34,13 +42,13 @@ export type ToolApprovalResult = ToolApproval | ToolRejection;
  * Shared between the primary agent loop and sub-agents so delegated tools are
  * gated by exactly the same prompts as inline ones.
  */
-export async function approveToolUse(
-  tool: SomeTool,
-  input: unknown,
-  channel: NotifierChannel<ToolChannelParams>,
-  signal?: AbortSignal,
-  timeoutMs?: number
-): Promise<ToolApprovalResult> {
+export async function approveToolUse({
+  tool,
+  input,
+  channel,
+  signal,
+  timeoutMs,
+}: ApproveToolUseProps): Promise<ToolApprovalResult> {
   if (!(await tool.requiresApproval(input, channel))) {
     return { approved: true };
   }
@@ -55,6 +63,7 @@ export async function approveToolUse(
     })),
     allowMultiple: false,
     signal,
+    timeoutMs,
   })
     .then(([choice]) => ({ approved: true, result: choice.value }))
     .catch(err => ({ approved: false, result: String(err) }));
@@ -124,7 +133,12 @@ function makeTool(
         content: tool.inputToString(input, channel),
       });
 
-      const approvalResult = await approveToolUse(tool, input, channel, signal);
+      const approvalResult = await approveToolUse({
+        tool,
+        input,
+        channel,
+        signal,
+      });
 
       if (!approvalResult.approved) {
         notifier.unsubscribe(toolCallId);
