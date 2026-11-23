@@ -114,11 +114,18 @@ describe('read_file', () => {
     const [[labeledLine, seenContent]] = lineNrs;
 
     const replaceResult = await replaceInFile.handle(
-      { filePath, line: labeledLine, count: 1, replacement: 'REPLACED' },
+      {
+        filePath,
+        range: { lineNumber: labeledLine, anchor: seenContent, count: 1 },
+        replacement: 'REPLACED',
+      },
       channel,
       signal
     );
     expect(replaceResult.ok).toBe(true);
+    if (!replaceResult.ok) return;
+    // The anchor would mask a wrong label by relocating, so assert no relocation.
+    expect(replaceResult.data.startLine).toBe(labeledLine);
 
     const updated = await fs.readFile(filePath, 'utf-8');
     const updatedLines = updated.split('\n');

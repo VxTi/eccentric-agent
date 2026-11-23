@@ -283,7 +283,10 @@ export class Agent extends EventEmitter<EventMap> {
   private async handleResponseStream(
     stream: AsyncIterableStream<TextStreamPart<ToolSet>>
   ): Promise<void> {
-    const messages = new Map<string, string>();
+    type PartId = string;
+
+    const messages = new Map<PartId, { content: string; messageId: string }>();
+
     let reasoning: { id: string; startedAt: number } | undefined;
 
     // Reasoning is surfaced in the message list: a spinner row while the model
@@ -302,23 +305,31 @@ export class Agent extends EventEmitter<EventMap> {
       });
       reasoning = undefined;
     };
+
     try {
       for await (const part of stream) {
         switch (part.type) {
           case 'text-start':
-            messages.set(part.id, '');
+            messages.set(part.id, { content: '', messageId: uuid() });
             break;
           case 'text-delta': {
-            const updated = (messages.get(part.id) ?? '') + part.text;
-            messages.set(part.id, updated);
+            const prev = messages.get(part.id);
+            const updated = (prev?.content ?? '') + part.text;
+            const messageId = prev?.messageId ?? uuid();
+
+            messages.set(part.id, { content: updated, messageId });
 
             if (isNonEmptyString(updated)) {
               this.emit('message-delta', {
                 type: 'assistant',
-                id: part.id,
+                id: messageId,
                 content: updated,
               });
             }
+            break;
+          }
+          case 'text-end': {
+            messages.delete(part.id);
             break;
           }
           case 'reasoning-start': {
