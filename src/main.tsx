@@ -14,12 +14,12 @@ import { createInkStdin } from './lib/mouse-input';
 import chalk from 'chalk';
 
 // Ink never asks the terminal to report mouse events, so we opt in ourselves:
-// decset 1000 selects button press/release events, decset 1006 requests the SGR
-// encoding (`ESC[<64;x;yM`). Ink then drops these sequences before `useInput`
-// (it discards any control sequence it can't map to a key), so `createInkStdin`
-// taps stdin directly to deliver the wheel events to `useScroll`.
-const ENABLE_MOUSE_REPORTING = '\u001b[?1000h\u001b[?1006h';
-const DISABLE_MOUSE_REPORTING = '\u001b[?1006l\u001b[?1000l';
+// decset 1003 selects any-event tracking (motion, press and release), decset
+// 1006 requests the SGR encoding (`ESC[<32;x;yM`). Ink then drops these
+// sequences before `useInput` (it discards any control sequence it can't map
+// to a key), so `createInkStdin` taps stdin directly to deliver mouse events.
+const ENABLE_MOUSE_REPORTING = '\u001b[?1003h\u001b[?1006h';
+const DISABLE_MOUSE_REPORTING = '\u001b[?1006l\u001b[?1003l\u001b[?1000l';
 
 marked.setOptions({
   renderer: terminalRenderer,

@@ -1,4 +1,9 @@
-import { isNil, isNonEmptyArray, isNonEmptyString } from '@vxti/typed';
+import {
+  isNil,
+  isNonEmptyArray,
+  isNonEmptyString,
+  isNotNil,
+} from '@vxti/typed';
 import {
   type ReactNode,
   useCallback,
@@ -7,13 +12,21 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Box, type DOMElement, Text, useBoxMetrics, useInput } from 'ink';
+import {
+  Box,
+  type DOMElement,
+  measureElement,
+  Text,
+  useBoxMetrics,
+  useInput,
+} from 'ink';
 import { processCommand } from '../../../lib/commands';
 import {
   type Suggestion,
   SuggestionType,
 } from '../../../lib/input-suggestions';
 import { Position, ellipsize } from '../../../lib/utils/string-utils';
+import { onMouse, onWheel } from '../../../lib/mouse-input';
 import { useUserInputField } from '../../hooks';
 
 const MAX_SUGGESTION_COUNT = 14;
@@ -140,6 +153,49 @@ export function InputSuggestions(): ReactNode {
       ),
     };
   }, [suggestions, suggestionIndex, maxWidth]);
+
+  // Hovering a row selects it; pressing the left button on a row submits it,
+  // mirroring Tab/Return. Rows are one line tall, so the report's viewport row
+  // minus the container's top (live-region coordinates; the live region starts
+  // at viewport row 0 in alternate-screen mode) is the row under the pointer.
+  useEffect(() => {
+    if (!state || isNotNil(inputRequest) || !suggestions?.values) return;
+
+    const { type, values } = suggestions;
+
+    return onMouse(event => {
+      const container = containerRef.current;
+
+      if (!container) return;
+
+      const rowIndex = event.y - measureElement(container).y;
+
+      if (rowIndex < 0 || rowIndex >= state.shown.length) return;
+
+      if (event.kind === 'move') {
+        setSuggestionIndex(state.offsetIndex + rowIndex);
+        return;
+      }
+
+      if (event.kind !== 'down' || event.button !== 0) return;
+
+      const picked = values[state.offsetIndex + rowIndex]?.value;
+
+      if (!isNil(picked)) handlePickSuggestion(type, picked);
+    });
+  }, [state, suggestions, inputRequest, handlePickSuggestion]);
+
+  // Wheel scrolling steps the highlight like the arrow keys. The lib reports
+  // wheel up as 1, so the delta is negated to move the selection with the wheel.
+  useEffect(() => {
+    if (isNotNil(inputRequest) || !isNonEmptyArray(suggestions?.values)) return;
+
+    const { length } = suggestions.values;
+
+    return onWheel(direction => {
+      setSuggestionIndex(prev => (prev + length - direction) % length);
+    });
+  }, [suggestions, inputRequest]);
 
   if (!state) return;
 

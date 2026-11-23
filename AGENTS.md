@@ -121,3 +121,5 @@ If a task demands you to write code, try to recycle as many utility functions as
 Instead of writing `if (<something> === undefined)`, use `if (isNotNil(...))` instead.
 Also, use as little comments as possible. Code should be self-explanatory. Comments should
 only ever serve as a last resort if the task is not trivial.
+If the task could be written in nested ternaries, DON'T. Make use of utility functions instead.
+Make code as readable as possible, without unnecessary comments.

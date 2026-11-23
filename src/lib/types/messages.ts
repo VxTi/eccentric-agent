@@ -35,8 +35,6 @@ export interface CollapsedToolCalls {
   /** Tool internal name → number of calls collapsed for that tool, in the
    *  order the tools first appeared. */
   tools: Partial<Record<ToolIdentifier, number>>;
-  /** Whether any of the collapsed calls failed. */
-  failure: boolean;
 }
 
 export type Message = UserMessage | AssistantMessage | GenericMessage;
