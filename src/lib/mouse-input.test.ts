@@ -2,9 +2,10 @@ import { PassThrough } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 import {
   createInkStdin,
-  onMouse,
-  onWheel,
-  type MouseReport,
+  type MouseEvent,
+  mouseEventEmitter,
+  type MouseListener,
+  type WheelListener,
 } from './mouse-input';
 
 function createFakeStdin(): {
@@ -23,10 +24,24 @@ function createFakeStdin(): {
   };
 }
 
+function onMouse(listener: MouseListener): () => void {
+  mouseEventEmitter.on('mouse', listener);
+  return () => {
+    mouseEventEmitter.off('mouse', listener);
+  };
+}
+
+function onWheel(listener: WheelListener): () => void {
+  mouseEventEmitter.on('wheel', listener);
+  return () => {
+    mouseEventEmitter.off('wheel', listener);
+  };
+}
+
 describe('createInkStdin mouse reports', () => {
   it('parses a motion report into a 0-based viewport move event', () => {
     const { stdin, write } = createFakeStdin();
-    const events: MouseReport[] = [];
+    const events: MouseEvent[] = [];
     stdin.on('data', () => {});
     const off = onMouse(event => events.push(event));
 
@@ -38,7 +53,7 @@ describe('createInkStdin mouse reports', () => {
 
   it('maps press and release reports to down and up events', () => {
     const { stdin, write } = createFakeStdin();
-    const events: MouseReport[] = [];
+    const events: MouseEvent[] = [];
     stdin.on('data', () => {});
     const off = onMouse(event => events.push(event));
 
@@ -54,7 +69,7 @@ describe('createInkStdin mouse reports', () => {
 
   it('preserves the button code for non-left buttons', () => {
     const { stdin, write } = createFakeStdin();
-    const events: MouseReport[] = [];
+    const events: MouseEvent[] = [];
     stdin.on('data', () => {});
     const off = onMouse(event => events.push(event));
 
@@ -69,7 +84,7 @@ describe('createInkStdin mouse reports', () => {
     const wheel: number[] = [];
     const forwarded: string[] = [];
     stdin.on('data', chunk => forwarded.push(String(chunk)));
-    const off = onWheel((direction, x, y) => wheel.push(direction, x, y));
+    const off = onWheel(({ direction, x, y }) => wheel.push(direction, x, y));
 
     write('\u001b[<64;1;1M\u001b[<65;1;1M');
 
@@ -80,7 +95,7 @@ describe('createInkStdin mouse reports', () => {
 
   it('reassembles a report split across two chunks', () => {
     const { stdin, write } = createFakeStdin();
-    const events: MouseReport[] = [];
+    const events: MouseEvent[] = [];
     stdin.on('data', () => {});
     const off = onMouse(event => events.push(event));
 

@@ -1,13 +1,6 @@
-import {
-  Box,
-  type DOMElement,
-  measureElement,
-  useBoxMetrics,
-} from 'ink';
-import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
-import { isNotNil } from '@vxti/typed';
-import { isWithinBounds } from '../../lib/mouse-input';
-import { useScroll } from '../hooks/use-scroll';
+import { Box, type DOMElement, useBoxMetrics } from 'ink';
+import { type RefObject, useEffect, useRef, useState } from 'react';
+import { usePointerFocus, useScroll } from '../hooks';
 import { MessageList } from './messages/message-list';
 import { WelcomingText } from './welcome-text';
 
@@ -34,26 +27,19 @@ export function ScrollList({
 
   // Wheel events are only meaningful while the pointer sits inside the scroll
   // area; everywhere else they belong to other hit-tested views.
-  const isPointerInScrollArea = useCallback(
-    (x: number, y: number) => {
-      const container = containerRef.current;
-
-      return (
-        isNotNil(container) && isWithinBounds(x, y, measureElement(container))
-      );
-    },
-    [containerRef]
-  );
+  const isPointerInScrollArea = usePointerFocus(containerRef);
 
   useScroll(
-    dy => {
+    ({ scrollDy }) => {
+      if (!isPointerInScrollArea) return;
+
       setScrollTop(prev => {
-        const next = Math.min(maxScroll, Math.max(prev + dy, 0));
+        const next = Math.min(maxScroll, Math.max(prev + scrollDy, 0));
         isPinnedToBottom.current = next >= maxScroll;
         return next;
       });
     },
-    isPointerInScrollArea
+    [isPointerInScrollArea]
   );
 
   // Follow the content while pinned to the bottom (e.g. as the agent streams

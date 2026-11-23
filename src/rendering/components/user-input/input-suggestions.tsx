@@ -26,8 +26,12 @@ import {
   SuggestionType,
 } from '../../../lib/input-suggestions';
 import { Position, ellipsize } from '../../../lib/utils/string-utils';
-import { isWithinBounds, onMouse, onWheel } from '../../../lib/mouse-input';
-import { useUserInputField } from '../../hooks';
+import {
+  useMouse,
+  usePointerFocus,
+  useScroll,
+  useUserInputField,
+} from '../../hooks';
 
 const MAX_SUGGESTION_COUNT = 14;
 // Breathing room between the suggestion list and the right edge of the
@@ -158,18 +162,15 @@ export function InputSuggestions(): ReactNode {
   // mirroring Tab/Return. Rows are one line tall, so the report's viewport row
   // minus the container's top (live-region coordinates; the live region starts
   // at viewport row 0 in alternate-screen mode) is the row under the pointer.
-  useEffect(() => {
-    if (!state || isNotNil(inputRequest) || !suggestions?.values) return;
+  useMouse(
+    event => {
+      if (!state || isNotNil(inputRequest) || !suggestions?.values) return;
 
-    const { type, values } = suggestions;
-
-    return onMouse(event => {
+      const { type, values } = suggestions;
       const container = containerRef.current;
-
       if (!container) return;
 
       const rowIndex = event.y - measureElement(container).y;
-
       if (rowIndex < 0 || rowIndex >= state.shown.length) return;
 
       if (event.kind === 'move') {
@@ -178,30 +179,28 @@ export function InputSuggestions(): ReactNode {
       }
 
       if (event.kind !== 'down' || event.button !== 0) return;
-
       const picked = values[state.offsetIndex + rowIndex]?.value;
 
       if (!isNil(picked)) handlePickSuggestion(type, picked);
-    });
-  }, [state, suggestions, inputRequest, handlePickSuggestion]);
-
+    },
+    [state, suggestions, inputRequest, handlePickSuggestion]
+  );
   // Wheel scrolling steps the highlight like the arrow keys. The lib reports
   // wheel up as 1, so the delta is negated to move the selection with the wheel.
-  useEffect(() => {
-    if (isNotNil(inputRequest) || !isNonEmptyArray(suggestions?.values)) return;
+  const containerFocussed = usePointerFocus(containerRef);
 
-    const { length } = suggestions.values;
-
-    return onWheel((direction, x, y) => {
-      const container = containerRef.current;
-
-      if (!container || !isWithinBounds(x, y, measureElement(container))) {
+  useScroll(
+    ({ direction }) => {
+      if (isNotNil(inputRequest) || !isNonEmptyArray(suggestions?.values))
         return;
-      }
+
+      if (!containerFocussed) return;
+      const { length } = suggestions.values;
 
       setSuggestionIndex(prev => (prev + length - direction) % length);
-    });
-  }, [suggestions, inputRequest]);
+    },
+    [suggestions, inputRequest]
+  );
 
   if (!state) return;
 

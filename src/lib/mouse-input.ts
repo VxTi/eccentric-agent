@@ -23,7 +23,7 @@ const MAX_PARTIAL_SEQUENCE_LENGTH = 24;
 export type MouseButton = 0 | 1 | 2;
 export type MouseEventKind = 'move' | 'down' | 'up';
 
-export interface MouseReport {
+export interface MouseEvent {
   kind: MouseEventKind;
   button: MouseButton;
   // 0-based column/row within the terminal viewport.
@@ -32,28 +32,20 @@ export interface MouseReport {
 }
 
 export type WheelDirection = 1 | -1;
-export type WheelListener = (direction: WheelDirection, x: number, y: number) => void;
-export type MouseListener = (event: MouseReport) => void;
-
-export interface Bounds {
+export interface WheelEvent {
+  direction: WheelDirection;
   x: number;
   y: number;
-  width: number;
-  height: number;
 }
 
-export function isWithinBounds(x: number, y: number, bounds: Bounds): boolean {
-  return (
-    x >= bounds.x &&
-    x < bounds.x + bounds.width &&
-    y >= bounds.y &&
-    y < bounds.y + bounds.height
-  );
+interface EventMap {
+  mouse: [MouseEvent];
+  wheel: [WheelEvent];
 }
 
-const emitter = new EventEmitter();
+export const mouseEventEmitter = new EventEmitter<EventMap>();
 // One listener per mounted scroll view; don't warn as views come and go.
-emitter.setMaxListeners(0);
+mouseEventEmitter.setMaxListeners(0);
 
 function emitMouseEvents(buffer: string): string {
   MOUSE_SEQUENCE.lastIndex = 0;
@@ -72,16 +64,16 @@ function emitMouseEvents(buffer: string): string {
     if (isScrolling) {
       // Wheel reports have no press/release split, so any final byte maps.
       if (code === WHEEL_FLAG) {
-        emitter.emit('wheel', 1, x, y);
+        mouseEventEmitter.emit('wheel', { direction: 1 as const, x, y });
       } else if (code === WHEEL_FLAG + 1) {
-        emitter.emit('wheel', -1, x, y);
+        mouseEventEmitter.emit('wheel', { direction: -1, x, y });
       }
     } else {
       const kind: MouseEventKind =
         (code & MOTION_FLAG) !== 0 ? 'move' : match[4] === 'M' ? 'down' : 'up';
       const button = (code & 3) as MouseButton;
 
-      emitter.emit('mouse', { kind, button, x, y });
+      mouseEventEmitter.emit('mouse', { kind, button, x, y });
     }
     consumedUpTo = MOUSE_SEQUENCE.lastIndex;
   }
@@ -123,18 +115,4 @@ export function createInkStdin(
   source.once('end', () => proxy.end());
 
   return stdin;
-}
-
-export function onWheel(listener: WheelListener): () => void {
-  emitter.on('wheel', listener);
-  return () => {
-    emitter.off('wheel', listener);
-  };
-}
-
-export function onMouse(listener: MouseListener): () => void {
-  emitter.on('mouse', listener);
-  return () => {
-    emitter.off('mouse', listener);
-  };
 }
