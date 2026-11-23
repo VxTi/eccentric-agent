@@ -119,11 +119,12 @@ export function InputSuggestions(): ReactNode {
         return;
       }
 
-      const value = values[suggestionIndex]?.value;
+      if (!key.tab && !key.return) return;
 
-      if (isNil(value) || (!key.tab && !key.return)) return;
+      const suggestion = values[suggestionIndex];
+      if (isNil(suggestion) || suggestion.disabled) return;
 
-      handlePickSuggestion(suggestions.type, value);
+      handlePickSuggestion(suggestions.type, suggestion.value);
     },
     {
       isActive: isNil(inputRequest) && isNonEmptyArray(suggestions?.values),
@@ -177,11 +178,13 @@ export function InputSuggestions(): ReactNode {
         setSuggestionIndex(state.offsetIndex + rowIndex);
         return;
       }
-
       if (event.kind !== 'down' || event.button !== 0) return;
-      const picked = values[state.offsetIndex + rowIndex]?.value;
 
-      if (!isNil(picked)) handlePickSuggestion(type, picked);
+      const suggestion = values[state.offsetIndex + rowIndex];
+      if (isNil(suggestion) || suggestion.disabled) return;
+      const picked = suggestion.value;
+
+      handlePickSuggestion(type, picked);
     },
     [state, suggestions, inputRequest, handlePickSuggestion]
   );
@@ -214,6 +217,8 @@ export function InputSuggestions(): ReactNode {
           selected={suggestionIndex === i + offsetIndex}
           commandWidth={state.commandWidth}
           maxWidth={maxWidth}
+          disabled={suggestion.disabled}
+          disabledReason={suggestion.disabledReason}
         >
           {suggestion}
         </SuggestionText>
@@ -228,11 +233,10 @@ export function InputSuggestions(): ReactNode {
 interface SuggestionTextProps {
   children: Suggestion;
   selected: boolean;
-  // Width of the command column, shared across all rows so the description
-  // column starts at the same x position in every row.
   commandWidth: number;
-  // Total width available for command + gap + description.
   maxWidth: number;
+  disabled?: boolean;
+  disabledReason?: string | undefined;
 }
 
 function SuggestionText({
@@ -240,21 +244,28 @@ function SuggestionText({
   selected,
   commandWidth,
   maxWidth,
+  disabled,
+  disabledReason,
 }: SuggestionTextProps): ReactNode {
   const suggestion = ellipsize(value, maxWidth, Position.START).padEnd(
     commandWidth
   );
   const descriptionWidth = maxWidth - commandWidth - COLUMN_GAP;
+  const color = disabled ? 'gray' : selected ? 'redBright' : 'white';
 
   return (
     <Box flexShrink={0} gap={COLUMN_GAP}>
-      <Text color={selected ? 'redBright' : 'white'}>
+      <Text color={color}>
         {selected ? '▶ ' : '  '}
         {suggestion}
       </Text>
       {isNonEmptyString(description, true) && descriptionWidth > 0 && (
         <Text color="gray" italic>
-          {ellipsize(description, descriptionWidth, Position.END)}
+          {ellipsize(
+            disabledReason ?? description,
+            descriptionWidth,
+            Position.END
+          )}
         </Text>
       )}
     </Box>

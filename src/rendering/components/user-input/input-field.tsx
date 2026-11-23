@@ -2,13 +2,22 @@ import { isEmptyString, isNotNil } from '@vxti/typed';
 import { type JSX, type ReactNode, useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import { CURSOR_BLINK_INTERVAL_MS } from '../../../lib/constants';
+import { UserInputProvider } from '../../context/user-input-context';
 import { hasActiveInputRequest, useInputArea } from '../../hooks';
 import { InputSuggestions } from './input-suggestions';
 import { UserInputRequestDialog } from './user-input-request-dialog';
 
 const INPUT_PLACEHOLDER = 'Reference files with @, and type commands using / ↵';
 
-export default function InputField(): JSX.Element {
+export function InputFieldContainer() {
+  return (
+    <UserInputProvider>
+      <InputField />
+    </UserInputProvider>
+  );
+}
+
+export function InputField(): JSX.Element {
   const { inputRequest } = useInputArea();
 
   if (hasActiveInputRequest(inputRequest)) {

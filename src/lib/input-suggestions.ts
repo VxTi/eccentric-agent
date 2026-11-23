@@ -22,6 +22,9 @@ export interface Suggestion {
   value: string;
   // Description shown after a suggestion, when highlighted
   description?: string;
+
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 export interface Suggestions {

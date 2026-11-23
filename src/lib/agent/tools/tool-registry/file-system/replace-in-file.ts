@@ -48,16 +48,17 @@ const inputSchema = z.object({
 });
 
 const outputSchema = z.object({
-  bytesWritten: z.number(),
   startLine: z.number(),
   linesRemoved: z.number(),
   linesInserted: z.number(),
   duplicatesRemoved: z.number(),
+  duplicatedSeamLines: z.array(z.string()),
   filePath: z.string(),
 });
 
 const MAX_SHOWN_LINES = 5;
 const TRAILING_LINE_BREAK = /\r?\n$/;
+const READ_FILE_PREFIX = /^\s*\d+\t/;
 
 export const replaceInFile = createTool({
   internalName: 'replace_in_file',
@@ -78,7 +79,7 @@ export const replaceInFile = createTool({
     '    edit is rejected if no line matches, or if several lines match equally near.\n' +
     '  • A whitespace-only `anchor` matches only at the hinted line; it is never relocated.\n' +
     '  • Only the first line of `anchor` is used, and a copied `read_file` prefix' +
-    '    (`<lineNumber>\\t`) is ignored.\n' +
+    '    (`<n>\\t`) is ignored, even when its line number is stale.\n' +
     '  • The anchored range must not extend past the end of the file.\n' +
     '  • `replacement` may span multiple lines separated by `\\n`, or be empty to delete' +
     '    the range. A trailing `\\n` in `replacement` is a separator and is dropped.\n' +
@@ -86,7 +87,8 @@ export const replaceInFile = createTool({
     '  • If `replacement` begins or ends with lines that exactly duplicate the file' +
     '    lines immediately adjacent to the replaced range (misaligned context from a' +
     '    diff-style hunk), those duplicate lines are dropped and reported as' +
-    '    `duplicatesRemoved`.',
+    '    `duplicatesRemoved` and `duplicatedSeamLines`. If you actually intended' +
+    '    those duplicates, re-send the edit with the range adjusted to include them.',
   inputSchema,
   outputSchema,
 
@@ -108,11 +110,14 @@ export const replaceInFile = createTool({
     return `Editing ${describeRange(range.lineNumber, range.count)} in \`${path.basename(filePath)}\``;
   },
 
-  outputToString({ filePath, duplicatesRemoved }, _, { previous, current }) {
+  outputToString({ filePath, duplicatedSeamLines }, _, { previous, current }) {
     const fileName = path.basename(filePath);
     const repairNote =
-      duplicatesRemoved > 0
-        ? `\n\nDropped ${duplicatesRemoved} duplicated seam line(s) from \`replacement\`.`
+      duplicatedSeamLines.length > 0
+        ? `\n\nDropped ${duplicatedSeamLines.length} duplicated seam line(s) from` +
+          ` \`replacement\`:\n\`\`\`\n${duplicatedSeamLines.join('\n')}\n\`\`\`\n` +
+          'If these were intentional, re-send the edit with the range adjusted to' +
+          ' include them.'
         : '';
     return `Edited \`${fileName}\`\n\n${formatDiffMd(previous, current)}${repairNote}`;
   },
@@ -177,11 +182,11 @@ async function handleReplaceInFile({
 
   return Result.Ok(
     {
-      bytesWritten: Buffer.byteLength(updated, 'utf-8'),
       startLine,
       linesRemoved: count,
       linesInserted: trimmed.replacementLines.length,
       duplicatesRemoved: trimmed.duplicatesRemoved,
+      duplicatedSeamLines: trimmed.duplicatedLines,
       filePath,
     },
     {
@@ -217,9 +222,12 @@ function locateRangeStart(
   if (hintedLine?.trim() === trimmedAnchor) return Result.Ok(lineNumber);
 
   if (isEmptyString(trimmedAnchor)) {
+    const reason = isNil(hintedLine)
+      ? `line ${lineNumber} is out of range: the file has only ${lines.length} line(s)`
+      : `line ${lineNumber} does not match the blank \`anchor\``;
     return Result.Error(
-      `Line ${lineNumber} does not match the blank \`anchor\`, and a blank anchor cannot be` +
-        ' relocated. Re-read the file and anchor on a non-blank line.'
+      `A blank \`anchor\` cannot be relocated (${reason}). Re-read the file and anchor` +
+        ' on a non-blank line.'
     );
   }
 
@@ -233,12 +241,16 @@ function locateRangeStart(
     if (nearest.length > 1) {
       return Result.Error(
         `\`anchor\` is ambiguous: lines ${nearest.join(', ')} match and are equally` +
-          ` near line ${lineNumber}. Re-read the file and retry with the correct \`lineNumber\`.`
+          ` near line ${lineNumber}. Re-read the file and anchor on a line that is` +
+          ' unique in the file.'
       );
     }
     const [match] = nearest;
     if (isNotNil(match)) return Result.Ok(match);
   }
+
+  const stalePrefixMatch = findUniqueLineWithoutReadFilePrefix(lines, anchor);
+  if (isNotNil(stalePrefixMatch)) return Result.Ok(stalePrefixMatch);
 
   const found = isNil(hintedLine)
     ? `the file has only ${lines.length} line(s)`
@@ -260,6 +272,25 @@ function normalizeAnchor(anchor: string, lineNumber: number): string {
   return unpadded.startsWith(readFilePrefix)
     ? unpadded.slice(readFilePrefix.length)
     : firstLine;
+}
+
+/**
+ * Last-resort repair for an anchor copied from an older `read_file` whose
+ * `<n>\t` prefix no longer matches the hinted line number. Only an exact
+ * match unique in the whole file is accepted, so content that legitimately
+ * starts with digits and a tab can never be rewritten onto an unrelated line.
+ */
+function findUniqueLineWithoutReadFilePrefix(
+  lines: string[],
+  anchor: string
+): number | undefined {
+  const withoutPrefix = anchor.replace(READ_FILE_PREFIX, '');
+  if (withoutPrefix === anchor || isEmptyString(withoutPrefix))
+    return undefined;
+  const matches = lines.flatMap((line, index) =>
+    line === withoutPrefix ? [index + 1] : []
+  );
+  return matches.length === 1 ? matches[0] : undefined;
 }
 
 /** All matching 1-based line numbers at the minimum distance from `hintLine`. */
@@ -299,7 +330,11 @@ function trimDuplicatedSeams(
   startLine: number,
   endLine: number,
   replacementLines: string[]
-): { replacementLines: string[]; duplicatesRemoved: number } {
+): {
+  replacementLines: string[];
+  duplicatesRemoved: number;
+  duplicatedLines: string[];
+} {
   const linesAbove = lines.slice(0, startLine - 1);
   const linesBelow = lines.slice(endLine);
 
@@ -324,7 +359,7 @@ function trimDuplicatedSeams(
     : 0;
 
   if (leadingTrim + trailingTrim >= replacementLines.length) {
-    return { replacementLines, duplicatesRemoved: 0 };
+    return { replacementLines, duplicatesRemoved: 0, duplicatedLines: [] };
   }
 
   return {
@@ -333,6 +368,10 @@ function trimDuplicatedSeams(
       replacementLines.length - trailingTrim
     ),
     duplicatesRemoved: leadingTrim + trailingTrim,
+    duplicatedLines: [
+      ...replacementLines.slice(0, leadingTrim),
+      ...replacementLines.slice(replacementLines.length - trailingTrim),
+    ],
   };
 }
 

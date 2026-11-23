@@ -1,6 +1,6 @@
 import { Box, type DOMElement, useBoxMetrics } from 'ink';
 import { type RefObject, useEffect, useRef, useState } from 'react';
-import { usePointerFocus, useScroll } from '../hooks';
+import { ScrollAcceleration, usePointerFocus, useScroll } from '../hooks';
 import { MessageList } from './messages/message-list';
 import { WelcomingText } from './welcome-text';
 
@@ -39,7 +39,8 @@ export function ScrollList({
         return next;
       });
     },
-    [isPointerInScrollArea]
+    [isPointerInScrollArea],
+    { scrollAccelerator: ScrollAcceleration.accelerated }
   );
 
   // Follow the content while pinned to the bottom (e.g. as the agent streams

@@ -3,7 +3,6 @@ import type { ToolIdentifier } from '../agent/tools';
 interface IMessage {
   id: string;
   content: string;
-  immutable?: boolean;
 }
 
 export interface UserMessage extends IMessage {

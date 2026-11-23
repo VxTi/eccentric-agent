@@ -1,5 +1,6 @@
 import { isNil } from '@vxti/typed';
 import { ReasoningEffort } from './agent/agent';
+import { SkillInclusion } from './agent/skills/model';
 import { TokenSource } from './events/events';
 import { emitMessage } from './events/messaging';
 import {
@@ -28,10 +29,18 @@ export function isCommand(input: string): input is Command {
 export function getCommandSuggestions(): Suggestion[] {
   return [
     ...SUPPORTED_COMMANDS,
-    ...store.getState().agent.agent.skills.map(s => ({
-      value: s.name,
-      description: ellipsize(s.description, 100, Position.END),
-    })),
+    ...store.getState().agent.agent.skills.map(
+      (s): Suggestion => ({
+        value: s.name,
+        ...(s.inclusion === SkillInclusion.ALWAYS
+          ? {
+              disabled: true,
+              disabledReason: 'This skill is always enabled',
+            }
+          : {}),
+        description: ellipsize(s.description, 100, Position.END),
+      })
+    ),
   ];
 }
 
@@ -101,7 +110,10 @@ export function processCommand(command: string) {
         });
       break;
     default: {
-      const skill = agent.skills.find(s => s.name === command);
+      const skill = agent.skills.find(
+        s => s.name === command && s.inclusion !== SkillInclusion.ALWAYS
+      );
+
       if (isNil(skill)) {
         emitMessage({
           type: 'assistant',

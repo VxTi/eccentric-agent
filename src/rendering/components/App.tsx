@@ -3,7 +3,7 @@ import { type ReactNode, useRef } from 'react';
 import { GitInfoLine } from './git-info-line';
 import { BottomInfoBar } from './bottom-info-bar';
 import { ScrollList } from './scroll-list';
-import InputField from './user-input/input-field';
+import { InputFieldContainer } from './user-input/input-field';
 
 export function App(): ReactNode {
   const scrollAreaRef = useRef<DOMElement>(null);
@@ -31,7 +31,7 @@ export function App(): ReactNode {
         flexShrink={0}
       >
         <GitInfoLine />
-        <InputField />
+        <InputFieldContainer />
         <BottomInfoBar />
       </Box>
     </Box>

@@ -1,7 +1,8 @@
 import { type DependencyList, useEffect } from 'react';
-import { type MouseEvent, mouseEventEmitter } from '../../lib/mouse-input';
+import { type MouseListener } from '../context/mouse-context';
+import { useMouseContext } from './use-mouse-context';
 
-export type MouseListener = (event: MouseEvent) => void;
+export type { MouseListener };
 
 /**
  * Subscribes the given listener to global mouse events for the lifetime of the component.
@@ -10,10 +11,7 @@ export type MouseListener = (event: MouseEvent) => void;
  * @param deps - Extra dependencies; when they change, the listener is resubscribed.
  */
 export function useMouse(listener: MouseListener, deps?: DependencyList) {
-  useEffect(() => {
-    mouseEventEmitter.on('mouse', listener);
-    return () => {
-      mouseEventEmitter.off('mouse', listener);
-    };
-  }, [listener, deps]);
+  const { mouse } = useMouseContext();
+
+  useEffect(() => mouse.subscribe(listener), [listener, deps, mouse]);
 }

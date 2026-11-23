@@ -1,9 +1,9 @@
-import { type DependencyList, useEffect, useRef } from 'react';
-import {
-  mouseEventEmitter,
-  type WheelDirection,
-  type WheelEvent,
-} from '../../lib/mouse-input';
+import { type DependencyList, useEffect } from 'react';
+import type { WheelDirection } from '../../lib/mouse-input';
+import type { WheelListener } from '../context/mouse-context';
+import { useMouseContext } from './use-mouse-context';
+
+export type { WheelListener };
 
 const SCROLL_STEP = 1;
 
@@ -14,8 +14,18 @@ export interface ScrollEvent {
   scrollDy: number;
 }
 
-export type WheelListener = (event: WheelEvent) => void;
 export type ScrollCallback = (params: ScrollEvent) => void;
+
+type ScrollAccelerationFn = (dt: number) => number;
+
+interface ScrollHookConfig {
+  scrollAccelerator?: ScrollAccelerationFn;
+}
+
+export const ScrollAcceleration = {
+  accelerated: (dt: number) => 70 / Math.max(40, dt),
+  noAcceleration: (dt: number) => dt,
+} as const satisfies Record<string, ScrollAccelerationFn>;
 
 /**
  * Subscribes to wheel events and reports velocity-smoothed scroll deltas.
@@ -26,29 +36,35 @@ export type ScrollCallback = (params: ScrollEvent) => void;
  *
  * @param callback - Invoked for each wheel event with the computed {@link ScrollEvent}.
  * @param deps - Extra dependencies; when they change, the callback is resubscribed.
+ * @param config - Optional configuration
  */
-export function useScroll(callback: ScrollCallback, deps?: DependencyList) {
-  const lastScrollTimeMs = useRef<number>(-1);
+export function useScroll(
+  callback: ScrollCallback,
+  deps?: DependencyList,
+  config?: ScrollHookConfig
+) {
+  const { wheel } = useMouseContext();
 
   useEffect(() => {
-    const listener: WheelListener = ({ direction, x, y }) => {
-      const dt =
-        lastScrollTimeMs.current === -1
-          ? 0
-          : 70 / Math.max(40, Date.now() - lastScrollTimeMs.current);
+    let lastScrollTimeMs = -1;
 
-      lastScrollTimeMs.current = Date.now();
+    const acceleratorFn =
+      config?.scrollAccelerator ?? ScrollAcceleration.noAcceleration;
+    const listener: WheelListener = ({ direction, x, y }) => {
+      const now = Date.now();
+      const dt = lastScrollTimeMs === -1 ? 0 : now - lastScrollTimeMs;
+      lastScrollTimeMs = now;
+
+      const scrollDy = -direction * SCROLL_STEP * acceleratorFn(dt);
+
       callback({
         direction,
         mouseX: x,
         mouseY: y,
-        scrollDy: -direction * SCROLL_STEP * dt,
+        scrollDy,
       });
     };
 
-    mouseEventEmitter.on('wheel', listener);
-    return () => {
-      mouseEventEmitter.off('wheel', listener);
-    };
-  }, [callback, deps]);
+    return wheel.subscribe(listener);
+  }, [wheel, config, callback, deps]);
 }

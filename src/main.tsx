@@ -7,6 +7,7 @@ import { render } from 'ink';
 import { Provider } from 'react-redux';
 import { defaultController, store } from './lib/state';
 import { AgentProvider } from './rendering/context/agent-context';
+import { MouseProvider } from './rendering/context/mouse-context';
 import { UserInputProvider } from './rendering/context/user-input-context';
 import { App } from './rendering/components/App';
 import { terminalRenderer } from './rendering/terminal-markdown-renderer/markdown-renderer';
@@ -33,11 +34,13 @@ async function main(): Promise<void> {
 
   const { waitUntilExit } = render(
     <Provider store={store}>
-      <AgentProvider>
-        <UserInputProvider>
-          <App />
-        </UserInputProvider>
-      </AgentProvider>
+      <MouseProvider>
+        <AgentProvider>
+          <UserInputProvider>
+            <App />
+          </UserInputProvider>
+        </AgentProvider>
+      </MouseProvider>
     </Provider>,
     {
       kittyKeyboard: { mode: 'enabled' },

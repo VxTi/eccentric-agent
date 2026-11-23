@@ -149,9 +149,6 @@ function collapseCompletedToolCalls(state: AgentState, index: number): void {
 }
 
 function formatCollapsedToolCalls(collapsed: CollapsedToolCalls): string {
-  const label = `${collapsed.count} tool call${
-    collapsed.count === 1 ? '' : 's'
-  }`;
   const summary = entries(collapsed.tools)
     .map(([name, count]) => {
       const summarize = TOOL_COLLAPSE_SUMMARIES[name];
@@ -159,7 +156,7 @@ function formatCollapsedToolCalls(collapsed: CollapsedToolCalls): string {
     })
     .join(', ');
 
-  const parts = [label];
+  const parts: string[] = [];
   if (isNonEmptyString(summary, true)) parts.push(summary);
   return chalk.dim(parts.join(' — '));
 }

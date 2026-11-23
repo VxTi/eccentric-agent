@@ -118,6 +118,7 @@ describe('replace_in_file', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.duplicatesRemoved).toBe(1);
+    expect(result.data.duplicatedSeamLines).toEqual(['line 4']);
 
     const lines = await readLines(filePath);
     expect(lines).toEqual([
@@ -178,6 +179,11 @@ describe('replace_in_file', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.duplicatesRemoved).toBe(3);
+    expect(result.data.duplicatedSeamLines).toEqual([
+      'line 3',
+      'line 4',
+      'line 6',
+    ]);
     const lines = await readLines(filePath);
     expect(lines.slice(2, 6)).toEqual(['line 3', 'line 4', 'NEW', 'line 6']);
   });
@@ -200,6 +206,7 @@ describe('replace_in_file', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.duplicatesRemoved).toBe(0);
+    expect(result.data.duplicatedSeamLines).toEqual([]);
     const lines = await readLines(filePath);
     expect(lines.slice(3, 6)).toEqual(['line 4', 'line 4', 'line 6']);
   });
@@ -430,6 +437,58 @@ describe('replace_in_file', () => {
       expect((await readLines(filePath))[4]).toBe('FIVE');
     });
 
+    it('rescues an anchor whose copied read_file prefix is stale', async () => {
+      const filePath = await prepareFixture();
+
+      const result = await replaceInFile.handle(
+        {
+          filePath,
+          range: { lineNumber: 5, anchor: '4\tline 5', count: 1 },
+          replacement: 'FIVE',
+        },
+        channel,
+        signal
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.startLine).toBe(5);
+      expect((await readLines(filePath))[4]).toBe('FIVE');
+    });
+
+    it('does not rescue a stale prefix that strips to a blank anchor', async () => {
+      const filePath = await prepareFixture();
+
+      const result = await replaceInFile.handle(
+        {
+          filePath,
+          range: { lineNumber: 5, anchor: '4\t', count: 1 },
+          replacement: 'FIVE',
+        },
+        channel,
+        signal
+      );
+
+      expect(result.ok).toBe(false);
+    });
+
+    it('does not rescue when the stripped anchor matches more than one line', async () => {
+      const filePath = path.join(tmpDir, `fixture-${++counter}.txt`);
+      await fs.writeFile(filePath, 'x\na\nx\n', 'utf-8');
+
+      const result = await replaceInFile.handle(
+        {
+          filePath,
+          range: { lineNumber: 1, anchor: '9\tx', count: 1 },
+          replacement: 'Y',
+        },
+        channel,
+        signal
+      );
+
+      expect(result.ok).toBe(false);
+    });
+
     it('anchors on the first line of a multi-line anchor', async () => {
       const filePath = await prepareFixture();
 
@@ -464,6 +523,24 @@ describe('replace_in_file', () => {
 
       expect(result.ok).toBe(true);
       expect(await fs.readFile(filePath, 'utf-8')).toBe('a\nX\nb\n');
+    });
+
+    it('reports an out-of-range hint when a blank anchor cannot match', async () => {
+      const filePath = await prepareFixture();
+
+      const result = await replaceInFile.handle(
+        {
+          filePath,
+          range: { lineNumber: 99, anchor: '', count: 1 },
+          replacement: 'X',
+        },
+        channel,
+        signal
+      );
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error).toContain('out of range');
     });
 
     it('numbers lines like read_file in files with mixed line endings', async () => {
