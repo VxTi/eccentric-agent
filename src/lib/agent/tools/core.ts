@@ -12,6 +12,18 @@ import {
   ToolSelectionOption,
 } from './tool-definition';
 
+interface ToolApproval {
+  approved: true;
+  reason?: never;
+}
+
+interface ToolRejection {
+  approved: false;
+  reason: string;
+}
+
+export type ToolApprovalResult = ToolApproval | ToolRejection;
+
 /**
  * Runs the approval flow for a single tool invocation: consults the tool's
  * `requiresApproval`, prompts the user when needed, and applies the chosen
@@ -25,38 +37,49 @@ import {
 export async function approveToolUse(
   tool: SomeTool,
   input: unknown,
-  channel: NotifierChannel<ToolChannelParams>
-): Promise<boolean> {
-  if (!(await tool.requiresApproval(input, channel))) return true;
+  channel: NotifierChannel<ToolChannelParams>,
+  signal?: AbortSignal,
+  timeoutMs?: number
+): Promise<ToolApprovalResult> {
+  if (!(await tool.requiresApproval(input, channel))) {
+    return { approved: true };
+  }
 
-  const options = await tool.approvalOptions(input, channel);
-
-  const [chosen] = await requestUserInput({
+  const approvalOptions = await tool.approvalOptions(input, channel);
+  const inputRequestResult = await requestUserInput({
     title: 'Approval required',
     description: `Tool \`${tool.name}\` requires approval:\n\n${tool.formatArguments(input)}`,
-    options: options.map(opt => ({
+    options: approvalOptions.map(opt => ({
       label: opt.text,
       value: opt.option,
     })),
     allowMultiple: false,
-  });
+    signal,
+  })
+    .then(([choice]) => ({ approved: true, result: choice.value }))
+    .catch(err => ({ approved: false, result: String(err) }));
+
+  if (!inputRequestResult.approved) {
+    return {
+      approved: false,
+      reason: inputRequestResult.result,
+    };
+  }
+
   const selectionOption = await tool.onOptionSelect(
     input,
-    chosen.value,
+    inputRequestResult.result,
     channel
   );
 
   if (selectionOption === ToolSelectionOption.DENY) {
-    channel.notify({
-      content: chalk.red(
-        `User denied tool execution for ${chalk.underline(tool.name)}`
-      ),
-      loading: false,
-    });
-    return false;
+    return {
+      approved: false,
+      reason: `User denied permission to run  \'${tool.name}\'`,
+    };
   }
 
-  return true;
+  return { approved: true };
 }
 
 export function makeToolSet(
@@ -101,14 +124,17 @@ function makeTool(
         content: tool.inputToString(input, channel),
       });
 
-      const approved = await approveToolUse(tool, input, channel);
-      if (!approved) {
+      const approvalResult = await approveToolUse(tool, input, channel, signal);
+
+      if (!approvalResult.approved) {
         notifier.unsubscribe(toolCallId);
-        return Result.Error(`User denied permission to run tool "${name}".`);
+        return Result.Error(approvalResult.reason);
       }
+
       const result = await Result.trySafe(() =>
         tool.handle(input, channel, signal)
       );
+
       if (result.ok) {
         channel.notify({
           loading: false,

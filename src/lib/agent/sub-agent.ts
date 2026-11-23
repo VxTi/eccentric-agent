@@ -20,6 +20,9 @@ import { Result } from '../result';
 
 const AGENT_MAX_LOOP_ITERATIONS = 200;
 
+/** Default wait for a user to answer a sub-agent's approval prompt. */
+const APPROVAL_TIMEOUT_MS = 60_000;
+
 const PRIMARY_GOAL_TOOL_NAME = 'complete_goal';
 
 export interface SubAgentOptions {
@@ -88,6 +91,7 @@ export class SubAgent {
       if (this.goalAccomplished) {
         return this.result ?? '';
       }
+      this.throwIfAborted();
       const result = streamText({
         tools: this.toolset,
         allowSystemInMessages: true,
@@ -107,9 +111,16 @@ export class SubAgent {
         const response = (await result.finalStep).response;
         this.messages.push(...response.messages);
       } catch (e) {
+        this.throwIfAborted();
         this.channel.notify({
           content: `An error occurred in agent task - ${String(e)}`,
         });
+        // Feed the failure back to the model, otherwise the next iteration
+        // replays byte-identical messages and deterministically repeats the
+        // same failing call until the iteration budget is exhausted.
+        this.pushErrorNotice(
+          `The previous step failed with an error: ${String(e)}. Diagnose the failure and take a different approach instead of repeating the same call.`
+        );
         await sleepFor(1_000);
       }
     }
@@ -117,6 +128,21 @@ export class SubAgent {
     throw new Error(
       `Agent exceeded maximum loop iterations (${AGENT_MAX_LOOP_ITERATIONS}) without accomplishing its goal.`
     );
+  }
+
+  private throwIfAborted(): void {
+    if (this.signal.aborted) {
+      throw new Error('Sub-agent aborted before accomplishing its goal.');
+    }
+  }
+
+  private pushErrorNotice(content: string): void {
+    const last = this.messages[this.messages.length - 1];
+    // A persistently failing step produces no assistant messages between
+    // retries, so without this guard the same notice would grow the context
+    // by one message per retry iteration.
+    if (last?.role === 'user' && last.content === content) return;
+    this.messages.push({ role: 'user', content });
   }
 
   private constructSystemPrompt(): string {
@@ -162,11 +188,19 @@ export class SubAgent {
 
         // Sub-agents share the primary agent's approval flow, so delegated
         // tools are gated by the same prompts as inline ones.
-        const approved = await approveToolUse(tool, input, this.channel);
-        if (!approved) {
-          return Result.Error(
-            `User denied permission to run tool "${tool.internalName}".`
-          );
+        // The sub-agent's signal settles a pending approval prompt on abort,
+        // so a cancelled task can never hang on a user who never answers.
+        // An unanswered prompt also settles via the 1-minute default timeout,
+        // surfacing to the sub-agent as a denial it can report and work around.
+        const approvalResult = await approveToolUse(
+          tool,
+          input,
+          this.channel,
+          this.signal,
+          APPROVAL_TIMEOUT_MS
+        );
+        if (!approvalResult.approved) {
+          return Result.Error(approvalResult.reason);
         }
 
         const output = await Result.trySafe(() =>
@@ -178,8 +212,9 @@ export class SubAgent {
           });
           return output;
         }
+
         this.channel.notify({
-          content: tool.outputToString(output, this.channel, undefined),
+          content: tool.outputToString(output, this.channel, output.metadata),
         });
 
         return output.data;

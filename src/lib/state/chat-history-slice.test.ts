@@ -11,7 +11,10 @@ function stateWith(
   return chatHistorySlice.reducer(
     entries.reduce(
       (state, entry) =>
-        chatHistorySlice.reducer(state, chatHistorySlice.actions.pushEntry(entry)),
+        chatHistorySlice.reducer(
+          state,
+          chatHistorySlice.actions.pushEntry(entry)
+        ),
       chatHistorySlice.getInitialState()
     ),
     action
@@ -20,7 +23,10 @@ function stateWith(
 
 describe('Chat History Slice', () => {
   it('pushes entries in submission order', () => {
-    const state = stateWith(['first'], chatHistorySlice.actions.pushEntry('second'));
+    const state = stateWith(
+      ['first'],
+      chatHistorySlice.actions.pushEntry('second')
+    );
 
     expect(state.entries).toEqual(['first', 'second']);
   });
