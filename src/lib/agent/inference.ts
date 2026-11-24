@@ -36,6 +36,11 @@ export const MODEL_CATALOG: ModelDefinition[] = [
   },
   { id: 'openai/gpt-5.1', label: 'GPT-5.1', contextWindow: 400_000 },
   {
+    id: 'openai/gpt-6-luna-fast',
+    label: 'GPT-6 Luna Fast',
+    contextWindow: 1_050_000,
+  },
+  {
     id: 'anthropic/claude-opus-4.6',
     label: 'Claude Opus 4.6',
     contextWindow: 200_000,

@@ -109,6 +109,9 @@ export class SubAgent {
         messages: this.messages,
         abortSignal: this.signal,
         reasoning: 'medium',
+        onStepEnd: step => {
+          this.messages.push(...step.response.messages);
+        },
         onError: ({ error }) => {
           this.channel.notify({
             content: `An error occurred in agent task - ${String(error)}`,
@@ -123,8 +126,7 @@ export class SubAgent {
       });
 
       try {
-        const steps = await result.steps;
-        this.messages.push(...steps.flatMap(step => step.response.messages));
+        await result.steps;
       } catch (e) {
         this.throwIfAborted();
         this.channel.notify({

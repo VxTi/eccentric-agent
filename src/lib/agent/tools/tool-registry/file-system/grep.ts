@@ -91,6 +91,112 @@ const outputSchema = z.object({
     ),
 });
 
+export const grep = createTool({
+  internalName: 'grep',
+  name: 'Grep',
+  description:
+    'Searches the contents of files under a directory for a regular expression (or literal substring with' +
+    ' `isRegex: false`) and returns matching lines with their file path, line number, column, matched text,' +
+    ' and line content — or, with `outputMode: files_with_matches`, just the paths of matching files. This' +
+    ' is the preferred tool for searching across many files by content — PREFER IT over invoking `Shell`' +
+    ' with `grep`, `rg`, or similar commands, which require approval and are less structured. Use `find_file`' +
+    ' when you need to locate files by name rather than by content, and `find_in_file` when you already know' +
+    ' the single file to inspect. For broad or vague patterns, pass `maxResults` or use' +
+    ' `outputMode: files_with_matches` — unrestricted searches on common terms produce very large result' +
+    ' sets. Restrict the search with `filePattern` (a glob) when only certain files are relevant. ONLY use' +
+    ' this tool when the current context does not already contain the information being searched for.' +
+    ' `node_modules` and `.git` directories are skipped automatically.',
+  inputSchema,
+  outputSchema,
+
+  handle(input, _channel, signal) {
+    return handleGrep(input, signal);
+  },
+
+  inputToString({ pattern, directoryPath }) {
+    return `Searching for pattern \`${pattern}\` in \`${directoryPath}\``;
+  },
+
+  outputToString({ matches, files }, _, { pattern, truncated }): string {
+    if (files.length > 0) {
+      return formatMatchingFiles(files, pattern, truncated);
+    }
+
+    if (matches.length === 0) {
+      return `Found no matches for pattern \`${pattern}\`.`;
+    }
+
+    const limitVisible = matches.length > MAX_SHOWN_MATCHES;
+    const shown = limitVisible ? matches.slice(0, MAX_SHOWN_MATCHES) : matches;
+    const formatted = shown
+      .map(
+        m =>
+          `${relativeToCwd(m.filePath)}:${m.line}: ${truncateLine(m.lineContent)}`
+      )
+      .join('\n');
+    const fileCount = new Set(matches.map(m => m.filePath)).size;
+
+    const truncationNotice = truncated
+      ? '\n\nResults were truncated. Narrow the search with `filePattern`, raise `maxResults`, or use' +
+        ' `outputMode: files_with_matches` for broad patterns.'
+      : '';
+
+    return (
+      `Found ${matches.length} match${matches.length === 1 ? '' : 'es'} for pattern \`${pattern}\`` +
+      ` across ${fileCount} file${fileCount === 1 ? '' : 's'}:\n\n${formatted}\n${
+        limitVisible
+          ? `\n... and ${matches.length - MAX_SHOWN_MATCHES} more`
+          : ''
+      }${truncationNotice}`
+    );
+  },
+});
+
+async function handleGrep(
+  params: z.infer<typeof inputSchema>,
+  signal: AbortSignal
+): Promise<
+  Result<
+    z.infer<typeof outputSchema>,
+    string,
+    { pattern: string; truncated: boolean }
+  >
+> {
+  const {
+    directoryPath,
+    pattern,
+    filePattern,
+    isRegex,
+    caseSensitive,
+    maxResults,
+    outputMode,
+  } = params;
+  const cwd = path.resolve(process.cwd(), directoryPath);
+  const limit = maxResults ?? DEFAULT_MAX_RESULTS;
+  const listMatchingFiles = outputMode === 'files_with_matches';
+
+  let regex: RegExp;
+  try {
+    regex = compileRegex(pattern, isRegex, caseSensitive);
+  } catch (error) {
+    return Result.Error(
+      `${String(error)}. Escape the special characters, or pass \`isRegex: false\` to search for` +
+        ' the pattern as a literal substring.'
+    );
+  }
+
+  const result = await searchFiles(regex, filePattern, {
+    cwd,
+    limit,
+    listMatchingFiles,
+    signal,
+  });
+  return Result.Ok(toToolOutput(result, listMatchingFiles), {
+    pattern,
+    truncated: result.truncated,
+  });
+}
+
 function isIgnored(entryPath: string): boolean {
   return DEFAULT_IGNORED_DIRS.includes(path.basename(entryPath));
 }
@@ -138,164 +244,147 @@ function formatMatchingFiles(
   );
 }
 
-export const grep = createTool({
-  internalName: 'grep',
-  name: 'Grep',
-  description:
-    'Searches the contents of files under a directory for a regular expression (or literal substring with' +
-    ' `isRegex: false`) and returns matching lines with their file path, line number, column, matched text,' +
-    ' and line content — or, with `outputMode: files_with_matches`, just the paths of matching files. This' +
-    ' is the preferred tool for searching across many files by content — PREFER IT over invoking `Shell`' +
-    ' with `grep`, `rg`, or similar commands, which require approval and are less structured. Use `find_file`' +
-    ' when you need to locate files by name rather than by content, and `find_in_file` when you already know' +
-    ' the single file to inspect. For broad or vague patterns, pass `maxResults` or use' +
-    ' `outputMode: files_with_matches` — unrestricted searches on common terms produce very large result' +
-    ' sets. Restrict the search with `filePattern` (a glob) when only certain files are relevant. ONLY use' +
-    ' this tool when the current context does not already contain the information being searched for.' +
-    ' `node_modules` and `.git` directories are skipped automatically.',
-  inputSchema,
-  outputSchema,
+interface SearchOptions {
+  cwd: string;
+  limit: number;
+  listMatchingFiles: boolean;
+  signal: AbortSignal;
+}
 
-  async handle(
-    {
-      directoryPath,
-      pattern,
-      filePattern,
-      isRegex,
-      caseSensitive,
-      maxResults,
-      outputMode,
-    },
-    _channel,
-    signal
-  ) {
-    const cwd = path.resolve(process.cwd(), directoryPath);
+interface SearchState {
+  matches: GrepMatch[];
+  files: Set<string>;
+  limit: number;
+  listMatchingFiles: boolean;
+  collected(): number;
+}
 
-    const flags = caseSensitive === false ? 'gi' : 'g';
-    let regex: RegExp;
-    try {
-      regex = new RegExp(
-        isRegex === false ? escapeRegex(pattern) : pattern,
-        flags
-      );
-    } catch (error) {
-      return Result.Error(
-        `${String(error)}. Escape the special characters, or pass \`isRegex: false\` to search for` +
-          ' the pattern as a literal substring.'
-      );
+interface GrepSearchResult {
+  matches: GrepMatch[];
+  files: string[];
+  truncated: boolean;
+}
+
+function compileRegex(
+  pattern: string,
+  isRegex: boolean | undefined,
+  caseSensitive: boolean | undefined
+): RegExp {
+  const source = isRegex === false ? escapeRegex(pattern) : pattern;
+  const flags = caseSensitive === false ? 'gi' : 'g';
+  return new RegExp(source, flags);
+}
+
+function listCandidateFiles(
+  cwd: string,
+  filePattern: string | undefined
+): AsyncIterable<string> {
+  return fs.promises.glob(
+    filePattern !== undefined
+      ? toRecursiveGlob(filePattern)
+      : DEFAULT_FILE_PATTERN,
+    { cwd, exclude: isIgnored }
+  );
+}
+
+async function readFileOrSkip(absolutePath: string): Promise<string | null> {
+  try {
+    const stats = await fs.promises.stat(absolutePath);
+    if (!stats.isFile()) return null;
+    return await fs.promises.readFile(absolutePath, 'utf-8');
+  } catch {
+    // Unreadable or binary file — skip rather than fail the whole search.
+    return null;
+  }
+}
+
+function matchLine(regex: RegExp, line: string): RegExpExecArray | null {
+  regex.lastIndex = 0;
+  return regex.exec(line);
+}
+
+function toGrepMatch(
+  filePath: string,
+  lineNumber: number,
+  match: RegExpExecArray,
+  lineContent: string
+): GrepMatch {
+  return {
+    filePath,
+    line: lineNumber,
+    column: match.index + 1,
+    match: match[0],
+    lineContent,
+  };
+}
+
+function scanFile(
+  regex: RegExp,
+  filePath: string,
+  content: string,
+  state: SearchState
+): boolean {
+  const lines = content.split(/\r?\n/);
+  let fileMatchCount = 0;
+  for (let i = 0; i < lines.length && state.collected() < state.limit; i++) {
+    const line = lines[i] ?? '';
+    const match = matchLine(regex, line);
+    if (match === null) continue;
+
+    if (state.listMatchingFiles) {
+      state.files.add(filePath);
+      return false;
     }
 
-    const limit = maxResults ?? DEFAULT_MAX_RESULTS;
-    const listMatchingFiles = outputMode === 'files_with_matches';
-    const matches: GrepMatch[] = [];
-    const files = new Set<string>();
-    const collected = () => (listMatchingFiles ? files.size : matches.length);
-    let limitReached = false;
-    let perFileLimitHit = false;
+    state.matches.push(toGrepMatch(filePath, i + 1, match, line));
+    fileMatchCount++;
+    if (fileMatchCount >= MAX_MATCHES_PER_FILE) {
+      return i < lines.length - 1;
+    }
+  }
+  return false;
+}
 
-    const filePaths = fs.promises.glob(
-      filePattern !== undefined
-        ? toRecursiveGlob(filePattern)
-        : DEFAULT_FILE_PATTERN,
-      { cwd, exclude: isIgnored }
-    );
+async function searchFiles(
+  regex: RegExp,
+  filePattern: string | undefined,
+  { cwd, limit, listMatchingFiles, signal }: SearchOptions
+): Promise<GrepSearchResult> {
+  const matches: GrepMatch[] = [];
+  const files = new Set<string>();
+  const state: SearchState = {
+    matches,
+    files,
+    limit,
+    listMatchingFiles,
+    collected: () => (listMatchingFiles ? files.size : matches.length),
+  };
 
-    for await (const relativePath of filePaths) {
-      if (signal.aborted) break;
-      if (collected() >= limit) {
-        limitReached = true;
-        break;
-      }
+  let limitReached = false;
+  let perFileLimitHit = false;
 
-      const absolutePath = path.resolve(cwd, relativePath);
-
-      let stats: fs.Stats;
-      try {
-        stats = await fs.promises.stat(absolutePath);
-      } catch {
-        continue;
-      }
-      if (!stats.isFile()) continue;
-
-      let content: string;
-      try {
-        content = await fs.promises.readFile(absolutePath, 'utf-8');
-      } catch {
-        // Unreadable or binary file — skip rather than fail the whole search.
-        continue;
-      }
-
-      const lines = content.split(/\r?\n/);
-      let fileMatchCount = 0;
-      for (let i = 0; i < lines.length && collected() < limit; i++) {
-        const line = lines[i] ?? '';
-        regex.lastIndex = 0;
-        const m = regex.exec(line);
-        if (m === null) continue;
-
-        if (listMatchingFiles) {
-          files.add(absolutePath);
-          break;
-        }
-
-        matches.push({
-          filePath: absolutePath,
-          line: i + 1,
-          column: m.index + 1,
-          match: m[0],
-          lineContent: line,
-        });
-        fileMatchCount++;
-        if (fileMatchCount >= MAX_MATCHES_PER_FILE) {
-          perFileLimitHit = i < lines.length - 1;
-          break;
-        }
-      }
+  for await (const relativePath of listCandidateFiles(cwd, filePattern)) {
+    if (signal.aborted) break;
+    if (state.collected() >= limit) {
+      limitReached = true;
+      break;
     }
 
-    return Result.Ok(
-      listMatchingFiles
-        ? { matches: [], files: [...files].sort() }
-        : { matches, files: [] },
-      { pattern, truncated: limitReached || perFileLimitHit }
-    );
-  },
+    const filePath = path.resolve(cwd, relativePath);
+    const content = await readFileOrSkip(filePath);
+    if (content === null) continue;
+    perFileLimitHit ||= scanFile(regex, filePath, content, state);
+  }
 
-  inputToString({ pattern, directoryPath }) {
-    return `Searching for pattern \`${pattern}\` in \`${directoryPath}\``;
-  },
+  return {
+    matches,
+    files: [...files].sort(),
+    truncated: limitReached || perFileLimitHit,
+  };
+}
 
-  outputToString({ matches, files }, _, { pattern, truncated }): string {
-    if (files.length > 0) {
-      return formatMatchingFiles(files, pattern, truncated);
-    }
-
-    if (matches.length === 0) {
-      return `Found no matches for pattern \`${pattern}\`.`;
-    }
-
-    const limitVisible = matches.length > MAX_SHOWN_MATCHES;
-    const shown = limitVisible ? matches.slice(0, MAX_SHOWN_MATCHES) : matches;
-    const formatted = shown
-      .map(
-        m =>
-          `${relativeToCwd(m.filePath)}:${m.line}: ${truncateLine(m.lineContent)}`
-      )
-      .join('\n');
-    const fileCount = new Set(matches.map(m => m.filePath)).size;
-
-    const truncationNotice = truncated
-      ? '\n\nResults were truncated. Narrow the search with `filePattern`, raise `maxResults`, or use' +
-        ' `outputMode: files_with_matches` for broad patterns.'
-      : '';
-
-    return (
-      `Found ${matches.length} match${matches.length === 1 ? '' : 'es'} for pattern \`${pattern}\`` +
-      ` across ${fileCount} file${fileCount === 1 ? '' : 's'}:\n\n${formatted}\n${
-        limitVisible
-          ? `\n... and ${matches.length - MAX_SHOWN_MATCHES} more`
-          : ''
-      }${truncationNotice}`
-    );
-  },
-});
+function toToolOutput(result: GrepSearchResult, listMatchingFiles: boolean) {
+  return listMatchingFiles
+    ? { matches: [], files: result.files }
+    : { matches: result.matches, files: [] };
+}
