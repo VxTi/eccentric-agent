@@ -27,3 +27,7 @@ export const LINE_BREAK = /\r?\n/;
 export function detectLineEnding(content: string): string {
   return content.match(LINE_BREAK)?.[0] ?? '\n';
 }
+
+export function capitalize(input: string): string {
+  return input.charAt(0).toUpperCase() + input.slice(1);
+}

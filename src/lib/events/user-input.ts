@@ -60,10 +60,6 @@ export function requestUserInput<
       if (event.detail.channelId !== channelId) return;
 
       cleanup();
-      if (event.detail.options[0].cancelled) {
-        rejectWith('User cancelled input request');
-      }
-
       resolve(event.detail.options);
     };
 

@@ -7,6 +7,7 @@ import {
   type Message,
   MessageType,
 } from '../types/messages';
+import { capitalize } from './string-utils';
 
 /** Human-readable summaries for collapsed tool-call listings, keyed by the
  *  tool's internal name. Tools without an entry fall back to `name ×count`. */
@@ -18,6 +19,10 @@ const TOOL_COLLAPSE_SUMMARIES: Partial<
   shell: count => `ran ${count} ${count === 1 ? 'command' : 'commands'}`,
   create_file: count => `created ${count} ${count === 1 ? 'file' : 'files'}`,
   find_file: count => `looked for ${count} ${count === 1 ? 'file' : 'files'}`,
+  use_skill: count => `used ${count} ${count === 1 ? 'skill' : 'skills'}`,
+  create_task_list: () => 'created a task-list', // should technically never be called more than once
+  update_task_list: count =>
+    count === 1 ? 'updated a task-list' : `made ${count} task-list updates`,
   replace_in_file: count =>
     `${count} file ${count === 1 ? 'update' : 'updates'}`,
   find_in_file: count =>
@@ -97,7 +102,7 @@ function formatCollapsedToolCalls(collapsed: CollapsedToolCalls): string {
     })
     .join(', ');
 
-  const parts: string[] = [];
-  if (isNonEmptyString(summary, true)) parts.push(summary);
-  return chalk.dim(parts.join(' — '));
+  if (!isNonEmptyString(summary, true)) return '';
+
+  return chalk.dim(capitalize(summary));
 }

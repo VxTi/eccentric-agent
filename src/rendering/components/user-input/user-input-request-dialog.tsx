@@ -20,13 +20,22 @@ interface Props {
   request: UserInputRequest;
 }
 
-export function UserInputRequestDialog({ request }: Props): ReactNode {
+export function UserInputRequestDialog({
+  request: {
+    allowMultiple,
+    allowTextInput,
+    cancellable,
+    options,
+    title,
+    channelId,
+    description,
+  },
+}: Props): ReactNode {
   const { setInputRequest } = useInputArea();
   const { agent } = useAgent();
-  const { allowMultiple, allowTextInput, cancellable, options, title } =
-    request;
   const [userSelectedInputIndex, setUserSelectedInputIndex] =
     useState<number>(0);
+
   const [activeIndices, setActiveIndices] = useState<number[]>([]);
   const [textValue, setTextValue] = useState<string>('');
 
@@ -36,7 +45,7 @@ export function UserInputRequestDialog({ request }: Props): ReactNode {
   const isTextInputRow =
     allowTextInput === true && userSelectedInputIndex === options.length;
 
-  const reset = () => {
+  const resetInputRequestState = () => {
     setInputRequest(undefined);
     setUserSelectedInputIndex(0);
     setActiveIndices([]);
@@ -44,25 +53,21 @@ export function UserInputRequestDialog({ request }: Props): ReactNode {
   };
 
   const submit = (response: NonEmptyArray<SelectedInputOptionResult>) => {
-    emitEvent(EventName.INPUT_RESPONSE, response, request.channelId);
-    reset();
+    emitEvent(EventName.INPUT_RESPONSE, response, channelId);
+    resetInputRequestState();
   };
 
   // Dismisses without answering: the awaiting caller is settled as cancelled
   // and the agent's in-flight turn is interrupted.
-  const cancel = () => {
-    emitEvent(
-      EventName.INPUT_RESPONSE,
-      [{ cancelled: true }],
-      request.channelId
-    );
+  const cancelInputRequest = () => {
+    emitEvent(EventName.INPUT_RESPONSE, [{ cancelled: true }], channelId);
     agent.cancel();
-    reset();
+    resetInputRequestState();
   };
 
   useInput((char, key) => {
     if (key.escape && cancellable) {
-      cancel();
+      cancelInputRequest();
       return;
     }
 
@@ -125,19 +130,19 @@ export function UserInputRequestDialog({ request }: Props): ReactNode {
 
       submit(
         indices.map(
-          idx => request.options[idx]
+          idx => options[idx]
         ) as NonEmptyArray<SelectedInputOptionResult>
       );
     }
   });
 
-  const description = useMemo(() => {
-    if (!isNonEmptyString(request.description)) return;
+  const mdDescription = useMemo(() => {
+    if (!isNonEmptyString(description)) return;
 
-    const md = parseMarkdown(request.description);
+    const md = parseMarkdown(description);
 
     return md.split('\n').slice(0, 5).join('\n');
-  }, [request.description]);
+  }, [description]);
 
   return (
     <Box
@@ -158,8 +163,8 @@ export function UserInputRequestDialog({ request }: Props): ReactNode {
             {title}
           </Text>
         )}
-        {isNonEmptyString(description) && (
-          <Text color="white">{description}</Text>
+        {isNonEmptyString(mdDescription) && (
+          <Text color="white">{mdDescription}</Text>
         )}
       </Box>
       <Box marginTop={1} marginLeft={1} flexDirection="column">

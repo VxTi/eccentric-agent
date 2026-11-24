@@ -110,7 +110,7 @@ export function createTool<
 ): IToolDefinition<TIn, TOut, TOutMeta, TApprovalOption, TInternalName> {
   return {
     ...props,
-    formatArguments: props.formatArguments ?? (args => JSON.stringify(args)),
+    formatArguments: props.formatArguments ?? defaultArgFormatter,
     approvalOptions:
       props.approvalOptions ??
       (() =>
@@ -120,4 +120,8 @@ export function createTool<
     requiresApproval: props.requiresApproval ?? (() => false),
     onOptionSelect: props.onOptionSelect ?? (() => ToolSelectionOption.ALLOW),
   };
+}
+
+function defaultArgFormatter<TIn>(args: TIn): string {
+  return JSON.stringify(args);
 }
