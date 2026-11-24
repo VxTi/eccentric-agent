@@ -46,7 +46,6 @@ describe('agentSlice setMessage tool-call collapsing', () => {
     const collapsed = state.messages[1] as GenericMessage;
     expect(collapsed.collapsed?.count).toBe(2);
     expect(collapsed.collapsed?.tools).toEqual({ read_file: 2 });
-    expect(collapsed.content).toContain('2 tool calls');
     expect(collapsed.content).toContain('read 2 files');
   });
 

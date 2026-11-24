@@ -1,4 +1,5 @@
 import { tavily, type TavilyClient } from '@tavily/core';
+import { requiredEnv } from '../env';
 
 let client: TavilyClient | undefined;
 

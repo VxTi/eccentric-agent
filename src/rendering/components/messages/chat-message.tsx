@@ -4,6 +4,7 @@ import { Box } from 'ink';
 import { type Message, MessageType } from '../../../lib/types/messages';
 import { AssistantChatMessage } from './assistant-chat-message';
 import { GenericChatMessage } from './generic-chat-message';
+import { ThoughtChatMessage } from './thought-chat-message';
 import { UserChatMessage } from './user-chat-message';
 
 export function ChatMessage({ message }: BaseProps<Message>) {
@@ -32,5 +33,7 @@ function ModelMessageText({ message }: BaseProps<Message>) {
       return <AssistantChatMessage message={message} />;
     case MessageType.GENERIC:
       return <GenericChatMessage message={message} />;
+    case MessageType.REASONING:
+      return <ThoughtChatMessage message={message} />;
   }
 }

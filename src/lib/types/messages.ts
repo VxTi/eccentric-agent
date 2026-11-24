@@ -6,11 +6,16 @@ export enum MessageType {
   ASSISTANT = 'assistant',
   GENERIC = 'generic',
   TOOL_CALL = 'tool_call',
+  REASONING = 'reasoning',
 }
 
 interface IMessage {
   id: string;
   content: string;
+}
+
+interface IPendable {
+  loading?: boolean;
 }
 
 export interface UserMessage extends IMessage {
@@ -23,9 +28,8 @@ export interface AssistantMessage extends IMessage {
   metadata?: object;
 }
 
-export interface GenericMessage extends IMessage {
+export interface GenericMessage extends IMessage, IPendable {
   type: MessageType.GENERIC;
-  loading?: boolean;
   failure?: boolean;
   /** Present when the message was emitted by a tool execution; the tool's
    *  internal name. Absent for other generic messages (debug output, agent
@@ -36,6 +40,10 @@ export interface GenericMessage extends IMessage {
   collapsed?: CollapsedToolCalls;
 }
 
+export interface ThoughtMessage extends IMessage, IPendable {
+  type: MessageType.REASONING;
+}
+
 export interface CollapsedToolCalls {
   /** Total number of tool calls aggregated into this message. */
   count: number;
@@ -44,7 +52,11 @@ export interface CollapsedToolCalls {
   tools: Partial<Record<ToolIdentifier, number>>;
 }
 
-export type Message = UserMessage | AssistantMessage | GenericMessage;
+export type Message =
+  | UserMessage
+  | AssistantMessage
+  | GenericMessage
+  | ThoughtMessage;
 
 /** A `Message` with `id` optional, keeping each variant's own fields intact.
  *  Must distribute over the union: applying `MakeOptional` to the union

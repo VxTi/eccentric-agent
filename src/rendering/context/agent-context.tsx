@@ -4,6 +4,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useMemo,
   useState,
 } from 'react';
 import {
@@ -164,20 +165,30 @@ export function AgentProvider({
     agent.toggleAutoApprove();
   }, [agent]);
 
+  const value = useMemo<AgentContextInstance>(
+    () => ({
+      reasoningEffort,
+      agent,
+      submitMessage,
+      messages,
+      status,
+      autoApprove,
+      queuedMessageCount,
+      toggleAutoApprove,
+    }),
+    [
+      reasoningEffort,
+      agent,
+      submitMessage,
+      messages,
+      status,
+      autoApprove,
+      queuedMessageCount,
+      toggleAutoApprove,
+    ]
+  );
+
   return (
-    <AgentContext.Provider
-      value={{
-        reasoningEffort,
-        agent,
-        submitMessage,
-        messages,
-        status,
-        autoApprove,
-        queuedMessageCount,
-        toggleAutoApprove,
-      }}
-    >
-      {children}
-    </AgentContext.Provider>
+    <AgentContext.Provider value={value}>{children}</AgentContext.Provider>
   );
 }

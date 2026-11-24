@@ -6,6 +6,7 @@ export const eventTarget = new EventTarget();
 export const enum EventName {
   REQUEST_INPUT = 'request-user-input',
   INPUT_RESPONSE = 'user-input-response',
+  INPUT_CANCEL = 'user-input-cancel',
   AGENT_MESSAGE = 'agent-message',
   AGENT_REASONING = 'agent-reasoning',
   RESPONSE_TOKENS = 'response-tokens',
@@ -32,6 +33,11 @@ export interface UserInputRequest<T = string> {
   allowMultiple?: boolean;
   /** When true, the dialog offers a row to type a custom free-text answer. */
   allowTextInput?: boolean;
+  /**
+   * When true, the dialog lets the user dismiss the request with ESC. This
+   * settles the awaiting caller as cancelled instead of answering it.
+   */
+  cancellable?: boolean;
   channelId: string;
 }
 
@@ -49,6 +55,12 @@ export class UserInputResponseEvent<T = string> extends CustomEvent<{
 }> {
   constructor(options: NonEmptyArray<InputOption<T>>, channelId: string) {
     super(EventName.INPUT_RESPONSE, { detail: { options, channelId } });
+  }
+}
+
+export class UserInputCancelEvent extends CustomEvent<{ channelId: string }> {
+  constructor(channelId: string) {
+    super(EventName.INPUT_CANCEL, { detail: { channelId } });
   }
 }
 

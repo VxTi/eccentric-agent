@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Box } from 'ink';
 import { useAgent } from '../../hooks/use-agent';
-import { ChatMessage } from './chat-message';
+import { MemoizedChatMessage } from './memoized-chat-message';
 
 export function MessageList(): ReactNode {
   const { messages } = useAgent();
@@ -17,7 +17,7 @@ export function MessageList(): ReactNode {
       overflow="hidden"
     >
       {messages.map(message => (
-        <ChatMessage key={message.id} message={message} />
+        <MemoizedChatMessage key={message.id} message={message} />
       ))}
     </Box>
   );

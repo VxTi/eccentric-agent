@@ -345,9 +345,7 @@ export class Agent extends EventEmitter<EventMap> {
   private abortMessageLoadingStates(): void {
     const messages: Message[] = store
       .getState()
-      .agent.messages.map(m =>
-        m.type === MessageType.GENERIC ? { ...m, loading: false } : m
-      );
+      .agent.messages.map(m => ('loading' in m ? { ...m, loading: false } : m));
     store.dispatch(setMessages(messages));
   }
 
@@ -379,12 +377,11 @@ export class Agent extends EventEmitter<EventMap> {
         Math.round((Date.now() - reasoning.startedAt) / 1000)
       );
       this.emit('message-delta', {
-        type: MessageType.GENERIC,
+        type: MessageType.REASONING,
         id: reasoning.id,
         loading: false,
-        content: chalk.dim(`Thought for ${seconds}s`),
+        content: `Thought for ${seconds}s`,
       });
-      reasoning = undefined;
     };
 
     try {
@@ -417,7 +414,7 @@ export class Agent extends EventEmitter<EventMap> {
             const id = uuid();
             reasoning = { id, startedAt: Date.now() };
             this.emit('message-delta', {
-              type: MessageType.GENERIC,
+              type: MessageType.REASONING,
               id,
               loading: true,
               content: 'Thinking...',
