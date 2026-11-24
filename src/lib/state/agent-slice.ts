@@ -32,7 +32,7 @@ const initialState: AgentState = {
   messages: [],
   reasoning: { active: false },
   autoApprove: false,
-  agent: new Agent(defaultController.signal, process.cwd()),
+  agent: new Agent(defaultController.signal, process.env.CWD ?? process.cwd()),
 };
 
 export const agentSlice = createSlice({

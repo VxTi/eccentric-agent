@@ -21,6 +21,11 @@ beforeAll(async () => {
     'export function alpha() {}\nconst beta = alpha(1);\n'
   );
   await fs.writeFile(path.join(tmpDir, 'src/b.md'), 'alpha in docs\n');
+  await fs.writeFile(path.join(tmpDir, 'src/dup.txt'), 'alpha alpha alpha\n');
+  await fs.writeFile(
+    path.join(tmpDir, 'src/many.txt'),
+    `${Array.from({ length: 25 }, (_, i) => `alpha ${i}`).join('\n')}\n`
+  );
   await fs.writeFile(
     path.join(tmpDir, 'node_modules/dep/index.ts'),
     'export function alpha() {}\n'
@@ -80,5 +85,54 @@ describe('grep', () => {
     expect(
       await matchLocations({ pattern: 'alpha', filePattern: 'src/*.md' })
     ).toEqual(['src/b.md:1']);
+  });
+
+  it('returns at most one match per line', async () => {
+    expect(
+      await matchLocations({ pattern: 'alpha', filePattern: 'dup.txt' })
+    ).toEqual(['src/dup.txt:1']);
+  });
+
+  it('caps matches per file and reports truncation', async () => {
+    const result = await grep.handle(
+      { directoryPath: tmpDir, pattern: 'alpha', filePattern: 'many.txt' },
+      channel,
+      signal
+    );
+    if (!result.ok) throw new Error(result.error);
+    expect(result.data.matches).toHaveLength(20);
+    expect(result.metadata.truncated).toBe(true);
+  });
+
+  it('flags truncation when maxResults is hit', async () => {
+    const result = await grep.handle(
+      { directoryPath: tmpDir, pattern: 'alpha', maxResults: 2 },
+      channel,
+      signal
+    );
+    if (!result.ok) throw new Error(result.error);
+    expect(result.data.matches).toHaveLength(2);
+    expect(result.metadata.truncated).toBe(true);
+  });
+
+  it('lists matching files with outputMode files_with_matches', async () => {
+    const result = await grep.handle(
+      {
+        directoryPath: tmpDir,
+        pattern: 'alpha',
+        outputMode: 'files_with_matches',
+      },
+      channel,
+      signal
+    );
+    if (!result.ok) throw new Error(result.error);
+    expect(result.data.matches).toEqual([]);
+    expect(result.data.files.map(f => path.relative(tmpDir, f))).toEqual([
+      'src/b.md',
+      'src/dup.txt',
+      'src/many.txt',
+      'src/nested/a.ts',
+    ]);
+    expect(result.metadata.truncated).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
 import {
-  isLoopFinished,
+  hasToolCall,
+  isStepCount,
   type ModelMessage,
   streamText,
   tool as createTool,
@@ -20,6 +21,15 @@ import { emitResponseTokensEvent } from '../events/token-usage';
 import { Result } from '../result';
 
 const AGENT_MAX_LOOP_ITERATIONS = 200;
+
+/**
+ * Cap on model steps within a single `streamText` call. `isLoopFinished()` is
+ * a no-op condition (`() => false`), so without this the inner tool loop only
+ * ends when the model stops calling tools — a model that keeps calling tools
+ * runs unbounded, and the outer iteration budget can never fire because
+ * `result.steps` never resolves.
+ */
+const SUB_AGENT_MAX_STEPS = 500;
 
 /** Default wait for a user to answer a sub-agent's approval prompt. */
 const APPROVAL_TIMEOUT_MS = 60_000;
@@ -108,12 +118,17 @@ export class SubAgent {
             content: `An error occurred in agent task - ${String(error)}`,
           });
         },
-        stopWhen: isLoopFinished(),
+        stopWhen: [
+          // Stop immediately after `complete_goal` executes so the loop does
+          // not burn an extra turn asking the model what to do next.
+          hasToolCall(PRIMARY_GOAL_TOOL_NAME),
+          isStepCount(SUB_AGENT_MAX_STEPS),
+        ],
       });
 
       try {
-        const response = (await result.finalStep).response;
-        this.messages.push(...response.messages);
+        const steps = await result.steps;
+        this.messages.push(...steps.flatMap(step => step.response.messages));
       } catch (e) {
         this.throwIfAborted();
         this.channel.notify({
