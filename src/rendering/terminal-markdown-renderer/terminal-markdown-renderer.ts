@@ -61,9 +61,33 @@ function diffSideLine(side: string[], lineNumber: number | undefined): string {
   if (!isNotNil(lineNumber)) return '';
   return side[lineNumber - 1] ?? '';
 }
-/** Characters a row spends on everything that is not cell content. */
+/** Characters a two-sided row spends on everything that is not cell content. */
 const DIFF_COLUMN_OVERHEAD = 5; // '<num> <cell> | <num> <cell>'
+/** Characters a single-sided row spends on everything that is not cell content. */
+const DIFF_SINGLE_COLUMN_OVERHEAD = 1; // '<num> <cell>'
 const DIFF_MIN_COL_WIDTH = 10;
+
+/** Width budget shared by every row of one rendered diff. */
+interface DiffRowLayout {
+  numberWidth: number;
+  colWidth: number;
+}
+
+/** Everything a single-sided row draws: one cell taken from one side. */
+interface SingleSidedRowParams {
+  line: DiffLine;
+  side: string[];
+  lineNumber: number | undefined;
+  at: Position;
+}
+
+/** The two halves one side-by-side row aligns. */
+interface SideBySideRowParams {
+  left: DiffLine;
+  right: DiffLine;
+  oldLines: string[];
+  newLines: string[];
+}
 
 const DIFF_REMOVED_MARKER = '- ';
 const DIFF_ADDED_MARKER = '+ ';
@@ -230,10 +254,12 @@ export class TerminalRenderer extends Renderer {
   }
 
   /**
-   * Renders `oldStr` -> `newStr` as two aligned columns.
+   * Renders `oldStr` -> `newStr` as two aligned columns, or as a single
+   * full-width column when the change is one-sided (only additions or only
+   * removals) — a permanently empty opposite column carries no information.
    *
    * `lang` is the language of the *content*, not of the diff itself; it is
-   * what the two sides are highlighted as.
+   * what the columns are highlighted as.
    */
   public renderDiff(
     oldStr: string,
@@ -244,17 +270,35 @@ export class TerminalRenderer extends Renderer {
     const rows = generateSideBySideDiff(oldStr, newStr);
     if (!isNonEmptyArray(rows)) return '';
 
+    const hasRemoved = rows.some(([left, right]) =>
+      Boolean(left.removed || right.removed)
+    );
+    const hasAdded = rows.some(([left, right]) =>
+      Boolean(left.added || right.added)
+    );
+    const singleSided = hasRemoved !== hasAdded;
+
     const numberWidth = String(
       Math.max(oldStr.split('\n').length, newStr.split('\n').length)
     ).length;
 
-    // A row is "<num> <cell> | <num> <cell>", so the non-cell cost is
-    // 2 * numberWidth + DIFF_COLUMN_OVERHEAD. Floor the cell width so a
-    // narrow terminal stays legible instead of collapsing to nothing.
-    const colWidth = Math.max(
-      DIFF_MIN_COL_WIDTH,
-      Math.floor((availableWidth - 2 * numberWidth - DIFF_COLUMN_OVERHEAD) / 2)
-    );
+    // Floor the cell width so a narrow terminal stays legible instead of
+    // collapsing to nothing. The non-cell cost per row is numberWidth plus
+    // the separators: two cells joined by ' | ', or one cell after '<num> '.
+    const layout: DiffRowLayout = {
+      numberWidth,
+      colWidth: singleSided
+        ? Math.max(
+            DIFF_MIN_COL_WIDTH,
+            availableWidth - numberWidth - DIFF_SINGLE_COLUMN_OVERHEAD
+          )
+        : Math.max(
+            DIFF_MIN_COL_WIDTH,
+            Math.floor(
+              (availableWidth - 2 * numberWidth - DIFF_COLUMN_OVERHEAD) / 2
+            )
+          ),
+    };
 
     // Highlight each side as a single block, then index it by line number.
     // Highlighting per line loses the state of any token that spans a line
@@ -265,35 +309,26 @@ export class TerminalRenderer extends Renderer {
 
     const lines = rows.map(([left, right]) => {
       if (left.collapsed || right.collapsed) {
-        return this.collapsedRow(numberWidth, colWidth);
+        return singleSided
+          ? this.collapsedSingleSidedRow(layout)
+          : this.collapsedRow(layout);
       }
 
-      // Mirrors `collapsedRow`'s '<num> <cell> | <num> <cell>' layout: the
-      // column separator sits between the two halves, not inside them.
-      const oldHalf = [
-        this.diffNumber(left.lineNumberOriginal, numberWidth),
-        this.diffCell(
-          diffSideLine(oldLines, left.lineNumberOriginal),
-          left,
-          colWidth,
-          Position.END
-        ),
-      ].join(' ');
-      const newHalf = [
-        this.diffNumber(right.lineNumberModified, numberWidth),
-        this.diffCell(
-          diffSideLine(newLines, right.lineNumberModified),
-          right,
-          colWidth,
-          Position.START
-        ),
-      ].join(' ');
-      const row = `${oldHalf} | ${newHalf}`;
+      if (singleSided) {
+        const line = hasAdded ? right : left;
+        const at = hasAdded ? Position.START : Position.END;
+        const side = hasAdded ? newLines : oldLines;
+        const lineNumber = hasAdded
+          ? line.lineNumberModified
+          : line.lineNumberOriginal;
+        return this.finishDiffRow(
+          this.singleSidedDiffRow({ line, side, lineNumber, at }, layout)
+        );
+      }
 
-      // Clipping can cut a highlighted line inside an escape sequence, and the
-      // background wrappers only close their own background. Terminate the row
-      // so nothing bleeds into the next one or into the rest of the frame.
-      return row.includes(ESC) ? `${row}${ANSI_RESET}` : row;
+      return this.finishDiffRow(
+        this.sideBySideDiffRow({ left, right, oldLines, newLines }, layout)
+      );
     });
 
     return lines.join('\n');
@@ -328,11 +363,59 @@ export class TerminalRenderer extends Renderer {
     return cell;
   }
 
-  private collapsedRow(numberWidth: number, colWidth: number): string {
-    const blank = ' '.repeat(numberWidth);
-    const rule = chalk.dim(DIFF_ELLISION.repeat(colWidth));
-
+  private collapsedRow(layout: DiffRowLayout): string {
+    const blank = ' '.repeat(layout.numberWidth);
+    const rule = chalk.dim(DIFF_ELLISION.repeat(layout.colWidth));
     return `${blank} ${rule} | ${blank} ${rule}`;
+  }
+
+  private collapsedSingleSidedRow(layout: DiffRowLayout): string {
+    const blank = ' '.repeat(layout.numberWidth);
+    return `${blank} ${chalk.dim(DIFF_ELLISION.repeat(layout.colWidth))}`;
+  }
+
+  private singleSidedDiffRow(
+    { line, side, lineNumber, at }: SingleSidedRowParams,
+    layout: DiffRowLayout
+  ): string {
+    return [
+      this.diffNumber(lineNumber, layout.numberWidth),
+      this.diffCell(diffSideLine(side, lineNumber), line, layout.colWidth, at),
+    ].join(' ');
+  }
+
+  private sideBySideDiffRow(
+    { left, right, oldLines, newLines }: SideBySideRowParams,
+    layout: DiffRowLayout
+  ): string {
+    // Mirrors `collapsedRow`'s '<num> <cell> | <num> <cell>' layout: the
+    // column separator sits between the two halves, not inside them.
+    const oldHalf = [
+      this.diffNumber(left.lineNumberOriginal, layout.numberWidth),
+      this.diffCell(
+        diffSideLine(oldLines, left.lineNumberOriginal),
+        left,
+        layout.colWidth,
+        Position.END
+      ),
+    ].join(' ');
+    const newHalf = [
+      this.diffNumber(right.lineNumberModified, layout.numberWidth),
+      this.diffCell(
+        diffSideLine(newLines, right.lineNumberModified),
+        right,
+        layout.colWidth,
+        Position.START
+      ),
+    ].join(' ');
+    return `${oldHalf} | ${newHalf}`;
+  }
+
+  private finishDiffRow(row: string): string {
+    // Clipping can cut a highlighted line inside an escape sequence, and the
+    // background wrappers only close their own background. Terminate the row
+    // so nothing bleeds into the next one or into the rest of the frame.
+    return row.includes(ESC) ? `${row}${ANSI_RESET}` : row;
   }
 
   /**

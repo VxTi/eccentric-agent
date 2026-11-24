@@ -21,5 +21,31 @@ describe('TerminalRenderer', () => {
                                                | 4 + line 4                            "
       `);
     });
+
+    it('should render additions only as a single-sided diff', () => {
+      const oldContent = 'line 1\nline 2';
+      const newContent = 'line 1\nline 2\nline 3\nline 4';
+
+      const rendered = renderer.renderDiff(oldContent, newContent);
+      expect(rendered).toMatchInlineSnapshot(`
+        "1   line 1                                                                      
+        2   line 2                                                                      
+        3 + line 3                                                                      
+        4 + line 4                                                                      "
+      `);
+    });
+
+    it('should render removals only as a single-sided diff', () => {
+      const oldContent = 'line 1\nline 2\nline 3\nline 4';
+      const newContent = 'line 1\nline 2';
+
+      const rendered = renderer.renderDiff(oldContent, newContent);
+      expect(rendered).toMatchInlineSnapshot(`
+        "1   line 1                                                                      
+        2   line 2                                                                      
+        3 - line 3                                                                      
+        4 - line 4                                                                      "
+      `);
+    });
   });
 });
