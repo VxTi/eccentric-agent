@@ -19,9 +19,10 @@ export function UserChatMessage({ message }: BaseProps<UserMessage>) {
       borderLeftColor="red"
       borderStyle="single"
       width="100%"
+      gap={1}
     >
       <Text>Me</Text>
-      <Text color="#777777"> ▶ </Text>
+      <Text color="#777777">▶</Text>
       <ChatMessageContent content={message.content} uid={message.id} />
     </Box>
   );
