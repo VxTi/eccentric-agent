@@ -1,6 +1,6 @@
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { entries, isNonEmptyString } from '@vxti/typed';
 import chalk from 'chalk';
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { Agent } from '../agent/agent';
 import { type ToolIdentifier } from '../agent/tools';
 import type { ReasoningState } from '../events/events';
@@ -103,6 +103,7 @@ const TOOL_COLLAPSE_SUMMARIES: Partial<
 function isCollapsableTool(tool: ToolIdentifier) {
   switch (tool) {
     case 'prompt_user_options':
+    case 'replace_in_file':
       return false;
     default:
       return true;
@@ -114,7 +115,7 @@ function isCompletedToolCall(
 ): message is GenericMessage & { toolCall: string } {
   return (
     message !== undefined &&
-    message.type === 'generic' &&
+    message.type === MessageType.GENERIC &&
     message.toolCall !== undefined &&
     message.loading !== true
   );

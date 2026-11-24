@@ -320,21 +320,16 @@ export class Agent extends EventEmitter<EventMap> {
       }
 
       const steps = await result.steps;
+      const lastStep = await result.finalStep;
       this._context.pushResponse(steps.flatMap(step => step.response.messages));
 
       // Occupancy of the window going into the next turn: the full prompt the
-      // model just received plus the reply now appended to it. This is an
-      // absolute snapshot, not a per-step delta, so it is reported separately
-      // from per-step response tokens and reflects any compaction applied.
+      // model last received plus the reply appended after it. Per-step usage
+      // cannot be summed: each step's input already contains the whole
+      // conversation, so the final step's figures are the absolute snapshot.
       emitContextUsageEvent({
-        input: steps.reduce(
-          (acc, step) => acc + (step.usage.inputTokens ?? 0),
-          0
-        ),
-        output: steps.reduce(
-          (acc, step) => acc + (step.usage.outputTokens ?? 0),
-          0
-        ),
+        input: lastStep.usage.inputTokens ?? 0,
+        output: lastStep.usage.outputTokens ?? 0,
       });
     } catch (err: unknown) {
       this.setStatus({ loading: false, text: chalk.red('Fatal error') });

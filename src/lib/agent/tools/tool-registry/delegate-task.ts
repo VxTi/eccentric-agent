@@ -17,8 +17,6 @@ import {
   readFile,
   replaceInFile,
 } from './file-system';
-import { getUserLocation } from './get-user-location';
-import { getUserTime } from './get-user-time';
 import { callMcpTool, discoverMcpTool, listMcpTools } from './mcp';
 import { shell } from './shell';
 import { useSkill } from './skill';
@@ -32,8 +30,6 @@ const taskAgentTools: SomeTool[] = [
   readFile,
   webSearch,
   webFetch,
-  getUserTime,
-  getUserLocation,
   createTaskList,
   updateTaskList,
   discoverMcpTool,
