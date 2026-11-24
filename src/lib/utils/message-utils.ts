@@ -38,6 +38,7 @@ function isCollapsableTool(tool: ToolIdentifier) {
   switch (tool) {
     case 'prompt_user_options':
     case 'replace_in_file':
+    case 'delegate_task':
       return false;
     default:
       return true;

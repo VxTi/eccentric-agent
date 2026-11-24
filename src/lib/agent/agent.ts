@@ -15,9 +15,10 @@ import {
 import chalk from 'chalk';
 import { EventEmitter } from 'node:events';
 import { v7 as uuid } from 'uuid';
-import { emitPrimaryStepUsage } from '../events/token-usage';
+import { emitPrimaryStepUsage, type StepUsage } from '../events/token-usage';
 import { Notifier } from '../events/notifier';
 import { ContextStore } from './context-store';
+import { ContextCompactor } from './context-compaction';
 import { DEFAULT_MODEL, type ModelDefinition } from './inference';
 import { loadMcpConfig, type MCP } from './mcp/mcp';
 import { FileCache } from '../file-cache';
@@ -60,6 +61,7 @@ export class Agent extends EventEmitter<EventMap> {
   private readonly _taskList: TaskList;
   private readonly _fileCache: FileCache;
   private readonly _context: ContextStore;
+  private readonly _compactor = new ContextCompactor();
   private readonly _mcpServers: Set<MCP>;
   private readonly _notifier: Notifier;
   private readonly _toolset: ToolSet;
@@ -318,9 +320,10 @@ export class Agent extends EventEmitter<EventMap> {
 
       const steps = await result.steps;
       this._context.pushResponse(steps.flatMap(step => step.response.messages));
-
+      const finalStep = await result.finalStep;
       // The final step's occupancy snapshot was already emitted by
       // `onStepEnd`, which fires for every step including the last one.
+      await this.compactContextIfOverloaded(finalStep.usage, request.signal);
     } catch (err: unknown) {
       this.setStatus({ loading: false, text: chalk.red('Fatal error') });
       if (request.signal.aborted) {
@@ -357,6 +360,48 @@ export class Agent extends EventEmitter<EventMap> {
     });
     this.setStatus({ loading: false, text: '' });
     this.abortMessageLoadingStates();
+  }
+
+  private async compactContextIfOverloaded(
+    usage: StepUsage,
+    signal: AbortSignal
+  ): Promise<void> {
+    if (!this._compactor.isThresholdExceeded(usage, this._model.contextWindow))
+      return;
+    this.setStatus({ loading: true, text: chalk.dim('Compacting context') });
+    try {
+      const summary = await this._compactor.summarize(
+        this._context.messages,
+        signal
+      );
+      this._context.clear();
+      this._context.pushUser(this.compactionNotice(summary));
+      this.emit('message-delta', {
+        type: MessageType.GENERIC,
+        id: uuid(),
+        content: chalk.dim(
+          'Context window nearing capacity — earlier conversation summarized.'
+        ),
+      });
+    } catch (error: unknown) {
+      if (signal.aborted) return;
+      this.emit('message-delta', {
+        type: MessageType.GENERIC,
+        id: uuid(),
+        failure: true,
+        content: `Context compaction failed: ${String(error)}`,
+      });
+    }
+  }
+
+  private compactionNotice(summary: string): string {
+    return [
+      '[The earlier conversation was summarized to free context window space.]',
+      '',
+      summary,
+      '',
+      'Continue from this summary; re-read files on disk when their current contents matter.',
+    ].join('\n');
   }
 
   private async handleResponseStream(

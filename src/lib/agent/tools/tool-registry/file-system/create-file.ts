@@ -3,7 +3,8 @@ import path from 'node:path';
 import { Result } from '../../../../result';
 import { store } from '../../../../state';
 import { formatDiffMd } from '../../../../utils/diff-utils';
-import { mkdir, writeFile, access } from 'fs/promises';
+import { mkdir, writeFile } from 'fs/promises';
+import { existsAsync } from '../../../../utils/fs';
 import { createTool } from '../../tool-definition';
 
 const inputSchema = z.object({
@@ -29,15 +30,6 @@ const outputSchema = z.object({
   success: z.boolean().describe('Whether the file was successfully updated'),
 });
 
-async function safeExists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export const createFile = createTool({
   internalName: 'create_file',
   name: 'Create File',
@@ -49,6 +41,7 @@ export const createFile = createTool({
     ' file, prefer `replace_in_file` instead.',
   inputSchema,
   outputSchema,
+  requiresApproval: () => true,
 
   formatArguments: ({ path: filePath }) => `Creating a file at \`${filePath}\``,
 
@@ -73,7 +66,7 @@ async function createFileImpl({
   const { fileCache } = agent;
   const override = overwrite ?? false;
 
-  const alreadyExists = await safeExists(filePath);
+  const alreadyExists = await existsAsync(filePath);
   if (alreadyExists && !override) {
     return Result.Error(
       `File already exists at ${filePath}. Pass overwrite: true to replace it.`
