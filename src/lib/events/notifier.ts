@@ -10,8 +10,13 @@ export class NotifierChannel<T> {
     notifier.bind(this);
   }
 
-  public addInterceptor(interceptor: InterceptorFn<T>) {
+  public addInterceptor(interceptor: InterceptorFn<T>): void {
     this.interceptors.push(interceptor);
+  }
+
+  public removeInterceptor(interceptor: InterceptorFn<T>): void {
+    const index = this.interceptors.indexOf(interceptor);
+    if (index !== -1) this.interceptors.splice(index, 1);
   }
 
   public notify(arg: T): void {

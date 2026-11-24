@@ -63,6 +63,9 @@ export class SubAgent {
   private readonly callback: (data: Result<string, Error>) => void;
   private readonly signal: AbortSignal;
   private readonly channel: NotifierChannel<ToolChannelParams>;
+  private readonly summaryInterceptor: (
+    message: ToolChannelParams
+  ) => ToolChannelParams;
   private readonly tools: SomeTool[];
   private readonly complexity: TaskComplexity;
 
@@ -85,17 +88,23 @@ export class SubAgent {
     // content is decorated with the goal. Forcing `loading: true` here would
     // override the terminal `loading: false` notification core.ts emits when the
     // tool resolves, leaving the aggregated message spinning forever.
-    this.channel.addInterceptor(message => ({
+    this.summaryInterceptor = message => ({
       ...message,
       content: `\`${this.summary}\` • ${message.content}`,
-    }));
+    });
+    this.channel.addInterceptor(this.summaryInterceptor);
 
-    this.process()
-      .then((result: string) => this.callback(Result.Ok(result)))
-      .catch((error: Error) => this.callback(Result.Error(error)));
+    this.processAgentTaskLoop()
+      .then(result => this.settleAgentTaskResult(Result.Ok(result)))
+      .catch((error: Error) => this.settleAgentTaskResult(Result.Error(error)));
   }
 
-  private async process(): Promise<string> {
+  private settleAgentTaskResult(result: Result<string, Error>): void {
+    this.channel.removeInterceptor(this.summaryInterceptor);
+    this.callback(result);
+  }
+
+  private async processAgentTaskLoop(): Promise<string> {
     let iterations = 0;
     while (iterations++ < AGENT_MAX_LOOP_ITERATIONS) {
       if (this.goalAccomplished) {
@@ -231,7 +240,11 @@ export class SubAgent {
         }
 
         this.channel.notify({
-          content: tool.outputToString(output, this.channel, output.metadata),
+          content: tool.outputToString(
+            output.data,
+            this.channel,
+            output.metadata
+          ),
         });
 
         return output.data;

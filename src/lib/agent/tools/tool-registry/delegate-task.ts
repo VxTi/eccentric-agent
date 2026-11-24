@@ -118,13 +118,23 @@ async function runTaskAgent({
 }: TaskAgentRun): Promise<Result<string, Error>> {
   return new Promise(resolve => {
     const controller = new AbortController();
+    const abort = (): void => controller.abort();
 
-    signal.addEventListener('abort', () => controller.abort());
+    // The `abort` event has already fired on an aborted signal, so the
+    // listener would never run and the sub-agent would keep executing.
+    if (signal.aborted) {
+      controller.abort();
+    } else {
+      signal.addEventListener('abort', abort, { once: true });
+    }
 
     new SubAgent({
       goal,
       summary,
-      callback: resolve,
+      callback: result => {
+        signal.removeEventListener('abort', abort);
+        resolve(result);
+      },
       signal: controller.signal,
       channel,
       tools: taskAgentTools,
