@@ -28,11 +28,13 @@ export interface AgentState {
   agent: Agent;
 }
 
+const cwd = process.env.ECA_CWD ?? process.env.CWD ?? process.cwd();
+
 const initialState: AgentState = {
   messages: [],
   reasoning: { active: false },
   autoApprove: false,
-  agent: new Agent(defaultController.signal, process.env.CWD ?? process.cwd()),
+  agent: new Agent(defaultController.signal, cwd),
 };
 
 export const agentSlice = createSlice({

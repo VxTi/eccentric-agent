@@ -23,6 +23,7 @@ import {
 } from '../../lib/state';
 import type { Message } from '../../lib/types/messages';
 import { basicHighlightFormatting } from '../terminal-markdown-renderer/markdown-renderer';
+import { isNonEmptyString } from '@vxti/typed';
 
 const THINKING_TEXT = basicHighlightFormatting('Thinking...');
 
@@ -152,6 +153,8 @@ export function AgentProvider({
 
   const submitMessage = useCallback(
     (input: string) => {
+      if (!isNonEmptyString(input, true)) return;
+
       void agent.submitMessage(input);
     },
     [agent]

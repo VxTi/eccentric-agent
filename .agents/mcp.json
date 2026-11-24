@@ -1,6 +1,7 @@
 {
   "mcpServers": {
     "atlassian-jira": {
+      "disabled": true,
       "command": "npx",
       "args": [
         "-y",
@@ -15,7 +16,14 @@
         "getTransitionsForJiraIssue"
       ]
     },
+    "jetbrains": {
+      "httpUrl": "http://127.0.0.1:64542/stream",
+      "headers": {
+        "IJ_MCP_SERVER_PROJECT_PATH": "/Users/luca/Projects/Personal/eccentric-agent"
+      }
+    },
     "github": {
+      "disabled": true,
       "httpUrl": "https://api.githubcopilot.com/mcp/",
       "headers": {
         "Authorization": "Bearer $GITHUB_PAT"

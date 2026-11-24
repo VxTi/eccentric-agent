@@ -1,6 +1,3 @@
-import { config } from 'dotenv';
-config({ quiet: true });
-
 import { marked } from 'marked';
 import { stdin, stdout } from 'node:process';
 import { render } from 'ink';
@@ -11,7 +8,10 @@ import { MouseProvider } from './rendering/context/mouse-context';
 import { App } from './rendering/components/App';
 import { terminalRenderer } from './rendering/terminal-markdown-renderer/markdown-renderer';
 import { createInkStdin } from './lib/mouse-input';
+import { loadEnv } from './lib/env';
 import chalk from 'chalk';
+
+loadEnv();
 
 // Ink never asks the terminal to report mouse events, so we opt in ourselves:
 // decset 1003 selects any-event tracking (motion, press and release), decset

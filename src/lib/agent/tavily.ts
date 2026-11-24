@@ -1,10 +1,6 @@
 import { tavily, type TavilyClient } from '@tavily/core';
-import { config } from 'dotenv';
-import { requiredEnv } from '../env';
 
-config({ quiet: true });
-
-let client: TavilyClient | null;
+let client: TavilyClient | undefined;
 
 /**
  * @see https://app.tavily.com/home

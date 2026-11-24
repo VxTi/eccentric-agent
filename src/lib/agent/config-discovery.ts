@@ -1,26 +1,25 @@
 import { isNil } from '@vxti/typed';
 import { existsSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 const rootDirname = '.agents';
 
-function resolveRootDirectoryPath(): string | undefined {
-  const base = process.cwd();
-  const rootDir = path.join(base, rootDirname);
+function resolveAgentsPath(itemName: string): string | undefined {
+  const candidates = [process.cwd(), os.homedir()].map(base =>
+    path.join(base, rootDirname, itemName)
+  );
 
-  return existsSync(rootDir) ? rootDir : undefined;
+  const existing = candidates.find(candidate => existsSync(candidate));
+  if (isNil(existing)) return;
+
+  return existing;
 }
 
 export function getMcpFilePath(): string | undefined {
-  const base = resolveRootDirectoryPath();
-  if (isNil(base)) return;
-
-  return path.join(base, 'mcp.json');
+  return resolveAgentsPath('mcp.json');
 }
 
 export function getSkillsRootDirPath(): string | undefined {
-  const base = resolveRootDirectoryPath();
-  if (isNil(base)) return;
-
-  return path.join(base, 'skills');
+  return resolveAgentsPath('skills');
 }

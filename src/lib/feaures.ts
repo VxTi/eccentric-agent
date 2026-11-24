@@ -1,3 +1,3 @@
 export const Features = {
-  MCP: false,
+  MCP: true,
 };
