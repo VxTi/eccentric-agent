@@ -7,6 +7,19 @@ export enum SkillInclusion {
 
 /**
  * See  [Specification](https://agentskills.io/specification)
+ *
+ * @example
+ * A skill file starts with a YAML front-matter header followed by its content:
+ *
+ * ```yaml
+ * ---
+ * name: <skill name>
+ * description: ...
+ * inclusion: <skill inclusion>
+ * ---
+ * <content>
+ * ...
+ * ```
  */
 export const FrontMatterSchema = z.object({
   name: z
