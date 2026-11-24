@@ -259,6 +259,54 @@ describe('ContextStore', () => {
     expect(contentAt([...context.messages], 0)).toContain('1\tline 1');
   });
 
+  it('elides the earlier of two identical reads in one message', () => {
+    const [first] = readMsg('r1', '/repo/a.ts', 1, 50).content as unknown[];
+    const [second] = readMsg('r2', '/repo/a.ts', 1, 50).content as unknown[];
+    const context = store({
+      role: 'tool',
+      content: [first, second],
+    } as ModelMessage);
+    const out = context.materialize();
+    const parts = out[0]!.content as unknown as {
+      output: { value: { data: { content: string } } };
+    }[];
+    expect(parts[0]!.output.value.data.content).toContain('supersedes');
+    expect(parts[1]!.output.value.data.content).toContain('1\tline 1');
+  });
+
+  it('does not treat an errored mutation as a modification', () => {
+    const context = store(readMsg('r1', '/repo/a.ts', 1, 50), {
+      role: 'tool',
+      content: [
+        {
+          type: 'tool-result',
+          toolCallId: 'e1',
+          toolName: 'replace_in_file',
+          output: { type: 'error-text', value: 'Invalid input' },
+        },
+      ],
+    });
+    const out = context.materialize();
+    expect(contentAt(out, 0)).not.toContain('elided');
+  });
+
+  it('keeps stubs stable when re-applied to its own output', () => {
+    const context = store(
+      readMsg('r1', '/repo/a.ts', 1, 50),
+      readMsg('r2', '/repo/a.ts', 1, 50)
+    );
+    const once = context.materialize();
+    const twice = context.materialize([...once, editMsg('e1', '/repo/a.ts')]);
+    expect(contentAt(twice, 0)).toBe(contentAt(once, 0));
+    expect(contentAt(twice, 0)).toContain('lines 1-50');
+    expect(contentAt(twice, 1)).toContain('modified after this read');
+  });
+
+  it('returns the given list untouched when nothing is elided', () => {
+    const messages = [readMsg('r1', '/repo/a.ts', 1, 50)];
+    expect(new ContextStore(CWD).materialize(messages)).toBe(messages);
+  });
+
   it('clear() empties the history', () => {
     const context = store(readMsg('r1', '/repo/a.ts', 1, 50));
     context.clear();

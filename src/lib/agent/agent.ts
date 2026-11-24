@@ -15,8 +15,7 @@ import {
 import chalk from 'chalk';
 import { EventEmitter } from 'node:events';
 import { v7 as uuid } from 'uuid';
-import { type ResponseTokensProps } from '../events/events';
-import { emitContextUsageEvent } from '../events/token-usage';
+import { emitPrimaryStepUsage } from '../events/token-usage';
 import { Notifier } from '../events/notifier';
 import { ContextStore } from './context-store';
 import { DEFAULT_MODEL, type ModelDefinition } from './inference';
@@ -50,7 +49,6 @@ export enum ReasoningEffort {
 
 interface EventMap {
   'message-delta': [Message];
-  'response-tokens': [ResponseTokensProps];
   'status-change': [AgentStatus];
   'reasoning-effort-change': [ReasoningEffort];
   'model-change': [ModelDefinition];
@@ -289,15 +287,14 @@ export class Agent extends EventEmitter<EventMap> {
         model: this._model.id,
         messages: [
           { content: systemPrompt, role: 'system' },
-          ...this._context.materialize(),
+          ...this._context.messages,
         ],
+        prepareStep: ({ messages }) => ({
+          messages: this._context.materialize(messages),
+        }),
         reasoning: this._reasoningEffort,
         tools: this._toolset,
-        onStepEnd: step => {
-          this.emit('response-tokens', {
-            output: step.usage.outputTokens ?? 0,
-          });
-        },
+        onStepEnd: step => emitPrimaryStepUsage(step.usage),
         onStepStart: () => {},
         stopWhen: isLoopFinished(),
         onError: ({ error }) => {
@@ -320,17 +317,10 @@ export class Agent extends EventEmitter<EventMap> {
       }
 
       const steps = await result.steps;
-      const lastStep = await result.finalStep;
       this._context.pushResponse(steps.flatMap(step => step.response.messages));
 
-      // Occupancy of the window going into the next turn: the full prompt the
-      // model last received plus the reply appended after it. Per-step usage
-      // cannot be summed: each step's input already contains the whole
-      // conversation, so the final step's figures are the absolute snapshot.
-      emitContextUsageEvent({
-        input: lastStep.usage.inputTokens ?? 0,
-        output: lastStep.usage.outputTokens ?? 0,
-      });
+      // The final step's occupancy snapshot was already emitted by
+      // `onStepEnd`, which fires for every step including the last one.
     } catch (err: unknown) {
       this.setStatus({ loading: false, text: chalk.red('Fatal error') });
       if (request.signal.aborted) {

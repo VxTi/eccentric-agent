@@ -11,7 +11,6 @@ import {
   type AgentStatus,
   type ReasoningEffort,
 } from '../../lib/agent/agent';
-import { emitResponseTokensEvent } from '../../lib/events/token-usage';
 import { EventName, eventOn } from '../../lib/events/events';
 import { Features } from '../../lib/feaures';
 import {
@@ -103,7 +102,6 @@ export function AgentProvider({
       dispatch(setMessage(message));
     };
     const onStatus = (next: AgentStatus): void => setStatus(next);
-    const onTokens = emitResponseTokensEvent;
 
     const onReasoningEffortChange = (effort: ReasoningEffort): void => {
       setReasoningEffort(effort);
@@ -122,7 +120,6 @@ export function AgentProvider({
     agent.on('queue-change', onQueueChange);
     agent.on('message-delta', onMessage);
     agent.on('status-change', onStatus);
-    agent.on('response-tokens', onTokens);
 
     // Tool output, reasoning and command feedback are emitted onto the global
     // event bus rather than through the agent instance, so mirror those too.
@@ -145,7 +142,6 @@ export function AgentProvider({
     return () => {
       agent.off('message-delta', onMessage);
       agent.off('status-change', onStatus);
-      agent.off('response-tokens', onTokens);
       agent.off('reasoning-effort-change', onReasoningEffortChange);
       agent.off('auto-mode-change', onAutoModeChange);
       agent.off('queue-change', onQueueChange);

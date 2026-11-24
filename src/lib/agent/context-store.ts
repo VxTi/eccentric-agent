@@ -1,5 +1,6 @@
 import * as path from 'node:path';
-import type { ModelMessage } from 'ai';
+import { isNil, isNotNil } from '@vxti/typed';
+import type { ModelMessage, ToolResultPart } from 'ai';
 
 /**
  * Owns the model-facing message history and keeps file content from clobbering
@@ -13,18 +14,27 @@ import type { ModelMessage } from 'ai';
  *
  * - **Superseded**: an earlier read whose line range is fully covered by a
  *   later read of the same file is elided (the later, broader copy wins).
- * - **Stale**: a read that predates an edit (`replace_in_file`) or
+ * - **Stale**: a read that predates a successful edit (`replace_in_file`) or
  *   (over)write (`create_file`) of the same file is elided — its line numbers
  *   and contents no longer match disk.
  *
- * The stored history is never mutated; compaction is applied copy-on-write to a
- * fresh array each turn, so a read that is later re-read or re-edited is
- * elided only from the point where that happens.
+ * The stored history is never mutated; compaction is copy-on-write, so a read
+ * that is later re-read or re-edited is elided only from the point where that
+ * happens.
  */
 export class ContextStore {
   private readonly _messages: ModelMessage[] = [];
 
-  /** @param cwd Working directory used to normalise tool paths before matching. */
+  /**
+   * Stored tool-result parts never change, and the SDK carries the same part
+   * objects into every step, so each part is parsed once rather than per step.
+   */
+  private readonly _fileReadByPart = new WeakMap<
+    ToolResultPart,
+    FileRead | undefined
+  >();
+
+  /** @param cwd Working directory used to resolve tool paths before matching. */
   public constructor(private readonly cwd: string) {}
 
   public pushUser(content: string): void {
@@ -39,311 +49,304 @@ export class ContextStore {
     this._messages.length = 0;
   }
 
-  /** Number of stored messages. */
   public get size(): number {
     return this._messages.length;
   }
 
-  /** The raw, uncompacted history. Exposed for inspection and testing. */
+  /** The raw, uncompacted history. */
   public get messages(): readonly ModelMessage[] {
     return this._messages;
   }
 
   /**
-   * The message list to send to the model this turn, with superseded and stale
-   * file reads elided. Returns a shallow copy; only the messages that carry an
-   * elided read are cloned.
+   * The message list to send to the model for a step, with superseded and
+   * stale file reads replaced by stubs. Accepts any message list — including
+   * one already carrying responses and stubs from earlier steps of the same
+   * turn — so it can run before every step.
+   *
+   * The input is returned as-is when nothing needs eliding; otherwise a shallow
+   * copy in which only the messages holding an elided read are cloned. Called
+   * without arguments it works on a copy of the stored history.
    */
-  public materialize(): ModelMessage[] {
-    const reads: ReadRef[] = [];
-    const mutations: MutationRef[] = [];
-    const callInputs = this.collectCallInputs();
+  public materialize(
+    messages: ModelMessage[] = [...this._messages]
+  ): ModelMessage[] {
+    const elisions = findElisions(this.collectFileEvents(messages));
+    if (elisions.length === 0) return messages;
+    return this.replaceWithStubs(messages, elisions);
+  }
 
-    this._messages.forEach((message, messageIndex) => {
-      if (message.role !== 'tool' || !Array.isArray(message.content)) return;
+  /** File reads and mutations in conversation order. */
+  private collectFileEvents(messages: readonly ModelMessage[]): FileEvent[] {
+    const events: FileEvent[] = [];
+    const mutationCallInputs = new Map<string, unknown>();
+
+    messages.forEach((message, messageIndex) => {
+      if (!Array.isArray(message.content)) return;
 
       message.content.forEach((part, partIndex) => {
-        const read = getReadData(part);
-        if (read !== undefined) {
-          const interval = parseInterval(read.content);
-          if (interval !== undefined) {
-            reads.push({
-              messageIndex,
-              partIndex,
-              path: this.normalise(read.filePath),
-              ...interval,
-            });
-          }
+        if (part.type === 'tool-call' && MUTATING_TOOLS.has(part.toolName)) {
+          mutationCallInputs.set(part.toolCallId, part.input);
+          return;
+        }
+        if (part.type !== 'tool-result') return;
+
+        const location = { messageIndex, partIndex };
+        const read = this.fileReadOf(part);
+        if (isNotNil(read)) {
+          events.push({ kind: 'read', location, read });
           return;
         }
 
-        const mutatedPath = getMutationPath(part, callInputs);
-        if (mutatedPath !== undefined) {
-          mutations.push({
-            messageIndex,
-            partIndex,
-            path: this.normalise(mutatedPath),
-          });
+        const mutatedPath = mutatedPathOf(part, mutationCallInputs);
+        if (isNotNil(mutatedPath)) {
+          events.push({ kind: 'mutation', path: this.resolve(mutatedPath) });
         }
       });
     });
 
-    const toElide = this.selectElidableReads(reads, mutations);
-    if (toElide.length === 0) return [...this._messages];
-
-    return this.withStubs(toElide);
+    return events;
   }
 
-  private collectCallInputs(): Map<string, unknown> {
-    const inputs = new Map<string, unknown>();
-    for (const message of this._messages) {
-      if (message.role !== 'assistant' || !Array.isArray(message.content)) {
-        continue;
-      }
-      for (const part of message.content) {
-        if (part.type === 'tool-call') {
-          inputs.set(part.toolCallId, part.input);
-        }
-      }
-    }
-    return inputs;
+  private fileReadOf(part: ToolResultPart): FileRead | undefined {
+    if (this._fileReadByPart.has(part)) return this._fileReadByPart.get(part);
+
+    const payload = readPayloadOf(part);
+    const read = isNil(payload)
+      ? undefined
+      : {
+          path: this.resolve(payload.filePath),
+          lines: lineRangeOf(payload.content),
+          isStub: payload.content.startsWith(STUB_PREFIX),
+        };
+    this._fileReadByPart.set(part, read);
+    return read;
   }
 
-  /**
-   * Returns the reads to elide, each with the reason (for the stub text).
-   */
-  private selectElidableReads(
-    reads: ReadRef[],
-    mutations: MutationRef[]
-  ): Elision[] {
-    const elide: Elision[] = [];
+  private replaceWithStubs(
+    messages: readonly ModelMessage[],
+    elisions: readonly Elision[]
+  ): ModelMessage[] {
+    const result = [...messages];
 
-    for (const read of reads) {
-      const editedAfter = mutations.some(
-        mutation =>
-          mutation.path === read.path &&
-          (mutation.messageIndex > read.messageIndex ||
-            (mutation.messageIndex === read.messageIndex &&
-              mutation.partIndex > read.partIndex))
-      );
-      if (editedAfter) {
-        elide.push({ read, reason: 'stale' });
-        continue;
+    for (const [messageIndex, elided] of groupByMessage(elisions)) {
+      const message = messages[messageIndex] as ModelMessage & {
+        content: unknown[];
+      };
+      const content = [...message.content];
+      for (const { read, location, reason } of elided) {
+        content[location.partIndex] = this.stubFor(
+          content[location.partIndex] as ToolResultPart,
+          read,
+          reason
+        );
       }
-
-      const supersededBy = reads.some(
-        other =>
-          other !== read &&
-          other.path === read.path &&
-          other.messageIndex > read.messageIndex &&
-          other.start <= read.start &&
-          other.end >= read.end
-      );
-      if (supersededBy) {
-        elide.push({ read, reason: 'superseded' });
-      }
-    }
-
-    return elide;
-  }
-
-  private withStubs(toElide: Elision[]): ModelMessage[] {
-    const result = [...this._messages];
-    const cloned = new Set<number>();
-
-    for (const { read: ref, reason } of toElide) {
-      const base = result[ref.messageIndex];
-      if (base === undefined || !Array.isArray(base.content)) continue;
-
-      // Clone the message and its content array once, then edit that array in
-      // place for any further elisions targeting the same message.
-      let content: unknown[];
-      if (cloned.has(ref.messageIndex)) {
-        content = base.content;
-      } else {
-        content = [...(base.content as unknown[])];
-        result[ref.messageIndex] = { ...base, content } as ModelMessage;
-        cloned.add(ref.messageIndex);
-      }
-
-      const part = content[ref.partIndex];
-      const read = getReadData(part);
-      if (read === undefined) continue;
-
-      content[ref.partIndex] = this.stubRead(part, read, reason);
+      result[messageIndex] = { ...message, content } as ModelMessage;
     }
 
     return result;
   }
 
-  private stubRead(
-    part: unknown,
-    read: ReadOutputData,
+  private stubFor(
+    part: ToolResultPart,
+    read: FileRead,
     reason: ElisionReason
-  ): unknown {
-    const interval = parseInterval(read.content);
-    const range =
-      interval === undefined ? '' : ` lines ${interval.start}-${interval.end}`;
-    const relative = path.relative(this.cwd, this.normalise(read.filePath));
-    const explanation =
-      reason === 'stale'
-        ? 'the file was modified after this read; re-read for current contents'
-        : 'a later read of this file supersedes it';
+  ): ToolResultPart {
+    const range = isNil(read.lines)
+      ? ''
+      : ` lines ${read.lines.start}-${read.lines.end}`;
+    const stub = `${STUB_PREFIX}${path.relative(this.cwd, read.path)}${range}] Contents elided — ${ELISION_EXPLANATIONS[reason]}.`;
 
-    const stub = `[read_file ${relative}${range}] Contents elided — ${explanation}.`;
-
-    // Copy-on-write down to the single string we change, leaving every other
-    // reference shared with the stored history.
-    const typed = part as ToolResultPartLike;
+    const { output } = part;
+    if (output.type !== 'json') return part;
+    const value = output.value as { data: object };
     return {
-      ...typed,
+      ...part,
       output: {
-        ...typed.output,
-        value: {
-          ...(typed.output.value as object),
-          data: { ...read, content: stub },
-        },
+        type: 'json',
+        value: { ...value, data: { ...value.data, content: stub } },
       },
     };
   }
 
-  private normalise(filePath: string): string {
-    return path.isAbsolute(filePath)
-      ? path.normalize(filePath)
-      : path.resolve(this.cwd, filePath);
+  private resolve(filePath: string): string {
+    return path.resolve(this.cwd, filePath);
   }
 }
 
 type ElisionReason = 'stale' | 'superseded';
 
-interface Elision {
-  read: ReadRef;
-  reason: ElisionReason;
-}
+const ELISION_EXPLANATIONS: Record<ElisionReason, string> = {
+  stale: 'the file was modified after this read; re-read for current contents',
+  superseded: 'a later read of this file supersedes it',
+};
 
-interface ReadRef {
-  messageIndex: number;
-  partIndex: number;
-  path: string;
-  start: number;
-  end: number;
-}
-
-interface MutationRef {
-  messageIndex: number;
-  partIndex: number;
-  path: string;
-}
-
-interface ReadOutputData {
-  filePath: string;
-  content: string;
-}
-
-interface ToolResultPartLike {
-  type: 'tool-result';
-  toolCallId: string;
-  toolName: string;
-  output: { type: string; value: unknown };
-}
+/** Line-numbered `read_file` content never starts with this, so stubs are recognisable. */
+const STUB_PREFIX = '[read_file ';
 
 const READ_TOOL = 'read_file';
 const MUTATING_TOOLS = new Set(['replace_in_file', 'create_file']);
 
-function isToolResultPart(part: unknown): part is ToolResultPartLike {
-  return (
-    typeof part === 'object' &&
-    part !== null &&
-    (part as { type?: unknown }).type === 'tool-result'
-  );
+interface LineRange {
+  start: number;
+  end: number;
+}
+
+interface FileRead {
+  path: string;
+  /** Absent when the content is not line-numbered, e.g. an existing stub. */
+  lines: LineRange | undefined;
+  isStub: boolean;
+}
+
+interface PartLocation {
+  messageIndex: number;
+  partIndex: number;
+}
+
+type FileEvent =
+  | { kind: 'read'; location: PartLocation; read: FileRead }
+  | { kind: 'mutation'; path: string };
+
+interface Elision {
+  location: PartLocation;
+  read: FileRead;
+  reason: ElisionReason;
 }
 
 /**
- * Extracts `{ filePath, content }` from a `read_file` tool-result part, or
- * `undefined` for any other part. `read_file` returns `Result.Ok({ content,
- * filePath })`, which the SDK wraps as `output: { type: 'json', value: { ok,
- * data } }`.
+ * Walks the events newest-first, so every read is judged against exactly the
+ * mutations and reads that follow it: O(events) plus one range scan per read.
  */
-function getReadData(part: unknown): ReadOutputData | undefined {
-  if (!isToolResultPart(part) || part.toolName !== READ_TOOL) return undefined;
-  return readDataOf(part);
-}
+function findElisions(events: readonly FileEvent[]): Elision[] {
+  const mutatedLater = new Set<string>();
+  const laterRanges = new Map<string, LineRange[]>();
+  const elisions: Elision[] = [];
 
-/** `Result.Error` serialises as `{ ok: false, ... }`. */
-function isFailedResult(value: unknown): boolean {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { ok?: unknown }).ok === false
-  );
-}
-
-function readDataOf(part: ToolResultPartLike): ReadOutputData | undefined {
-  if (part.output.type !== 'json') return undefined;
-  const value = part.output.value;
-  if (typeof value !== 'object' || value === null) return undefined;
-
-  const data = (value as { data?: unknown }).data;
-  if (typeof data !== 'object' || data === null) return undefined;
-
-  const { filePath, content } = data as Record<string, unknown>;
-  if (typeof filePath === 'string' && typeof content === 'string') {
-    return { filePath, content };
-  }
-  return undefined;
-}
-
-/**
- * Resolves the file path a mutating tool (`replace_in_file` / `create_file`)
- * acted on, preferring the result payload and falling back to the originating
- * tool-call's arguments (`create_file` reports only `success`).
- */
-function getMutationPath(
-  part: unknown,
-  callInputs: Map<string, unknown>
-): string | undefined {
-  if (!isToolResultPart(part) || !MUTATING_TOOLS.has(part.toolName)) {
-    return undefined;
-  }
-
-  if (part.output.type === 'json') {
-    const value = part.output.value;
-    // A failed edit left the file untouched, so it invalidates nothing.
-    if (isFailedResult(value)) return undefined;
-
-    const data = (value as { data?: unknown } | null)?.data;
-    const fromResult = (data as { filePath?: unknown } | undefined)?.filePath;
-    if (typeof fromResult === 'string') return fromResult;
-  }
-
-  const input = callInputs.get(part.toolCallId) as
-    | { path?: unknown; filePath?: unknown }
-    | undefined;
-  if (typeof input?.path === 'string') return input.path;
-  if (typeof input?.filePath === 'string') return input.filePath;
-  return undefined;
-}
-
-/**
- * Reads the first and last line numbers printed by `read_file`'s
- * `<n>\t<line>` prefix, giving the inclusive range the content covers. Returns
- * `undefined` when the content is not line-numbered.
- */
-function parseInterval(
-  content: string
-): { start: number; end: number } | undefined {
-  const lines = content.split(/\r?\n/);
-  const first = lines[0]?.match(/^\s*(\d+)\t/);
-  if (first === null || first === undefined) return undefined;
-
-  const start = Number(first[1]);
-  let end = start;
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const match = lines[i]?.match(/^\s*(\d+)\t/);
-    if (match) {
-      end = Number(match[1]);
-      break;
+  for (let i = events.length - 1; i >= 0; i--) {
+    const event = events[i]!;
+    if (event.kind === 'mutation') {
+      mutatedLater.add(event.path);
+      continue;
     }
+
+    const { read, location } = event;
+    if (read.isStub) continue;
+
+    const rangesOfFile = getOrInsert(laterRanges, read.path);
+    const reason = elisionReasonOf(read, mutatedLater, rangesOfFile);
+    if (isNotNil(reason)) elisions.push({ location, read, reason });
+
+    if (isNotNil(read.lines)) rangesOfFile.push(read.lines);
   }
-  return { start, end };
+
+  return elisions;
+}
+
+function elisionReasonOf(
+  read: FileRead,
+  mutatedLater: ReadonlySet<string>,
+  laterRanges: readonly LineRange[]
+): ElisionReason | undefined {
+  if (mutatedLater.has(read.path)) return 'stale';
+  const { lines } = read;
+  if (isNotNil(lines) && laterRanges.some(range => covers(range, lines))) {
+    return 'superseded';
+  }
+  return undefined;
+}
+
+function covers(outer: LineRange, inner: LineRange): boolean {
+  return outer.start <= inner.start && outer.end >= inner.end;
+}
+
+function groupByMessage(elisions: readonly Elision[]): Map<number, Elision[]> {
+  const groups = new Map<number, Elision[]>();
+  for (const elision of elisions) {
+    getOrInsert(groups, elision.location.messageIndex).push(elision);
+  }
+  return groups;
+}
+
+function getOrInsert<K, V>(map: Map<K, V[]>, key: K): V[] {
+  let values = map.get(key);
+  if (isNil(values)) {
+    values = [];
+    map.set(key, values);
+  }
+  return values;
+}
+
+/**
+ * `{ data }` of a successful tool result. Tools return `Result`, which the SDK
+ * wraps as `output: { type: 'json', value: { ok, data } }`; anything else —
+ * a `Result.Error`, a thrown error, a denied call — changed nothing on disk.
+ */
+function successDataOf(part: ToolResultPart): unknown {
+  if (part.output.type !== 'json') return undefined;
+  const value = part.output.value as { ok?: unknown; data?: unknown } | null;
+  return value?.ok === true ? value.data : undefined;
+}
+
+function stringField(source: unknown, key: string): string | undefined {
+  if (typeof source !== 'object' || isNil(source)) return undefined;
+  const field = (source as Record<string, unknown>)[key];
+  return typeof field === 'string' ? field : undefined;
+}
+
+function readPayloadOf(
+  part: ToolResultPart
+): { filePath: string; content: string } | undefined {
+  if (part.toolName !== READ_TOOL) return undefined;
+  const data = successDataOf(part);
+  const filePath = stringField(data, 'filePath');
+  const content = stringField(data, 'content');
+  return isNil(filePath) || isNil(content) ? undefined : { filePath, content };
+}
+
+/**
+ * The path a successful `replace_in_file` / `create_file` acted on: from the
+ * result payload, else from the originating call's arguments (`create_file`
+ * reports only `success`).
+ */
+function mutatedPathOf(
+  part: ToolResultPart,
+  mutationCallInputs: ReadonlyMap<string, unknown>
+): string | undefined {
+  if (!MUTATING_TOOLS.has(part.toolName)) return undefined;
+  const data = successDataOf(part);
+  if (isNil(data)) return undefined;
+
+  const input = mutationCallInputs.get(part.toolCallId);
+  return (
+    stringField(data, 'filePath') ??
+    stringField(input, 'path') ??
+    stringField(input, 'filePath')
+  );
+}
+
+const LINE_NUMBER_PREFIX = /^ *(\d+)\t/;
+
+/**
+ * The inclusive line range of `read_file` content, whose lines are each
+ * prefixed `<n>\t` and numbered consecutively — so the last number follows
+ * from the line count without splitting the content.
+ */
+function lineRangeOf(content: string): LineRange | undefined {
+  const first = LINE_NUMBER_PREFIX.exec(content);
+  if (isNil(first)) return undefined;
+  const start = Number(first[1]);
+  return { start, end: start + countLineFeeds(content) };
+}
+
+function countLineFeeds(content: string): number {
+  let count = 0;
+  for (
+    let i = content.indexOf('\n');
+    i !== -1;
+    i = content.indexOf('\n', i + 1)
+  ) {
+    count++;
+  }
+  return count;
 }
