@@ -19,7 +19,7 @@ import { type ResponseTokensProps } from '../events/events';
 import { emitContextUsageEvent } from '../events/token-usage';
 import { Notifier } from '../events/notifier';
 import { ContextStore } from './context-store';
-import { getAppropriateModel, TaskComplexity } from './inference';
+import { DEFAULT_MODEL, type ModelDefinition } from './inference';
 import { loadMcpConfig, type MCP } from './mcp/mcp';
 import { FileCache } from '../file-cache';
 import { TaskList } from '../tasks';
@@ -53,6 +53,7 @@ interface EventMap {
   'response-tokens': [ResponseTokensProps];
   'status-change': [AgentStatus];
   'reasoning-effort-change': [ReasoningEffort];
+  'model-change': [ModelDefinition];
   'auto-mode-change': [boolean];
 }
 
@@ -71,6 +72,7 @@ export class Agent extends EventEmitter<EventMap> {
   private _requestController?: AbortController;
   private _status: AgentStatus = { loading: false, text: '' };
   private _reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM;
+  private _model: ModelDefinition = DEFAULT_MODEL;
   private _gitIgnore: Set<string>;
 
   public constructor(
@@ -113,6 +115,15 @@ export class Agent extends EventEmitter<EventMap> {
   public set reasoningEffort(effort: ReasoningEffort) {
     this._reasoningEffort = effort;
     this.emit('reasoning-effort-change', effort);
+  }
+
+  public get model(): ModelDefinition {
+    return this._model;
+  }
+
+  public set model(model: ModelDefinition) {
+    this._model = model;
+    this.emit('model-change', model);
   }
 
   /**
@@ -261,7 +272,7 @@ export class Agent extends EventEmitter<EventMap> {
       const result = streamText({
         allowSystemInMessages: true,
         abortSignal: request.signal,
-        model: getAppropriateModel(TaskComplexity.MEDIUM),
+        model: this._model.id,
         messages: [
           { content: systemPrompt, role: 'system' },
           ...this._context.materialize(),

@@ -12,6 +12,47 @@ export enum TaskComplexity {
   COMPLEX = 'complex',
 }
 
+export interface ModelDefinition {
+  id: string;
+  label: string;
+  /** Maximum tokens the model's primary context window holds. */
+  contextWindow: number;
+}
+
+// Placeholder context-window sizes — correct against provider documentation
+// before relying on the reported occupancy percentage.
+export const DEFAULT_MODEL: ModelDefinition = {
+  id: 'zai/glm-5.3-flash',
+  label: 'GLM 5.3 Flash',
+  contextWindow: 200_000,
+};
+
+export const MODEL_CATALOG: ModelDefinition[] = [
+  DEFAULT_MODEL,
+  {
+    id: 'alibaba/qwen3.8-omni-flash',
+    label: 'Qwen 3.8 Omni Flash',
+    contextWindow: 1_000_000,
+  },
+  { id: 'openai/gpt-5.1', label: 'GPT-5.1', contextWindow: 400_000 },
+  {
+    id: 'anthropic/claude-opus-4.6',
+    label: 'Claude Opus 4.6',
+    contextWindow: 200_000,
+  },
+  {
+    id: 'google/gemini-3-pro',
+    label: 'Gemini 3 Pro',
+    contextWindow: 1_000_000,
+  },
+  { id: 'xai/grok-4', label: 'Grok 4', contextWindow: 256_000 },
+  {
+    id: 'deepseek/deepseek-v3.2',
+    label: 'DeepSeek v3.2',
+    contextWindow: 128_000,
+  },
+];
+
 interface GenerateTextProps<T> {
   schema: z.ZodType<T>;
   complexity: TaskComplexity;

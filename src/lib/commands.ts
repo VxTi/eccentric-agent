@@ -1,5 +1,6 @@
 import { isNil } from '@vxti/typed';
 import { ReasoningEffort } from './agent/agent';
+import { MODEL_CATALOG } from './agent/inference';
 import { SkillInclusion } from './agent/skills/model';
 import { emitMessage } from './events/messaging';
 import {
@@ -18,6 +19,7 @@ const SUPPORTED_COMMANDS = [
   { value: 'exit' },
   { value: 'quit' },
   { value: 'halt', description: 'Halts the agent of its activity' },
+  { value: 'model', description: 'Selects the model used for inference' },
   { value: 'system-prompt', description: 'Prints the current system prompt' },
 ] as const satisfies Suggestion[];
 export type Command = (typeof SUPPORTED_COMMANDS)[number]['value'];
@@ -79,6 +81,28 @@ export function processCommand(command: string) {
         emitMessage({
           type: MessageType.GENERIC,
           content: `Reasoning effort set to \`${chosen.value}\``,
+        });
+      });
+      break;
+    }
+    case 'model': {
+      void requestUserInput({
+        title: 'Model',
+        description: 'Select the model to use for subsequent requests.',
+        options: MODEL_CATALOG.map(model => ({
+          label:
+            model.id === agent.model.id
+              ? `${model.label} (current)`
+              : model.label,
+          value: model,
+        })),
+      }).then(([chosen]) => {
+        if (isNil(chosen)) return;
+
+        agent.model = chosen.value;
+        emitMessage({
+          type: MessageType.GENERIC,
+          content: `Model set to \`${chosen.value.id}\``,
         });
       });
       break;
