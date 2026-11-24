@@ -1,4 +1,4 @@
-import type { Message } from '../types/messages';
+import { type Message, MessageType } from '../types/messages';
 import {
   type AgentSkill,
   SkillInclusion,
@@ -228,7 +228,11 @@ export class Agent extends EventEmitter<EventMap> {
       this._messageQueue.push(message);
       return;
     }
-    this.emit('message-delta', { id: uuid(), type: 'user', content: message });
+    this.emit('message-delta', {
+      id: uuid(),
+      type: MessageType.USER,
+      content: message,
+    });
     this._context.pushUser(message);
     store.dispatch(pushEntry(message));
     await this.processRequest();
@@ -275,7 +279,7 @@ export class Agent extends EventEmitter<EventMap> {
           if (request.signal.aborted) return;
           this.emit('message-delta', {
             id: uuid(),
-            type: 'assistant',
+            type: MessageType.ASSISTANT,
             content: String(error),
           });
         },
@@ -308,7 +312,7 @@ export class Agent extends EventEmitter<EventMap> {
       }
 
       this.emit('message-delta', {
-        type: 'generic',
+        type: MessageType.GENERIC,
         id: uuid(),
         failure: true,
         content: `Something went wrong whilst responding: ${String(err)}`,
@@ -322,21 +326,23 @@ export class Agent extends EventEmitter<EventMap> {
     this.setStatus({ loading: false, text: '' });
   }
 
+  private abortMessageLoadingStates(): void {
+    const messages: Message[] = store
+      .getState()
+      .agent.messages.map(m =>
+        m.type === MessageType.GENERIC ? { ...m, loading: false } : m
+      );
+    store.dispatch(setMessages(messages));
+  }
+
   private finishInterruptedTurn(): void {
     this.emit('message-delta', {
-      type: 'generic',
+      type: MessageType.GENERIC,
       id: uuid(),
       content: chalk.dim('Interrupted'),
     });
     this.setStatus({ loading: false, text: '' });
-
-    const messages: Message[] = store
-      .getState()
-      .agent.messages.map(m =>
-        m.type === 'generic' ? { ...m, loading: false } : m
-      );
-
-    store.dispatch(setMessages(messages));
+    this.abortMessageLoadingStates();
   }
 
   private async handleResponseStream(
@@ -357,7 +363,7 @@ export class Agent extends EventEmitter<EventMap> {
         Math.round((Date.now() - reasoning.startedAt) / 1000)
       );
       this.emit('message-delta', {
-        type: 'generic',
+        type: MessageType.GENERIC,
         id: reasoning.id,
         loading: false,
         content: chalk.dim(`Thought for ${seconds}s`),
@@ -380,7 +386,7 @@ export class Agent extends EventEmitter<EventMap> {
 
             if (isNonEmptyString(updated)) {
               this.emit('message-delta', {
-                type: 'assistant',
+                type: MessageType.ASSISTANT,
                 id: messageId,
                 content: updated,
               });
@@ -395,7 +401,7 @@ export class Agent extends EventEmitter<EventMap> {
             const id = uuid();
             reasoning = { id, startedAt: Date.now() };
             this.emit('message-delta', {
-              type: 'generic',
+              type: MessageType.GENERIC,
               id,
               loading: true,
               content: 'Thinking...',
@@ -412,7 +418,7 @@ export class Agent extends EventEmitter<EventMap> {
       // An interrupted turn is not an error; `processRequest` reports it.
       if (this._requestController?.signal.aborted) return;
       this.emit('message-delta', {
-        type: 'generic',
+        type: MessageType.GENERIC,
         id: uuid(),
         failure: true,
         content: `Something went wrong whilst responding: ${String(err)}`,

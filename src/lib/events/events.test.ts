@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { MessageType } from '../types/messages';
 import {
   type AgentMessageEvent,
   emitEvent,
@@ -12,7 +13,7 @@ describe('Events', () => {
 
     subscribeEvent(EventName.AGENT_MESSAGE, handler);
     emitEvent(EventName.AGENT_MESSAGE, {
-      type: 'generic',
+      type: MessageType.GENERIC,
       content: 'Hello world!',
       id: '123',
     });
@@ -21,7 +22,7 @@ describe('Events', () => {
     expect(handler).toHaveBeenCalledWith(
       expect.objectContaining<Pick<AgentMessageEvent, 'detail'>>({
         detail: {
-          type: 'generic',
+          type: MessageType.GENERIC,
           content: 'Hello world!',
           id: '123',
         },

@@ -6,6 +6,8 @@ import { basicHighlightFormatting } from '../../../rendering/terminal-markdown-r
 import { emitMessage } from '../../events/messaging';
 import { requestUserInput } from '../../events/user-input';
 import { Result } from '../../result';
+import { MessageType } from '../../types/messages';
+import type { ToolIdentifier } from './registry';
 import {
   type SomeTool,
   type ToolChannelParams,
@@ -119,11 +121,11 @@ function makeTool(
         (message: ToolChannelParams) =>
           emitMessage({
             ...message,
+            type: MessageType.GENERIC,
             // Mark every message from a tool channel so the UI can collapse
             // consecutive completed tool calls into a single line.
-            toolCall: tool.internalName,
+            toolCall: tool.internalName as ToolIdentifier,
             content: message.content.trim(),
-            type: 'generic',
             id: toolCallId,
           })
       );

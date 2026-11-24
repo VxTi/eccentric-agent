@@ -4,10 +4,11 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { Agent } from '../agent/agent';
 import { type ToolIdentifier } from '../agent/tools';
 import type { ReasoningState } from '../events/events';
-import type {
-  CollapsedToolCalls,
-  GenericMessage,
-  Message,
+import {
+  type CollapsedToolCalls,
+  type GenericMessage,
+  type Message,
+  MessageType,
 } from '../types/messages';
 import { defaultController } from './app';
 
@@ -147,8 +148,8 @@ function collapseCompletedToolCalls(state: AgentState, index: number): void {
 
   const collapsed: CollapsedToolCalls = { count, tools };
   state.messages[index - 1] = {
+    type: MessageType.GENERIC,
     id: previous.id,
-    type: 'generic',
     loading: false,
     toolCall: msgCall,
     collapsed,

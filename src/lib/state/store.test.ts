@@ -10,13 +10,21 @@ import {
 import { setGitInfo, setLoading, setCwd } from './file-system';
 import { setController, exit } from './app';
 import { TaskStatus } from '../tasks';
-import type { Message } from '../types/messages';
+import { type Message, MessageType } from '../types/messages';
 
 describe('Redux Store and Slices', () => {
   describe('Agent Slice', () => {
     it('should manage messages', () => {
-      const msg1: Message = { id: '1', type: 'user', content: 'hello' };
-      const msg2: Message = { id: '2', type: 'assistant', content: 'hi' };
+      const msg1: Message = {
+        id: '1',
+        type: MessageType.USER,
+        content: 'hello',
+      };
+      const msg2: Message = {
+        id: '2',
+        type: MessageType.ASSISTANT,
+        content: 'hi',
+      };
 
       store.dispatch(setMessages([msg1]));
       expect(store.getState().agent.messages).toHaveLength(1);
@@ -26,8 +34,8 @@ describe('Redux Store and Slices', () => {
       expect(store.getState().agent.messages).toHaveLength(2);
 
       const msg1Updated: Message = {
+        type: MessageType.USER,
         id: '1',
-        type: 'user',
         content: 'hello world',
       };
       store.dispatch(setMessage(msg1Updated));

@@ -1,9 +1,3 @@
-import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import { isNil } from '@vxti/typed';
-import { store } from '../../state';
-import type { PromiseResult } from '../../types/types';
-import { getMcpFilePath } from '../config-discovery';
-import type { mcp } from './types';
 import {
   applyMiddlewares,
   Client,
@@ -12,14 +6,21 @@ import {
   type Transport,
   UnauthorizedError,
 } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { isNil } from '@vxti/typed';
 import { first } from 'lodash-es';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import { type z } from 'zod';
 import { debug, emitMessage } from '../../events/messaging';
 import { Result } from '../../result';
+import { store } from '../../state';
+import { MessageType } from '../../types/messages';
+import type { PromiseResult } from '../../types/types';
+import { getMcpFilePath } from '../config-discovery';
 import { mcpConfigSchema, mcpServerConfigSchema } from './models';
 import { LocalFileOAuthProvider } from './oauth-provider';
+import type { mcp } from './types';
 
 export type McpTool = PromiseResult<
   ReturnType<(typeof MCP)['prototype']['params']['client']['listTools']>
@@ -65,7 +66,7 @@ export async function loadMcpConfig(signal: AbortSignal): Promise<MCP[]> {
 
   if (failed.length > 0) {
     emitMessage({
-      type: 'generic',
+      type: MessageType.GENERIC,
       failure: true,
       content: `Failed to initialize the following MCPs:\n${failed.map(f => `- ${f}`).join('\n')}`,
     });

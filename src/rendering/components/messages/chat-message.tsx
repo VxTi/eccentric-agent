@@ -1,8 +1,8 @@
+import type { BaseProps } from './common';
 import { isEmptyString } from '@vxti/typed';
 import { Box } from 'ink';
-import { type Message } from '../../../lib/types/messages';
+import { type Message, MessageType } from '../../../lib/types/messages';
 import { AssistantChatMessage } from './assistant-chat-message';
-import { type BaseProps } from './common';
 import { GenericChatMessage } from './generic-chat-message';
 import { UserChatMessage } from './user-chat-message';
 
@@ -26,11 +26,11 @@ export function ChatMessage({ message }: BaseProps<Message>) {
 
 function ModelMessageText({ message }: BaseProps<Message>) {
   switch (message.type) {
-    case 'user':
+    case MessageType.USER:
       return <UserChatMessage message={message} />;
-    case 'assistant':
+    case MessageType.ASSISTANT:
       return <AssistantChatMessage message={message} />;
-    case 'generic':
+    case MessageType.GENERIC:
       return <GenericChatMessage message={message} />;
   }
 }

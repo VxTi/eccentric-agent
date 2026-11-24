@@ -9,6 +9,7 @@ import {
 import { requestUserInput } from './events/user-input';
 import type { Suggestion } from './input-suggestions';
 import { app, clearMessages, store } from './state';
+import { MessageType } from './types/messages';
 import { ellipsize, Position } from './utils/string-utils';
 
 const SUPPORTED_COMMANDS = [
@@ -76,7 +77,7 @@ export function processCommand(command: string) {
 
         agent.reasoningEffort = chosen.value;
         emitMessage({
-          type: 'generic',
+          type: MessageType.GENERIC,
           content: `Reasoning effort set to \`${chosen.value}\``,
         });
       });
@@ -92,13 +93,13 @@ export function processCommand(command: string) {
         .buildSystemPrompt()
         .then(systemPrompt =>
           emitMessage({
-            type: 'generic',
+            type: MessageType.GENERIC,
             content: `Here is the system prompt:\n\n${systemPrompt}`,
           })
         )
         .catch(() => {
           emitMessage({
-            type: 'generic',
+            type: MessageType.GENERIC,
             content: `Something went wrong whilst creating the system prompt`,
           });
         });
@@ -110,13 +111,13 @@ export function processCommand(command: string) {
 
       if (isNil(skill)) {
         emitMessage({
-          type: 'assistant',
+          type: MessageType.ASSISTANT,
           content: `Unable to load skill \`${command}\``,
         });
         return;
       }
       emitMessage({
-        type: 'assistant',
+        type: MessageType.ASSISTANT,
         content: `Using skill \`${command}\``,
       });
       agent.activateSkill(skill);

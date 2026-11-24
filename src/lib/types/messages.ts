@@ -1,4 +1,12 @@
 import type { ToolIdentifier } from '../agent/tools';
+import type { MakeOptional } from './types';
+
+export enum MessageType {
+  USER = 'user',
+  ASSISTANT = 'assistant',
+  GENERIC = 'generic',
+  TOOL_CALL = 'tool_call',
+}
 
 interface IMessage {
   id: string;
@@ -6,17 +14,17 @@ interface IMessage {
 }
 
 export interface UserMessage extends IMessage {
-  type: 'user';
+  type: MessageType.USER;
   attachedFiles?: string[];
 }
 
 export interface AssistantMessage extends IMessage {
-  type: 'assistant';
+  type: MessageType.ASSISTANT;
   metadata?: object;
 }
 
 export interface GenericMessage extends IMessage {
-  type: 'generic';
+  type: MessageType.GENERIC;
   loading?: boolean;
   failure?: boolean;
   /** Present when the message was emitted by a tool execution; the tool's
@@ -37,3 +45,10 @@ export interface CollapsedToolCalls {
 }
 
 export type Message = UserMessage | AssistantMessage | GenericMessage;
+
+/** A `Message` with `id` optional, keeping each variant's own fields intact.
+ *  Must distribute over the union: applying `MakeOptional` to the union
+ *  directly collapses it and loses variant-specific fields. */
+export type EmittableMessage<M extends Message = Message> = M extends unknown
+  ? MakeOptional<M, 'id'>
+  : never;

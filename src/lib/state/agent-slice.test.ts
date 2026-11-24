@@ -3,15 +3,20 @@
 // evaluation (as it does in the app, which enters through state/index).
 import './store';
 import { describe, expect, it } from 'vitest';
-import type { GenericMessage, Message } from '../types/messages';
+import type { ToolIdentifier } from '../agent/tools';
+import {
+  type GenericMessage,
+  type Message,
+  MessageType,
+} from '../types/messages';
 import { agentSlice } from './agent-slice';
 
 function toolMessage(
   id: string,
-  toolCall: string,
+  toolCall: ToolIdentifier,
   extra: Partial<GenericMessage> = {}
 ): GenericMessage {
-  return { id, type: 'generic', content: id, toolCall, ...extra };
+  return { id, type: MessageType.GENERIC, content: id, toolCall, ...extra };
 }
 
 function stateWith(messages: Message[]): ReturnType<typeof agentSlice.reducer> {
@@ -31,7 +36,7 @@ function dispatchSetMessage(
 describe('agentSlice setMessage tool-call collapsing', () => {
   it('collapses two consecutive completed tool calls into one aggregate message', () => {
     let state = stateWith([
-      { id: 'u1', type: 'user', content: 'hi' },
+      { id: 'u1', type: MessageType.USER, content: 'hi' },
       toolMessage('a', 'read_file'),
     ]);
 
@@ -65,7 +70,7 @@ describe('agentSlice setMessage tool-call collapsing', () => {
   it('does not collapse across a non-tool message', () => {
     let state = stateWith([
       toolMessage('a', 'read_file'),
-      { id: 'as1', type: 'assistant', content: 'some text' },
+      { id: 'as1', type: MessageType.ASSISTANT, content: 'some text' },
     ]);
 
     state = dispatchSetMessage(state, toolMessage('b', 'read_file'));
