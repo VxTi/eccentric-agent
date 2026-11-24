@@ -3,7 +3,7 @@ import {
   isNonEmptyString,
   type NonEmptyArray,
 } from '@vxti/typed';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text, useInput, useWindowSize } from 'ink';
 import { type ReactNode, useMemo, useState } from 'react';
 import {
   emitEvent,
@@ -136,13 +136,14 @@ export function UserInputRequestDialog({
     }
   });
 
+  const { columns } = useWindowSize();
   const mdDescription = useMemo(() => {
     if (!isNonEmptyString(description)) return;
 
-    const md = parseMarkdown(description);
+    const md = parseMarkdown(description, columns);
 
     return md.split('\n').slice(0, 5).join('\n');
-  }, [description]);
+  }, [description, columns]);
 
   return (
     <Box

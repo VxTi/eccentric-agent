@@ -5,7 +5,7 @@ import { ChatMessageContent } from './chat-message-content';
 
 export function AssistantChatMessage({ message }: BaseProps<AssistantMessage>) {
   return (
-    <Box flexDirection="row" flexShrink={0} flexWrap="wrap">
+    <Box flexDirection="row" flexShrink={0}>
       <Text color="blue">◆ </Text>
       <ChatMessageContent content={message.content} uid={message.id} />
     </Box>

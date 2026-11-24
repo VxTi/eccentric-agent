@@ -164,5 +164,5 @@ function collapseUnchangedRegions(
 }
 
 export function formatDiffMd(previous: string, current: string): string {
-  return `\`\`\`${DIFF_LANG}\n${previous}${DIFF_SEPARATOR}${current}\n\`\`\`\n`;
+  return `\`\`\`${DIFF_LANG}\n${previous}\n${DIFF_SEPARATOR}\n${current}\n\`\`\`\n`;
 }

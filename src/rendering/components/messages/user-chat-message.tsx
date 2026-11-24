@@ -18,7 +18,6 @@ export function UserChatMessage({ message }: BaseProps<UserMessage>) {
       borderRight={false}
       borderLeftColor="red"
       borderStyle="single"
-      flexWrap="wrap"
       width="100%"
     >
       <Text>Me</Text>

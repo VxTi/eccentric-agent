@@ -15,10 +15,10 @@ describe('TerminalRenderer', () => {
 
       const rendered = renderer.renderDiff(oldContent, newContent);
       expect(rendered).toMatchInlineSnapshot(`
-        "1   line 1                             1   line 1                            
-        2 - line 2                             2 + line A                            
-        3   line 3                             3   line 3                            
-                                               4 + line 4                            "
+        "1   line 1                             | 1   line 1                            
+        2 - line 2                             | 2 + line A                            
+        3   line 3                             | 3   line 3                            
+                                               | 4 + line 4                            "
       `);
     });
   });

@@ -31,7 +31,13 @@ export const markdownFormattingOptions = {
 
 export const terminalRenderer = new TerminalRenderer(markdownFormattingOptions);
 
-export function parseMarkdown(input: string): string {
+/**
+ * `width` is the column count the rendered blocks may occupy (diff grids are
+ * laid out against it, paragraphs are wrapped by Ink at the real layout
+ * width). Callers must pass the width their container actually gives them.
+ */
+export function parseMarkdown(input: string, width: number): string {
+  terminalRenderer.setWidth(width);
   return marked.parse(input, {
     gfm: true,
     renderer: terminalRenderer,

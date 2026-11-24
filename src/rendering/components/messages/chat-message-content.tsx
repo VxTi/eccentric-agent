@@ -1,7 +1,13 @@
 import { isEmptyString } from '@vxti/typed';
-import { Box, Text } from 'ink';
+import { Box, Text, useWindowSize } from 'ink';
 import { useMemo } from 'react';
 import { parseMarkdown } from '../../terminal-markdown-renderer/markdown-renderer';
+
+// Columns the parsed markdown may assume: MessageList horizontal padding (2)
+// plus the marker column every message row reserves for its bullet/prefix (2).
+// Diff grids are laid out against this width, so under-reserving would make
+// their rows overflow and re-wrap mid-cell.
+const PARSE_WIDTH_RESERVE = 4;
 
 interface MarkdownViewProps {
   content: string;
@@ -9,7 +15,11 @@ interface MarkdownViewProps {
 }
 
 export function ChatMessageContent({ content, uid }: MarkdownViewProps) {
-  const parsedContent = useMemo(() => parseMarkdown(content).trim(), [content]);
+  const { columns } = useWindowSize();
+  const parsedContent = useMemo(
+    () => parseMarkdown(content, columns - PARSE_WIDTH_RESERVE).trim(),
+    [content, columns]
+  );
 
   if (isEmptyString(parsedContent)) {
     return;

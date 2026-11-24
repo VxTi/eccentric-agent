@@ -1,6 +1,7 @@
 'use strict';
 
 import {
+  hasArrayLength,
   isEmptyString,
   isNonEmptyArray,
   isNonEmptyString,
@@ -132,10 +133,14 @@ export class TerminalRenderer extends Renderer {
     if (isNotNil(contentLang)) {
       const parts = text.split(DIFF_SEPARATOR);
 
-      renderedContent =
-        parts.length === 2
-          ? this.renderDiff(parts[0] ?? '', parts[1] ?? '', contentLang)
-          : this.highlightCode(text, contentLang);
+      renderedContent = hasArrayLength(parts, 2)
+        ? this.renderDiff(
+            parts[0],
+            parts[1],
+            contentLang,
+            this.width - (this.config.indentation ?? DEFAULT_INDENTATION)
+          )
+        : this.highlightCode(text, contentLang);
     } else {
       renderedContent = this.highlightCode(text, lang ?? DEFAULT_LANG);
     }
@@ -233,7 +238,8 @@ export class TerminalRenderer extends Renderer {
   public renderDiff(
     oldStr: string,
     newStr: string,
-    lang: string = DEFAULT_LANG
+    lang: string = DEFAULT_LANG,
+    availableWidth: number = this.width
   ): string {
     const rows = generateSideBySideDiff(oldStr, newStr);
     if (!isNonEmptyArray(rows)) return '';
@@ -247,7 +253,7 @@ export class TerminalRenderer extends Renderer {
     // narrow terminal stays legible instead of collapsing to nothing.
     const colWidth = Math.max(
       DIFF_MIN_COL_WIDTH,
-      Math.floor((this.width - 2 * numberWidth - DIFF_COLUMN_OVERHEAD) / 2)
+      Math.floor((availableWidth - 2 * numberWidth - DIFF_COLUMN_OVERHEAD) / 2)
     );
 
     // Highlight each side as a single block, then index it by line number.
@@ -262,7 +268,9 @@ export class TerminalRenderer extends Renderer {
         return this.collapsedRow(numberWidth, colWidth);
       }
 
-      const row = [
+      // Mirrors `collapsedRow`'s '<num> <cell> | <num> <cell>' layout: the
+      // column separator sits between the two halves, not inside them.
+      const oldHalf = [
         this.diffNumber(left.lineNumberOriginal, numberWidth),
         this.diffCell(
           diffSideLine(oldLines, left.lineNumberOriginal),
@@ -270,6 +278,8 @@ export class TerminalRenderer extends Renderer {
           colWidth,
           Position.END
         ),
+      ].join(' ');
+      const newHalf = [
         this.diffNumber(right.lineNumberModified, numberWidth),
         this.diffCell(
           diffSideLine(newLines, right.lineNumberModified),
@@ -278,6 +288,7 @@ export class TerminalRenderer extends Renderer {
           Position.START
         ),
       ].join(' ');
+      const row = `${oldHalf} | ${newHalf}`;
 
       // Clipping can cut a highlighted line inside an escape sequence, and the
       // background wrappers only close their own background. Terminate the row
@@ -444,7 +455,11 @@ export class TerminalRenderer extends Renderer {
 
   public override paragraph({ tokens }: Tokens.Paragraph): string {
     const parsed = this.parser.parseInline(tokens);
-    return `${this.reflowText(this.config.paragraph?.(parsed) ?? parsed).trim()}\n`;
+    const formatted = this.config.paragraph?.(parsed) ?? parsed;
+    const body = this.config.reflowText
+      ? this.reflowText(formatted)
+      : formatted;
+    return `${body.trim()}\n`;
   }
 
   public override table({ header, rows }: Tokens.Table): string {
