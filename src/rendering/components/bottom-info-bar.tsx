@@ -67,7 +67,7 @@ export function BottomInfoBar(): ReactNode {
     <Box
       flexDirection="row"
       flexShrink={0}
-      gap={1}
+      gap={2}
       width="100%"
       flexWrap="wrap"
       justifyContent="flex-start"

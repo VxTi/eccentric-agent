@@ -1,10 +1,10 @@
-import { Box, Text } from 'ink';
-import { type ReactNode } from 'react';
-import { useAgent } from '../hooks/use-agent';
+import type { ReactNode } from 'react';
+import { Text } from 'ink';
+import { useAgent } from '../hooks';
 
 export function QueuedMessages(): ReactNode {
   const { queuedMessageCount } = useAgent();
-  if (queuedMessageCount === 0) return null;
+  if (queuedMessageCount === 0) return;
 
   const label =
     queuedMessageCount === 1
@@ -12,8 +12,8 @@ export function QueuedMessages(): ReactNode {
       : `${queuedMessageCount} messages queued`;
 
   return (
-    <Box width="100%">
-      <Text color="gray">{label}</Text>
-    </Box>
+    <Text color="yellow" italic>
+      {label}
+    </Text>
   );
 }

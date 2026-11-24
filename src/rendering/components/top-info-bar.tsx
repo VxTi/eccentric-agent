@@ -2,11 +2,12 @@ import { isNil } from '@vxti/typed';
 import { Box, Text } from 'ink';
 import { ReasoningEffort } from '../../lib/agent/agent';
 import { useAppSelector } from '../../lib/state';
-import { useAgent } from '../hooks/use-agent';
+import { useAgent } from '../hooks';
+import { QueuedMessages } from './queued-messages';
 
 const reasoningEffortChars = ['○', '◔', '◑', '◕', '●'];
 
-export function GitInfoLine() {
+export function TopInfoBar() {
   const {
     git: { currentBranch, repoName },
     loading,
@@ -25,16 +26,23 @@ export function GitInfoLine() {
       width="100%"
       paddingX={2}
     >
-      <Box flexDirection="row" gap={1}>
-        <Text color="gray">{repoName}</Text>
-        <Text>•</Text>
-        <Text>{currentBranch}</Text>
+      <Box gap={2}>
+        <QueuedMessages />
+        <Box gap={1}>
+          <Text color="gray">{repoName}</Text>
+          <Text dimColor color="gray">
+            •
+          </Text>
+          <Text>{currentBranch}</Text>
+        </Box>
       </Box>
       <Box gap={1}>
         <Text color="blueBright" bold>
           {model.label}
         </Text>
-        <Text>•</Text>
+        <Text dimColor color="gray">
+          •
+        </Text>
         <Text color="gray">
           {reasoningEffortChars[getReasoningEffortIdx(reasoningEffort)]}{' '}
           {reasoningEffort}
