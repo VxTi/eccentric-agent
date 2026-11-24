@@ -80,7 +80,7 @@ export const promptUserOptions = createTool({
   inputSchema,
   outputSchema,
 
-  async handle({ options, question, selectMultiple }) {
+  async handle({ options, question, selectMultiple }, _channel, signal) {
     const duplicatesRes = checkForDuplicates(options);
     if (!duplicatesRes.ok) return duplicatesRes;
 
@@ -91,10 +91,15 @@ export const promptUserOptions = createTool({
       allowMultiple: selectMultiple,
       allowTextInput: true,
       cancellable: true,
+      signal,
     }).catch(() => undefined);
 
     if (!chosen) {
-      return Result.Error('User cancelled the input request.');
+      return Result.Error(
+        signal.aborted
+          ? 'Cancelled: the agent stream was aborted while awaiting user input.'
+          : 'User cancelled the input request.'
+      );
     }
 
     return Result.Ok({

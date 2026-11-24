@@ -67,7 +67,20 @@ export async function approveToolUse({
     cancellable: true,
     signal,
     timeoutMs,
-  }).then(res => res[0]);
+  })
+    .then(res => res[0])
+    .catch(error => {
+      if (!signal?.aborted) throw error;
+      return undefined;
+    });
+
+  if (!inputRequestResult) {
+    return {
+      approved: false,
+      reason:
+        'Approval request was cancelled because the agent stream was aborted.',
+    };
+  }
 
   if (inputRequestResult.cancelled) {
     return {
@@ -75,7 +88,6 @@ export async function approveToolUse({
       reason: 'User cancelled approval request',
     };
   }
-
   const selectionOption = await tool.onOptionSelect(
     input,
     inputRequestResult.value,
