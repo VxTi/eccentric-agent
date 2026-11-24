@@ -6,12 +6,27 @@ export const eventTarget = new EventTarget();
 export const enum EventName {
   REQUEST_INPUT = 'request-user-input',
   INPUT_RESPONSE = 'user-input-response',
-  INPUT_CANCEL = 'user-input-cancel',
   AGENT_MESSAGE = 'agent-message',
   AGENT_REASONING = 'agent-reasoning',
   RESPONSE_TOKENS = 'response-tokens',
   CONTEXT_USAGE = 'context-usage',
 }
+
+export interface CancelledOptionResult {
+  cancelled: true;
+  value?: never;
+  label?: never;
+}
+
+export interface SelectedInputOptionResult<T = string> {
+  cancelled?: false;
+  label: string;
+  value: T;
+}
+
+export type SelectedInputOption<T = string> =
+  | CancelledOptionResult
+  | SelectedInputOptionResult<T>;
 
 export interface InputOption<T = string> {
   label: string;
@@ -29,16 +44,12 @@ export const FREE_TEXT_INPUT_ID = 'free-text';
 export interface UserInputRequest<T = string> {
   title?: string;
   description?: string;
-  options: InputOption<T>[];
   allowMultiple?: boolean;
   /** When true, the dialog offers a row to type a custom free-text answer. */
   allowTextInput?: boolean;
-  /**
-   * When true, the dialog lets the user dismiss the request with ESC. This
-   * settles the awaiting caller as cancelled instead of answering it.
-   */
-  cancellable?: boolean;
   channelId: string;
+  options: InputOption<T>[];
+  cancellable?: boolean;
 }
 
 export class UserInputRequestEvent<T = any> extends CustomEvent<
@@ -50,17 +61,18 @@ export class UserInputRequestEvent<T = any> extends CustomEvent<
 }
 
 export class UserInputResponseEvent<T = string> extends CustomEvent<{
-  options: NonEmptyArray<InputOption<T>>;
+  options:
+    | NonEmptyArray<SelectedInputOptionResult<T>>
+    | [CancelledOptionResult];
   channelId: string;
 }> {
-  constructor(options: NonEmptyArray<InputOption<T>>, channelId: string) {
+  constructor(
+    options:
+      | NonEmptyArray<SelectedInputOptionResult<T>>
+      | [CancelledOptionResult],
+    channelId: string
+  ) {
     super(EventName.INPUT_RESPONSE, { detail: { options, channelId } });
-  }
-}
-
-export class UserInputCancelEvent extends CustomEvent<{ channelId: string }> {
-  constructor(channelId: string) {
-    super(EventName.INPUT_CANCEL, { detail: { channelId } });
   }
 }
 

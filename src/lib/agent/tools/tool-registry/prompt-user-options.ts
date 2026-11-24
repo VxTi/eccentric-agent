@@ -1,4 +1,3 @@
-import { isEmptyArray } from '@vxti/typed';
 import * as z from 'zod';
 import { requestUserInput } from '../../../events/user-input';
 import { Result } from '../../../result';
@@ -82,15 +81,8 @@ export const promptUserOptions = createTool({
   outputSchema,
 
   async handle({ options, question, selectMultiple }) {
-    const ids = new Set<string>();
-    options.forEach(option => {
-      if (ids.has(option.value)) {
-        throw new Error(
-          `Duplicate option id "${option.value}". Each option must have a unique id.`
-        );
-      }
-      ids.add(option.value);
-    });
+    const duplicatesRes = checkForDuplicates(options);
+    if (!duplicatesRes.ok) return duplicatesRes;
 
     const chosen = await requestUserInput({
       title: 'Your attention is needed',
@@ -98,13 +90,11 @@ export const promptUserOptions = createTool({
       options,
       allowMultiple: selectMultiple,
       allowTextInput: true,
-    });
+      cancellable: true,
+    }).catch(() => undefined);
 
-    if (isEmptyArray(chosen)) {
-      return Result.Error(
-        `User selected an unrecognised option(s) id "${chosen.map(({ value }) => value).join(', ')}". Expected one of:` +
-          ` ${options.map(option => option.value).join(', ')}.`
-      );
+    if (!chosen) {
+      return Result.Error('User cancelled the input request.');
     }
 
     return Result.Ok({
@@ -124,3 +114,19 @@ export const promptUserOptions = createTool({
     return `User selected option \`${selected}\``;
   },
 });
+
+function checkForDuplicates(
+  options: z.infer<typeof optionSchema>[]
+): Result<undefined, string> {
+  const ids = new Set<string>();
+  for (const opt of options) {
+    if (ids.has(opt.value)) {
+      return Result.Error(
+        `Duplicate option id "${opt.value}". Each option must have a unique id.`
+      );
+    }
+    ids.add(opt.value);
+  }
+
+  return Result.Ok(undefined);
+}

@@ -74,13 +74,18 @@ export function processCommand(command: string) {
           label: level === agent.reasoningEffort ? `${level} (current)` : level,
           value: level,
         })),
-      }).then(([chosen]) => {
-        if (isNil(chosen)) return;
+        cancellable: true,
+      }).then(([result]) => {
+        if (isNil(result)) return;
 
-        agent.reasoningEffort = chosen.value;
+        if (result.cancelled) {
+          return;
+        }
+
+        agent.reasoningEffort = result.value;
         emitMessage({
           type: MessageType.GENERIC,
-          content: `Reasoning effort set to \`${chosen.value}\``,
+          content: `Reasoning effort set to \`${result.value}\``,
         });
       });
       break;
@@ -96,13 +101,17 @@ export function processCommand(command: string) {
               : model.label,
           value: model,
         })),
-      }).then(([chosen]) => {
-        if (isNil(chosen)) return;
+        cancellable: true,
+      }).then(([result]) => {
+        if (isNil(result)) return;
 
-        agent.model = chosen.value;
+        if (result.cancelled) {
+          return;
+        }
+        agent.model = result.value;
         emitMessage({
           type: MessageType.GENERIC,
-          content: `Model set to \`${chosen.value.id}\``,
+          content: `Model set to \`${result.value.id}\``,
         });
       });
       break;

@@ -8,11 +8,15 @@ import {
   unsubscribeEvent,
   type UserInputRequest,
   type UserInputResponseEvent,
+  type SelectedInputOption,
 } from './events';
 
 export const CHANNEL_ID_NONE = 'channel$none';
 
-export function requestUserInput<T = string>(
+export function requestUserInput<
+  T = string,
+  TCancellable extends true | false = false,
+>(
   props: Omit<UserInputRequest<T>, 'channelId'> & {
     /**
      * Rejects the promise if no user response arrives within this many
@@ -26,8 +30,11 @@ export function requestUserInput<T = string>(
      * user who will never answer.
      */
     signal?: AbortSignal;
+    cancellable?: TCancellable;
   }
-): Promise<NonEmptyArray<InputOption<T>>> {
+): TCancellable extends true
+  ? Promise<NonEmptyArray<SelectedInputOption<T>>>
+  : Promise<NonEmptyArray<InputOption<T>>> {
   const { timeoutMs, signal, ...request } = props;
   const channelId = uuid();
   return new Promise((resolve, reject) => {
@@ -53,6 +60,10 @@ export function requestUserInput<T = string>(
       if (event.detail.channelId !== channelId) return;
 
       cleanup();
+      if (event.detail.options[0].cancelled) {
+        rejectWith('User cancelled input request');
+      }
+
       resolve(event.detail.options);
     };
 
@@ -74,5 +85,5 @@ export function requestUserInput<T = string>(
     subscribeEvent(EventName.INPUT_RESPONSE, handler);
     signal?.addEventListener('abort', onAbort);
     emitEvent(EventName.REQUEST_INPUT, { ...request, channelId });
-  });
+  }) as never;
 }

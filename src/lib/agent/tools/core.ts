@@ -64,22 +64,21 @@ export async function approveToolUse({
       value: opt.option,
     })),
     allowMultiple: false,
+    cancellable: true,
     signal,
     timeoutMs,
-  })
-    .then(([choice]) => ({ approved: true, result: choice.value }))
-    .catch(err => ({ approved: false, result: String(err) }));
+  }).then(res => res[0]);
 
-  if (!inputRequestResult.approved) {
+  if (inputRequestResult.cancelled) {
     return {
       approved: false,
-      reason: inputRequestResult.result,
+      reason: 'User cancelled approval request',
     };
   }
 
   const selectionOption = await tool.onOptionSelect(
     input,
-    inputRequestResult.result,
+    inputRequestResult.value,
     channel
   );
 

@@ -10,9 +10,10 @@ import {
   EventName,
   FREE_TEXT_INPUT_ID,
   type InputOption,
+  type SelectedInputOptionResult,
   type UserInputRequest,
 } from '../../../lib/events/events';
-import { useInputArea } from '../../hooks';
+import { useAgent, useInputArea } from '../../hooks';
 import { parseMarkdown } from '../../terminal-markdown-renderer/markdown-renderer';
 
 interface Props {
@@ -21,12 +22,13 @@ interface Props {
 
 export function UserInputRequestDialog({ request }: Props): ReactNode {
   const { setInputRequest } = useInputArea();
+  const { agent } = useAgent();
+  const { allowMultiple, allowTextInput, cancellable, options, title } =
+    request;
   const [userSelectedInputIndex, setUserSelectedInputIndex] =
     useState<number>(0);
   const [activeIndices, setActiveIndices] = useState<number[]>([]);
   const [textValue, setTextValue] = useState<string>('');
-
-  const { allowMultiple, allowTextInput, options, title } = request;
 
   // The optional free-text row lives right after the predefined options and is
   // navigated with the same highlight index.
@@ -34,16 +36,36 @@ export function UserInputRequestDialog({ request }: Props): ReactNode {
   const isTextInputRow =
     allowTextInput === true && userSelectedInputIndex === options.length;
 
-  const submit = (response: NonEmptyArray<InputOption>) => {
-    emitEvent(EventName.INPUT_RESPONSE, response, request.channelId);
-
+  const reset = () => {
     setInputRequest(undefined);
     setUserSelectedInputIndex(0);
     setActiveIndices([]);
     setTextValue('');
   };
 
+  const submit = (response: NonEmptyArray<SelectedInputOptionResult>) => {
+    emitEvent(EventName.INPUT_RESPONSE, response, request.channelId);
+    reset();
+  };
+
+  // Dismisses without answering: the awaiting caller is settled as cancelled
+  // and the agent's in-flight turn is interrupted.
+  const cancel = () => {
+    emitEvent(
+      EventName.INPUT_RESPONSE,
+      [{ cancelled: true }],
+      request.channelId
+    );
+    agent.cancel();
+    reset();
+  };
+
   useInput((char, key) => {
+    if (key.escape && cancellable) {
+      cancel();
+      return;
+    }
+
     if (isTextInputRow) {
       if (key.upArrow) {
         setUserSelectedInputIndex(prev => (prev + rowCount - 1) % rowCount);
@@ -102,7 +124,9 @@ export function UserInputRequestDialog({ request }: Props): ReactNode {
         : [userSelectedInputIndex];
 
       submit(
-        indices.map(idx => request.options[idx]) as NonEmptyArray<InputOption>
+        indices.map(
+          idx => request.options[idx]
+        ) as NonEmptyArray<SelectedInputOptionResult>
       );
     }
   });
@@ -140,9 +164,10 @@ export function UserInputRequestDialog({ request }: Props): ReactNode {
       </Box>
       <Box marginTop={1} marginLeft={1} flexDirection="column">
         <Text italic color="gray">
-          {allowTextInput
+          {(allowTextInput
             ? 'Press space to select one, enter to submit, or highlight the input row to type your own'
-            : 'Press space to select one and enter to submit'}
+            : 'Press space to select one and enter to submit') +
+            (cancellable ? ', esc to cancel' : '')}
         </Text>
         {options.map((option, i) => (
           <InputOption
