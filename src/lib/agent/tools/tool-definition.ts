@@ -1,13 +1,15 @@
-import { type NonEmptyArray } from '@vxti/typed';
+import type { NonEmptyArray } from '@vxti/typed';
 import type * as z from 'zod';
-import { type Result } from '../../result';
-import { type GenericMessage } from '../../types/messages';
-import { type NotifierChannel } from '../../events/notifier';
-import {
-  type ApprovalOption,
-  type MakeOptional,
-  type MaybePromise,
+import type { Result } from '../../result';
+import type { GenericMessage } from '../../types/messages';
+import type { NotifierChannel } from '../../events/notifier';
+import type {
+  ApprovalOption,
+  MakeOptional,
+  MaybePromise,
 } from '../../types/types';
+import { isBoolean, isNumber, isObject, isString } from 'lodash-es';
+import chalk from 'chalk';
 
 export const enum ToolSelectionOption {
   ALLOW = 'allow',
@@ -89,7 +91,7 @@ export interface IToolDefinition<
 }
 
 type ToolProps<
-  TIn = unknown,
+  TIn extends object = object,
   TOut extends object = object,
   TOutMeta = never,
   TApprovalOption extends string = string,
@@ -100,7 +102,7 @@ type ToolProps<
 > & {};
 
 export function createTool<
-  TIn = unknown,
+  TIn extends object = object,
   TOut extends object = object,
   TOutMeta = never,
   TApprovalOption extends string = string,
@@ -122,6 +124,27 @@ export function createTool<
   };
 }
 
-function defaultArgFormatter<TIn>(args: TIn): string {
-  return JSON.stringify(args);
+const MAX_FORMATTED_ARGS_LENGTH = 2000;
+
+function defaultArgFormatter(args: object): string {
+  const serialized = stringifyArgs(args);
+  const truncated =
+    serialized.length > MAX_FORMATTED_ARGS_LENGTH
+      ? `${serialized.slice(0, MAX_FORMATTED_ARGS_LENGTH)}…`
+      : serialized;
+  return `\`\`\`json\n${truncated}\n\`\`\``;
+}
+
+function stringifyArgs(args: object): string {
+  const summarized = Object.entries(args).map(([key, value]) => {
+    if (isObject(value)) return `${key}: ...`;
+
+    if (isNumber(value) || isString(value) || isBoolean(value)) {
+      return `${key}: ${value}`;
+    }
+
+    return `${key}: ${JSON.stringify(value)}`;
+  });
+
+  return summarized.map(line => chalk.dim(line)).join('\n\n');
 }

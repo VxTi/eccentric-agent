@@ -12,6 +12,17 @@ const FILE_SUGGESTION_PATTERN = /(?:\s|^)@([\w./_-]*)$/;
 // lists every command, and '-' is allowed for names like 'system-prompt'.
 const COMMAND_PATTERN = /^\/([\w-]*)$/;
 const MAX_SHOWN_SUGGESTIONS = 200;
+// The glob walks the whole tree, so results are cached briefly and reused
+// across keystrokes; new or deleted files appear within this window.
+const FILE_LIST_TTL_MS = 2_000;
+
+interface FileListCache {
+  key: string;
+  files: Suggestion[];
+  expiresAt: number;
+}
+
+let fileListCache: Nullable<FileListCache>;
 
 export const enum SuggestionType {
   FILE = 'file',
@@ -32,13 +43,13 @@ export interface Suggestions {
   values: Suggestion[];
 }
 
-export async function getInputSuggestions(
+export function getInputSuggestions(
   input: string,
   cursorOffset: number
 ): Promise<Nullable<Suggestions>> {
   const preCursorInput = input.slice(0, cursorOffset);
 
-  return await resolveInputSuggestions(
+  return resolveInputSuggestions(
     preCursorInput,
     resolveFileSuggestions,
     resolveCommandSuggestion
@@ -60,7 +71,39 @@ async function resolveInputSuggestions(
   return undefined;
 }
 
-async function resolveFileSuggestions(preCursorInput: string) {
+async function listProjectFiles(
+  cwd: string,
+  ignored: Set<string>
+): Promise<Nullable<Suggestion[]>> {
+  const key = [cwd, ...[...ignored].sort()].join('\u0000');
+
+  if (
+    isNotNil(fileListCache) &&
+    fileListCache.key === key &&
+    fileListCache.expiresAt > Date.now()
+  ) {
+    return fileListCache.files;
+  }
+
+  const files = await Array.fromAsync(
+    fs.promises.glob('**/*', {
+      exclude: Array.from(ignored),
+      cwd,
+    })
+  );
+
+  fileListCache = {
+    key,
+    files: files.map(value => ({ value })),
+    expiresAt: Date.now() + FILE_LIST_TTL_MS,
+  };
+
+  return fileListCache.files;
+}
+
+async function resolveFileSuggestions(
+  preCursorInput: string
+): Promise<Nullable<Suggestions>> {
   const {
     cwd,
     git: { ignored },
@@ -69,20 +112,14 @@ async function resolveFileSuggestions(preCursorInput: string) {
 
   if (isNil(filePath)) return;
 
-  return await Array.fromAsync(
-    fs.promises.glob('**/*', {
-      exclude: Array.from(ignored),
-      cwd,
-    })
-  )
-    .then(files => ({
-      type: SuggestionType.FILE,
-      values: filterSuggestions(
-        files.map(f => ({ value: f })),
-        filePath
-      ),
-    }))
-    .catch(() => undefined);
+  const files = await listProjectFiles(cwd, ignored).catch(() => undefined);
+
+  if (isNil(files)) return;
+
+  return {
+    type: SuggestionType.FILE,
+    values: filterSuggestions(files, filePath),
+  };
 }
 
 function resolveCommandSuggestion(
@@ -113,16 +150,23 @@ function filterSuggestions(
   query: string
 ): Suggestion[] {
   const q = query.toLowerCase();
+
   if (isEmptyString(q, true)) {
     return suggestions.slice(0, MAX_SHOWN_SUGGESTIONS);
   }
 
-  return suggestions
-    .filter(({ value }) => value.toLowerCase().includes(q))
-    .sort(({ value: a }, { value: b }) => {
-      const ai = a.toLowerCase().indexOf(q);
-      const bi = b.toLowerCase().indexOf(q);
-      if (ai !== bi) return ai - bi;
-      return a.length - b.length;
-    });
+  const matches: { suggestion: Suggestion; matchIndex: number }[] = [];
+
+  for (const suggestion of suggestions) {
+    const matchIndex = suggestion.value.toLowerCase().indexOf(q);
+
+    if (matchIndex !== -1) matches.push({ suggestion, matchIndex });
+  }
+
+  return matches
+    .sort((a, b) => {
+      if (a.matchIndex !== b.matchIndex) return a.matchIndex - b.matchIndex;
+      return a.suggestion.value.length - b.suggestion.value.length;
+    })
+    .map(({ suggestion }) => suggestion);
 }

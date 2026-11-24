@@ -1,4 +1,4 @@
-import { entries, isNonEmptyString } from '@vxti/typed';
+import { entries, isNonEmptyString, isNotNil } from '@vxti/typed';
 import chalk from 'chalk';
 import { type ToolIdentifier } from '../agent/tools';
 import {
@@ -14,6 +14,9 @@ import { capitalize } from './string-utils';
 const TOOL_COLLAPSE_SUMMARIES: Partial<
   Record<ToolIdentifier, (count: number) => string>
 > = {
+  list_mcp_tools: () => 'listed MCP tools',
+  call_mcp_tool: count =>
+    `called ${count} MCP ${count === 1 ? 'tool' : 'tools'}`,
   read_file: count => `read ${count} ${count === 1 ? 'file' : 'files'}`,
   grep: count => `looked for ${count} ${count === 1 ? 'pattern' : 'patterns'}`,
   shell: count => `ran ${count} ${count === 1 ? 'command' : 'commands'}`,
@@ -45,9 +48,8 @@ function isCompletedToolCall(
   message: Message | undefined
 ): message is GenericMessage & { toolCall: string } {
   return (
-    message !== undefined &&
-    message.type === MessageType.GENERIC &&
-    message.toolCall !== undefined &&
+    message?.type === MessageType.GENERIC &&
+    isNotNil(message.toolCall) &&
     message.loading !== true
   );
 }

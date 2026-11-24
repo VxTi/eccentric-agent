@@ -33,6 +33,10 @@ import { useAppSelector } from '../../lib/state';
 import { formatReferencedFiles } from '../components/user-input/input-field';
 import { useAgent } from '../hooks';
 
+// Suggestion lookups hit the file system; debouncing collapses the burst of
+// requests a burst of keystrokes would otherwise trigger.
+const SUGGESTIONS_DEBOUNCE_MS = 100;
+
 export interface InputRequestState {
   id: string;
   request: UserInputRequest;
@@ -101,18 +105,22 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
   const historyIndex = useRef<number | null>(null);
   useEffect(() => {
     let cancelled = false;
-    getInputSuggestions(value, cursorOffset)
-      .then(res => {
-        if (!cancelled) setSuggestions(res);
-      })
-      .catch(() => {
-        if (!cancelled) setSuggestions(undefined);
-      });
+
+    const timeout = setTimeout(() => {
+      getInputSuggestions(value, cursorOffset)
+        .then(res => {
+          if (!cancelled) setSuggestions(res);
+        })
+        .catch(() => {
+          if (!cancelled) setSuggestions(undefined);
+        });
+    }, SUGGESTIONS_DEBOUNCE_MS);
+
     return () => {
       cancelled = true;
+      clearTimeout(timeout);
     };
   }, [value, cursorOffset]);
-
   useEffect(() => {
     return eventOn(
       EventName.REQUEST_INPUT,

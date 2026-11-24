@@ -4,6 +4,7 @@ import * as fs from 'node:fs/promises';
 import * as z from 'zod';
 import { Result } from '../../../../result';
 import { store } from '../../../../state';
+import { existsAsync } from '../../../../utils/fs';
 import { detectLineEnding, LINE_BREAK } from '../../../../utils/string-utils';
 import { createTool } from '../../tool-definition';
 
@@ -85,6 +86,10 @@ export const readFile = createTool({
     const absolutePath = path.isAbsolute(filePath)
       ? filePath
       : path.join(cwd, filePath);
+
+    if (!(await existsAsync(absolutePath))) {
+      return Result.Error(`File not found: \`${absolutePath}\``);
+    }
 
     const stats = await fs.stat(absolutePath);
     const raw = await fs.readFile(absolutePath, 'utf8');

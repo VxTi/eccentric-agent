@@ -188,7 +188,7 @@ export const delegateTask = createTool({
     const status: TaskStatus[] = tasks.map(() => 'pending');
     const results: (TaskResult | undefined)[] = tasks.map(() => undefined);
 
-    const record = (
+    const recordStateChange = (
       index: number,
       name: string,
       success: boolean,
@@ -211,7 +211,7 @@ export const delegateTask = createTool({
         if (status[index] !== 'pending') continue;
         const taskDeps = deps[index] ?? [];
         if (taskDeps.some(dep => status[dep] === 'failed')) {
-          record(
+          recordStateChange(
             index,
             task.name,
             false,
@@ -229,7 +229,7 @@ export const delegateTask = createTool({
         // one another cyclically. Fail them rather than loop forever.
         for (const [index, task] of tasks.entries()) {
           if (status[index] === 'pending') {
-            record(
+            recordStateChange(
               index,
               task.name,
               false,
@@ -251,7 +251,7 @@ export const delegateTask = createTool({
             signal,
             complexity: task.complexity,
           });
-          record(
+          recordStateChange(
             index,
             task.name,
             result.ok,
