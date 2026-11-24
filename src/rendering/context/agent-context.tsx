@@ -34,6 +34,7 @@ export interface AgentContextInstance {
   status: AgentStatus;
   reasoningEffort: ReasoningEffort;
   autoApprove: boolean;
+  queuedMessageCount: number;
   toggleAutoApprove: () => void;
 }
 
@@ -54,6 +55,9 @@ export function AgentProvider({
 
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>(
     agent.reasoningEffort
+  );
+  const [queuedMessageCount, setQueuedMessageCount] = useState(
+    agent.queuedMessageCount
   );
 
   const [status, setStatus] = useState<AgentStatus>({
@@ -109,8 +113,13 @@ export function AgentProvider({
       dispatch(setAutoApprove(enabled));
     };
 
+    const onQueueChange = (count: number): void => {
+      setQueuedMessageCount(count);
+    };
+
     agent.on('reasoning-effort-change', onReasoningEffortChange);
     agent.on('auto-mode-change', onAutoModeChange);
+    agent.on('queue-change', onQueueChange);
     agent.on('message-delta', onMessage);
     agent.on('status-change', onStatus);
     agent.on('response-tokens', onTokens);
@@ -139,6 +148,7 @@ export function AgentProvider({
       agent.off('response-tokens', onTokens);
       agent.off('reasoning-effort-change', onReasoningEffortChange);
       agent.off('auto-mode-change', onAutoModeChange);
+      agent.off('queue-change', onQueueChange);
       offAgentMessage();
       offReasoning();
     };
@@ -164,6 +174,7 @@ export function AgentProvider({
         messages,
         status,
         autoApprove,
+        queuedMessageCount,
         toggleAutoApprove,
       }}
     >

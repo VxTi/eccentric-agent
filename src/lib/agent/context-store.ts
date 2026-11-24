@@ -81,6 +81,7 @@ export class ContextStore {
         if (mutatedPath !== undefined) {
           mutations.push({
             messageIndex,
+            partIndex,
             path: this.normalise(mutatedPath),
           });
         }
@@ -121,7 +122,9 @@ export class ContextStore {
       const editedAfter = mutations.some(
         mutation =>
           mutation.path === read.path &&
-          mutation.messageIndex > read.messageIndex
+          (mutation.messageIndex > read.messageIndex ||
+            (mutation.messageIndex === read.messageIndex &&
+              mutation.partIndex > read.partIndex))
       );
       if (editedAfter) {
         elide.push({ read, reason: 'stale' });
@@ -228,6 +231,7 @@ interface ReadRef {
 
 interface MutationRef {
   messageIndex: number;
+  partIndex: number;
   path: string;
 }
 
@@ -265,6 +269,15 @@ function getReadData(part: unknown): ReadOutputData | undefined {
   return readDataOf(part);
 }
 
+/** `Result.Error` serialises as `{ ok: false, ... }`. */
+function isFailedResult(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as { ok?: unknown }).ok === false
+  );
+}
+
 function readDataOf(part: ToolResultPartLike): ReadOutputData | undefined {
   if (part.output.type !== 'json') return undefined;
   const value = part.output.value;
@@ -294,7 +307,11 @@ function getMutationPath(
   }
 
   if (part.output.type === 'json') {
-    const data = (part.output.value as { data?: unknown } | null)?.data;
+    const value = part.output.value;
+    // A failed edit left the file untouched, so it invalidates nothing.
+    if (isFailedResult(value)) return undefined;
+
+    const data = (value as { data?: unknown } | null)?.data;
     const fromResult = (data as { filePath?: unknown } | undefined)?.filePath;
     if (typeof fromResult === 'string') return fromResult;
   }

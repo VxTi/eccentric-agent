@@ -49,6 +49,54 @@ function editMsg(id: string, filePath: string): ModelMessage {
   };
 }
 
+function failedEditMsg(id: string): ModelMessage {
+  return {
+    role: 'tool',
+    content: [
+      {
+        type: 'tool-result',
+        toolCallId: id,
+        toolName: 'replace_in_file',
+        output: {
+          type: 'json',
+          value: { ok: false, data: 'No line matches `anchor`.' },
+        },
+      },
+    ],
+  };
+}
+
+/** Read and edit results for the same file in one tool message. */
+function sameMessageMsg(
+  readId: string,
+  editId: string,
+  filePath: string
+): ModelMessage {
+  return {
+    role: 'tool',
+    content: [
+      {
+        type: 'tool-result',
+        toolCallId: readId,
+        toolName: 'read_file',
+        output: {
+          type: 'json',
+          value: { ok: true, data: { content: numbered(1, 50), filePath } },
+        },
+      },
+      {
+        type: 'tool-result',
+        toolCallId: editId,
+        toolName: 'replace_in_file',
+        output: {
+          type: 'json',
+          value: { ok: true, data: { filePath, bytesWritten: 1 } },
+        },
+      },
+    ],
+  };
+}
+
 /** `create_file` reports only `success`; its path comes from the tool call. */
 function createCall(id: string, filePath: string): ModelMessage[] {
   return [
@@ -174,6 +222,22 @@ describe('ContextStore', () => {
     );
     const out = context.materialize();
     expect(contentAt(out, 0)).toContain('Contents elided');
+  });
+
+  it('keeps a read when a later edit of the same file failed', () => {
+    const context = store(
+      readMsg('r1', '/repo/a.ts', 1, 50),
+      failedEditMsg('e1')
+    );
+    const out = context.materialize();
+    expect(contentAt(out, 0)).not.toContain('elided');
+  });
+
+  it('elides a read that a later part of the same message edit invalidates', () => {
+    const context = store(sameMessageMsg('r1', 'e1', '/repo/a.ts'));
+    const out = context.materialize();
+    expect(contentAt(out, 0)).toContain('Contents elided');
+    expect(contentAt(out, 0)).toContain('modified after this read');
   });
 
   it('matches relative and absolute paths for the same file', () => {

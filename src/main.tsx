@@ -8,7 +8,6 @@ import { Provider } from 'react-redux';
 import { defaultController, store } from './lib/state';
 import { AgentProvider } from './rendering/context/agent-context';
 import { MouseProvider } from './rendering/context/mouse-context';
-import { UserInputProvider } from './rendering/context/user-input-context';
 import { App } from './rendering/components/App';
 import { terminalRenderer } from './rendering/terminal-markdown-renderer/markdown-renderer';
 import { createInkStdin } from './lib/mouse-input';
@@ -36,9 +35,7 @@ async function main(): Promise<void> {
     <Provider store={store}>
       <MouseProvider>
         <AgentProvider>
-          <UserInputProvider>
-            <App />
-          </UserInputProvider>
+          <App />
         </AgentProvider>
       </MouseProvider>
     </Provider>,

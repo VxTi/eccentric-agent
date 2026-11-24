@@ -3,6 +3,7 @@ import { type ReactNode, useRef } from 'react';
 import { GitInfoLine } from './git-info-line';
 import { BottomInfoBar } from './bottom-info-bar';
 import { ScrollList } from './scroll-list';
+import { QueuedMessages } from './queued-messages';
 import { InputFieldContainer } from './user-input/input-field';
 
 export function App(): ReactNode {
@@ -31,6 +32,7 @@ export function App(): ReactNode {
         flexShrink={0}
       >
         <GitInfoLine />
+        <QueuedMessages />
         <InputFieldContainer />
         <BottomInfoBar />
       </Box>

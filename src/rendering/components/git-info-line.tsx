@@ -11,7 +11,10 @@ export function GitInfoLine() {
     git: { currentBranch, repoName },
     loading,
   } = useAppSelector(state => state.fileSystem);
-  const { reasoningEffort } = useAgent();
+  const {
+    reasoningEffort,
+    agent: { model },
+  } = useAgent();
 
   if (loading || isNil(currentBranch) || isNil(repoName)) return;
 
@@ -27,10 +30,16 @@ export function GitInfoLine() {
         <Text>•</Text>
         <Text>{currentBranch}</Text>
       </Box>
-      <Text color="gray">
-        {reasoningEffortChars[getReasoningEffortIdx(reasoningEffort)]}{' '}
-        {reasoningEffort}
-      </Text>
+      <Box gap={1}>
+        <Text color="blueBright" bold>
+          {model.label}
+        </Text>
+        <Text>•</Text>
+        <Text color="gray">
+          {reasoningEffortChars[getReasoningEffortIdx(reasoningEffort)]}{' '}
+          {reasoningEffort}
+        </Text>
+      </Box>
     </Box>
   );
 }

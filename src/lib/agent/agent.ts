@@ -55,6 +55,7 @@ interface EventMap {
   'reasoning-effort-change': [ReasoningEffort];
   'model-change': [ModelDefinition];
   'auto-mode-change': [boolean];
+  'queue-change': [number];
 }
 
 export class Agent extends EventEmitter<EventMap> {
@@ -102,6 +103,10 @@ export class Agent extends EventEmitter<EventMap> {
 
   public get status(): AgentStatus {
     return this._status;
+  }
+
+  public get queuedMessageCount(): number {
+    return this._messageQueue.length;
   }
 
   public get taskList(): TaskList {
@@ -181,7 +186,13 @@ export class Agent extends EventEmitter<EventMap> {
         skills.forEach(skill => this.loadSkill(skill));
         return true;
       })
-      .catch(() => false);
+      .catch(() => {
+        this.setStatus({
+          loading: false,
+          text: chalk.red('Failed loading skills'),
+        });
+        return false;
+      });
   }
 
   public async loadMcpServers(): Promise<boolean> {
@@ -221,6 +232,7 @@ export class Agent extends EventEmitter<EventMap> {
   public clear(): void {
     this._context.clear();
     this._messageQueue.length = 0;
+    this.emit('queue-change', 0);
     this.setStatus({ loading: false, text: '' });
   }
 
@@ -237,6 +249,7 @@ export class Agent extends EventEmitter<EventMap> {
     // drain it once it finishes, preserving submission order.
     if (this._status.loading) {
       this._messageQueue.push(message);
+      this.emit('queue-change', this._messageQueue.length);
       return;
     }
     this.emit('message-delta', {
@@ -249,6 +262,7 @@ export class Agent extends EventEmitter<EventMap> {
     await this.processRequest();
 
     const next = this._messageQueue.shift();
+    this.emit('queue-change', this._messageQueue.length);
     if (isNonEmptyString(next)) {
       await this.submitMessage(next);
     }
@@ -305,18 +319,25 @@ export class Agent extends EventEmitter<EventMap> {
         return;
       }
 
-      const finalStep = await result.finalStep;
-      this._context.pushResponse(finalStep.response.messages);
+      const steps = await result.steps;
+      this._context.pushResponse(steps.flatMap(step => step.response.messages));
 
       // Occupancy of the window going into the next turn: the full prompt the
       // model just received plus the reply now appended to it. This is an
       // absolute snapshot, not a per-step delta, so it is reported separately
       // from per-step response tokens and reflects any compaction applied.
       emitContextUsageEvent({
-        input: finalStep.usage.inputTokens ?? 0,
-        output: finalStep.usage.outputTokens ?? 0,
+        input: steps.reduce(
+          (acc, step) => acc + (step.usage.inputTokens ?? 0),
+          0
+        ),
+        output: steps.reduce(
+          (acc, step) => acc + (step.usage.outputTokens ?? 0),
+          0
+        ),
       });
     } catch (err: unknown) {
+      this.setStatus({ loading: false, text: chalk.red('Fatal error') });
       if (request.signal.aborted) {
         this.finishInterruptedTurn();
         return;
@@ -328,7 +349,6 @@ export class Agent extends EventEmitter<EventMap> {
         failure: true,
         content: `Something went wrong whilst responding: ${String(err)}`,
       });
-      this.setStatus({ loading: false, text: chalk.red('Fatal error') });
       return;
     } finally {
       this._requestController = undefined;

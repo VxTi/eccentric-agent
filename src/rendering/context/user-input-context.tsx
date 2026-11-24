@@ -17,6 +17,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { v7 as uuid } from 'uuid';
 import {
   EventName,
   eventOn,
@@ -31,7 +32,6 @@ import { type Optional, wrapOptional } from '../../lib/optional';
 import { useAppSelector } from '../../lib/state';
 import { formatReferencedFiles } from '../components/user-input/input-field';
 import { useAgent } from '../hooks';
-import { v7 as uuid } from 'uuid';
 
 export interface InputRequestState {
   id: string;

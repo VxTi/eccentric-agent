@@ -75,12 +75,18 @@ export function BottomInfoBar(): ReactNode {
       <Text color={contextOccupancyColor(occupancyPercentage)}>
         {`${occupancyPercentage}%`}
       </Text>
+      <Sep />
       <Text color="gray">
         {`↑ ${formatTokenCount(occupancy.input)} ↓ ${formatTokenCount(responseTokens)}`}
       </Text>
+      <Sep />
       <Text color={autoApprove ? 'yellow' : 'gray'}>
         ⏭ auto <Text dimColor>(ctrl+a)</Text>
       </Text>
     </Box>
   );
+}
+
+function Sep() {
+  return <Text color="gray">▪</Text>;
 }
