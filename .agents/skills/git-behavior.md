@@ -13,7 +13,7 @@ Guidelines for committing changes during and after large chunks of work.
 
 - Commit after every completed, coherent unit of work — a feature slice, a bug fix, a refactor step. Do not accumulate hours of unrelated changes into one commit.
 - Never leave a large working tree uncommitted. If work is in progress, commit the completed part with a message scoped to what is actually done.
-- Every commit should compile and pass tests. If it does not, finish or revert the broken piece before committing.
+- Every commit should compile and pass tests. If it does not, finish or revert the broken piece before committing. If the test suite has been executed right before, it is okay to skip this step.
 - Never use `--no-verify` or bypass pre-commit hooks unless the user explicitly asks.
 
 ## Commit message format
