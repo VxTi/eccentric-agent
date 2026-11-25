@@ -1,0 +1,449 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`formatDiffMd > matches its documented envelope shape 1`] = `
+"\`\`\`diff
+line 1
+line 2
+
+---DIFF_SEPARATOR---
+line 1
+changed
+
+\`\`\`
+"
+`;
+
+exports[`generateSideBySideDiff > collapses an unchanged head even when the change starts the file 1`] = `
+[
+  [
+    {
+      "lineNumberOriginal": 1,
+      "removed": true,
+      "value": "line 1",
+    },
+    {
+      "added": true,
+      "lineNumberModified": 1,
+      "value": "line ONE",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 2,
+      "value": "line 2",
+    },
+    {
+      "lineNumberModified": 2,
+      "value": "line 2",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 3,
+      "value": "line 3",
+    },
+    {
+      "lineNumberModified": 3,
+      "value": "line 3",
+    },
+  ],
+  [
+    {
+      "collapsed": true,
+      "value": "",
+    },
+    {
+      "collapsed": true,
+      "value": "",
+    },
+  ],
+]
+`;
+
+exports[`generateSideBySideDiff > collapses unchanged regions around a change 1`] = `
+[
+  [
+    {
+      "collapsed": true,
+      "value": "",
+    },
+    {
+      "collapsed": true,
+      "value": "",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 8,
+      "value": "line 8",
+    },
+    {
+      "lineNumberModified": 8,
+      "value": "line 8",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 9,
+      "value": "line 9",
+    },
+    {
+      "lineNumberModified": 9,
+      "value": "line 9",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 10,
+      "removed": true,
+      "value": "line 10",
+    },
+    {
+      "added": true,
+      "lineNumberModified": 10,
+      "value": "line TEN",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 11,
+      "value": "line 11",
+    },
+    {
+      "lineNumberModified": 11,
+      "value": "line 11",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 12,
+      "value": "line 12",
+    },
+    {
+      "lineNumberModified": 12,
+      "value": "line 12",
+    },
+  ],
+  [
+    {
+      "collapsed": true,
+      "value": "",
+    },
+    {
+      "collapsed": true,
+      "value": "",
+    },
+  ],
+]
+`;
+
+exports[`generateSideBySideDiff > honours an explicit context size of zero 1`] = `
+[
+  [
+    {
+      "collapsed": true,
+      "value": "",
+    },
+    {
+      "collapsed": true,
+      "value": "",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 10,
+      "removed": true,
+      "value": "line 10",
+    },
+    {
+      "added": true,
+      "lineNumberModified": 10,
+      "value": "line TEN",
+    },
+  ],
+  [
+    {
+      "collapsed": true,
+      "value": "",
+    },
+    {
+      "collapsed": true,
+      "value": "",
+    },
+  ],
+]
+`;
+
+exports[`generateSideBySideDiff > marks each unchanged stretch between two changes once 1`] = `
+[
+  [
+    {
+      "collapsed": true,
+      "value": "",
+    },
+    {
+      "collapsed": true,
+      "value": "",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 4,
+      "value": "line 4",
+    },
+    {
+      "lineNumberModified": 4,
+      "value": "line 4",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 5,
+      "removed": true,
+      "value": "line 5",
+    },
+    {
+      "added": true,
+      "lineNumberModified": 5,
+      "value": "FIVE",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 6,
+      "value": "line 6",
+    },
+    {
+      "lineNumberModified": 6,
+      "value": "line 6",
+    },
+  ],
+  [
+    {
+      "collapsed": true,
+      "value": "",
+    },
+    {
+      "collapsed": true,
+      "value": "",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 24,
+      "value": "line 24",
+    },
+    {
+      "lineNumberModified": 24,
+      "value": "line 24",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 25,
+      "removed": true,
+      "value": "line 25",
+    },
+    {
+      "added": true,
+      "lineNumberModified": 25,
+      "value": "TWENTY-FIVE",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 26,
+      "value": "line 26",
+    },
+    {
+      "lineNumberModified": 26,
+      "value": "line 26",
+    },
+  ],
+  [
+    {
+      "collapsed": true,
+      "value": "",
+    },
+    {
+      "collapsed": true,
+      "value": "",
+    },
+  ],
+]
+`;
+
+exports[`generateSideBySideDiff > pads the shorter side of a resized block 1`] = `
+[
+  [
+    {
+      "lineNumberOriginal": 1,
+      "value": "a",
+    },
+    {
+      "lineNumberModified": 1,
+      "value": "a",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 2,
+      "removed": true,
+      "value": "b",
+    },
+    {
+      "added": true,
+      "lineNumberModified": 2,
+      "value": "x",
+    },
+  ],
+  [
+    {
+      "value": "",
+    },
+    {
+      "added": true,
+      "lineNumberModified": 3,
+      "value": "y",
+    },
+  ],
+  [
+    {
+      "value": "",
+    },
+    {
+      "added": true,
+      "lineNumberModified": 4,
+      "value": "z",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 3,
+      "value": "c",
+    },
+    {
+      "lineNumberModified": 5,
+      "value": "c",
+    },
+  ],
+]
+`;
+
+exports[`generateSideBySideDiff > pairs a pure deletion with a blank right side 1`] = `
+[
+  [
+    {
+      "lineNumberOriginal": 1,
+      "value": "a",
+    },
+    {
+      "lineNumberModified": 1,
+      "value": "a",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 2,
+      "removed": true,
+      "value": "b",
+    },
+    {
+      "value": "",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 3,
+      "value": "c",
+    },
+    {
+      "lineNumberModified": 2,
+      "value": "c",
+    },
+  ],
+]
+`;
+
+exports[`generateSideBySideDiff > pairs a pure insertion with a blank left side 1`] = `
+[
+  [
+    {
+      "lineNumberOriginal": 1,
+      "value": "a",
+    },
+    {
+      "lineNumberModified": 1,
+      "value": "a",
+    },
+  ],
+  [
+    {
+      "value": "",
+    },
+    {
+      "added": true,
+      "lineNumberModified": 2,
+      "value": "b",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 2,
+      "value": "c",
+    },
+    {
+      "lineNumberModified": 3,
+      "value": "c",
+    },
+  ],
+]
+`;
+
+exports[`generateSideBySideDiff > pairs a replacement onto shared rows 1`] = `
+[
+  [
+    {
+      "lineNumberOriginal": 1,
+      "value": "a",
+    },
+    {
+      "lineNumberModified": 1,
+      "value": "a",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 2,
+      "removed": true,
+      "value": "b",
+    },
+    {
+      "added": true,
+      "lineNumberModified": 2,
+      "value": "B",
+    },
+  ],
+  [
+    {
+      "lineNumberOriginal": 3,
+      "value": "c",
+    },
+    {
+      "lineNumberModified": 3,
+      "value": "c",
+    },
+  ],
+]
+`;
+
+exports[`splitDiffSides > strips exactly the envelope breaks and nothing else 1`] = `
+[
+  "a
+b
+",
+  "a
+c
+",
+]
+`;
