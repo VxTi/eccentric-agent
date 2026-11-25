@@ -7,7 +7,8 @@ import { store } from '../../../../state';
 
 const DEFAULT_FILE_PATTERN = '**/*';
 const DEFAULT_IGNORED_DIRS = ['node_modules', '.git'];
-const MAX_SHOWN_MATCHES = 10;
+const MAX_SHOWN_MATCHES = 5;
+const MORE_MATCHES_INDICATOR = '+ ... more';
 const DEFAULT_MAX_RESULTS = 200;
 const MAX_MATCHES_PER_FILE = 20;
 const MAX_LINE_DISPLAY_LENGTH = 250;
@@ -144,9 +145,7 @@ export const grep = createTool({
     return (
       `Found ${matches.length} match${matches.length === 1 ? '' : 'es'} for pattern \`${pattern}\`` +
       ` across ${fileCount} file${fileCount === 1 ? '' : 's'}:\n\n${formatted}\n${
-        limitVisible
-          ? `\n... and ${matches.length - MAX_SHOWN_MATCHES} more`
-          : ''
+        limitVisible ? `\\n${MORE_MATCHES_INDICATOR}` : ''
       }${truncationNotice}`
     );
   },
@@ -231,9 +230,7 @@ function formatMatchingFiles(
   const shown = files.slice(0, MAX_SHOWN_MATCHES);
   const formatted = shown.map(relativeToCwd).join('\n');
   const more =
-    files.length > shown.length
-      ? `\n... and ${files.length - shown.length} more`
-      : '';
+    shown.length < files.length ? `\\n${MORE_MATCHES_INDICATOR}` : '';
   const truncationNotice = truncated
     ? '\n\nResult limit reached — the list may be incomplete. Narrow the search with `filePattern` or' +
       ' raise `maxResults`.'
