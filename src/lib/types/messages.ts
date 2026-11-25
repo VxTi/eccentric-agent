@@ -1,3 +1,4 @@
+import type { TaskComplexity } from '../agent/inference';
 import type { ToolIdentifier } from '../agent/tools';
 import type { MakeOptional } from './types';
 
@@ -5,8 +6,8 @@ export enum MessageType {
   USER = 'user',
   ASSISTANT = 'assistant',
   GENERIC = 'generic',
-  TOOL_CALL = 'tool_call',
   REASONING = 'reasoning',
+  DELEGATED_TASK = 'delegated_task',
 }
 
 interface IMessage {
@@ -14,7 +15,7 @@ interface IMessage {
   content: string;
 }
 
-interface IPendable {
+interface ILoadable {
   loading?: boolean;
 }
 
@@ -28,7 +29,7 @@ export interface AssistantMessage extends IMessage {
   metadata?: object;
 }
 
-export interface GenericMessage extends IMessage, IPendable {
+export interface GenericMessage extends IMessage, ILoadable {
   type: MessageType.GENERIC;
   failure?: boolean;
   /** Present when the message was emitted by a tool execution; the tool's
@@ -40,8 +41,30 @@ export interface GenericMessage extends IMessage, IPendable {
   collapsed?: CollapsedToolCalls;
 }
 
-export interface ThoughtMessage extends IMessage, IPendable {
+export interface ThoughtMessage extends IMessage, ILoadable {
   type: MessageType.REASONING;
+}
+
+/** Mirrors the `delegate_task` tool's task specification. */
+export interface DelegatedTaskSpec {
+  name: string;
+  goal: string;
+  dependsOn?: string[];
+  complexity?: TaskComplexity;
+}
+
+/** Mirrors the `delegate_task` tool's per-task result. */
+export interface DelegatedTaskResult {
+  taskName: string;
+  taskResult: string;
+  success: boolean;
+}
+
+export interface DelegatedTaskMessage extends IMessage, ILoadable {
+  type: MessageType.DELEGATED_TASK;
+  id: string;
+  tasks: DelegatedTaskSpec[];
+  results?: DelegatedTaskResult[];
 }
 
 export interface CollapsedToolCalls {
@@ -56,7 +79,8 @@ export type Message =
   | UserMessage
   | AssistantMessage
   | GenericMessage
-  | ThoughtMessage;
+  | ThoughtMessage
+  | DelegatedTaskMessage;
 
 /** A `Message` with `id` optional, keeping each variant's own fields intact.
  *  Must distribute over the union: applying `MakeOptional` to the union

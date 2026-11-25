@@ -3,12 +3,18 @@ import { isEmptyString } from '@vxti/typed';
 import { Box } from 'ink';
 import { type Message, MessageType } from '../../../lib/types/messages';
 import { AssistantChatMessage } from './assistant-chat-message';
+import { DelegatedTaskChatMessage } from './delegated-task-chat-message';
 import { GenericChatMessage } from './generic-chat-message';
 import { ThoughtChatMessage } from './thought-chat-message';
 import { UserChatMessage } from './user-chat-message';
 
 export function ChatMessage({ message }: BaseProps<Message>) {
-  if (isEmptyString(message.content, true)) {
+  // The delegated-task variant's `content` is an optional summary; its tasks
+  // are the payload and must render even when the summary is empty.
+  if (
+    message.type !== MessageType.DELEGATED_TASK &&
+    isEmptyString(message.content, true)
+  ) {
     return null;
   }
 
@@ -35,5 +41,7 @@ function ModelMessageText({ message }: BaseProps<Message>) {
       return <GenericChatMessage message={message} />;
     case MessageType.REASONING:
       return <ThoughtChatMessage message={message} />;
+    case MessageType.DELEGATED_TASK:
+      return <DelegatedTaskChatMessage message={message} />;
   }
 }
