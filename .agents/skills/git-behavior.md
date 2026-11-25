@@ -32,12 +32,21 @@ period and must be lowercase-friendly and self-sufficient:
 
 - **Summary**: imperative mood, no trailing period, max ~50 characters. Written as if completing "this commit will …".
 - **Body** (optional): one or more short paragraphs explaining *why* the change was needed and any notable side effects. Separate it from the summary with a blank line.
-- Breaking changes: add `!` after the type (`feat!:`) and describe the break in the body.
+- Co-author trailer: every commit ends with a `Co-authored-by: Eca` footer (this agent, the eccentric agent). Place it after the body, separated by a blank line, e.g.:
+
+  ```
+  wrap paragraphs at terminal width
+
+  Long lines overflowed the viewport because the renderer only
+  counted display width for ASCII characters.
+
+  Co-authored-by: Eca
+  ```
 
 ## Message quality
 
 - Clear and concise: a reader should understand the change from the summary alone.
-- Be specific: prefer `fix(renderer): wrap paragraphs at terminal width` over `fix stuff` or `update renderer`.
+- Be specific: prefer `wrap paragraphs at terminal width` over `stuff` or `update renderer`.
 - One logical change per commit; never mix unrelated fixes in a single commit.
 - Match the tone and style of the repository's existing history when in doubt (check `git log --oneline`).
 
