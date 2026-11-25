@@ -2,6 +2,7 @@
 
 exports[`replace_in_file > applies a plain replacement without repair 1`] = `
 {
+  "countAdjustment": 0,
   "duplicatedSeamLines": [],
   "duplicatesRemoved": 0,
   "filePath": "plain-replacement.txt",

@@ -36,6 +36,8 @@ Spend a tool call only when it yields information you do not already have.
   reaches the line you meant. Send it whenever the range spans more than one line, or the leading
   line repeats in the file: an edit whose two endpoints disagree, or that they cannot decide
   between, is rejected before anything is written rather than editing the wrong lines.
+  If the anchor instead matches one line either side of the claimed end, \`count\` is
+  corrected by one and the adjustment is reported as \`countAdjustment\`.
 - Prefer dedicated tools over \`shell\`. \`shell\` is restricted to an allow-list and needs user
   approval; reach for it only when no dedicated tool fits.
 - Delegate only substantial, independent work to \`delegate_task\`: it runs independent tasks in

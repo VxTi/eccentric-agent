@@ -957,6 +957,145 @@ describe('replace_in_file', () => {
       expect(expectError(result)).toContain('exceeds file length');
       expect(await fs.readFile(filePath, 'utf-8')).toBe(before);
     });
+
+    describe('count off-by-one tolerance', () => {
+      it('grows the range when the trailing anchor sits one line past the claimed end', async () => {
+        const filePath = await prepareLines('x();', 'a();', 'b();', 'c();');
+
+        const result = expectOk(
+          await replaceInFile.handle(
+            {
+              filePath,
+              range: {
+                lineNumber: 1,
+                leadingAnchor: 'x();',
+                trailingAnchor: 'c();',
+                count: 3,
+              },
+              replacement: 'NEW',
+            },
+            channel,
+            signal
+          )
+        );
+
+        expect(result.data.startLine).toBe(1);
+        expect(result.data.linesRemoved).toBe(4);
+        expect(result.data.countAdjustment).toBe(1);
+        expect(await readLines(filePath)).toEqual(['NEW', '']);
+      });
+
+      it('shrinks the range when the trailing anchor sits one line inside the claimed end', async () => {
+        const filePath = await prepareLines('x();', 'a();', 'b();', 'c();');
+
+        const result = expectOk(
+          await replaceInFile.handle(
+            {
+              filePath,
+              range: {
+                lineNumber: 1,
+                leadingAnchor: 'x();',
+                trailingAnchor: 'b();',
+                count: 4,
+              },
+              replacement: 'NEW',
+            },
+            channel,
+            signal
+          )
+        );
+
+        expect(result.data.startLine).toBe(1);
+        expect(result.data.linesRemoved).toBe(3);
+        expect(result.data.countAdjustment).toBe(-1);
+        expect(await readLines(filePath)).toEqual(['NEW', 'c();', '']);
+      });
+
+      it('rejects when the trailing anchor agrees one line either side of the claimed end', async () => {
+        const filePath = await prepareLines('x();', 'a();', 'b();', 'a();');
+        const before = await fs.readFile(filePath, 'utf-8');
+
+        const result = await replaceInFile.handle(
+          {
+            filePath,
+            range: {
+              lineNumber: 1,
+              leadingAnchor: 'x();',
+              trailingAnchor: 'a();',
+              count: 3,
+            },
+            replacement: 'NEW',
+          },
+          channel,
+          signal
+        );
+
+        expect(expectError(result)).toContain('ambiguous');
+        expect(await fs.readFile(filePath, 'utf-8')).toBe(before);
+      });
+
+      it('prefers an exactly corroborated range over a hinted range that only an inferred span supports', async () => {
+        const filePath = await prepareLines(
+          'x();',
+          'a();',
+          'd();',
+          'x();',
+          'd();'
+        );
+
+        const result = expectOk(
+          await replaceInFile.handle(
+            {
+              filePath,
+              range: {
+                lineNumber: 1,
+                leadingAnchor: 'x();',
+                trailingAnchor: 'd();',
+                count: 2,
+              },
+              replacement: 'NEW',
+            },
+            channel,
+            signal
+          )
+        );
+
+        expect(result.data.startLine).toBe(4);
+        expect(result.data.countAdjustment).toBe(0);
+        expect(await readLines(filePath)).toEqual([
+          'x();',
+          'a();',
+          'd();',
+          'NEW',
+          '',
+        ]);
+      });
+
+      it('rescues a one-line overrun when the trailing anchor names the last line', async () => {
+        const filePath = await prepareLines('x();', 'a();');
+
+        const result = expectOk(
+          await replaceInFile.handle(
+            {
+              filePath,
+              range: {
+                lineNumber: 1,
+                leadingAnchor: 'x();',
+                trailingAnchor: 'a();',
+                count: 3,
+              },
+              replacement: 'NEW',
+            },
+            channel,
+            signal
+          )
+        );
+
+        expect(result.data.linesRemoved).toBe(2);
+        expect(result.data.countAdjustment).toBe(-1);
+        expect(await readLines(filePath)).toEqual(['NEW', '']);
+      });
+    });
   });
 
   describe('rendering', () => {
