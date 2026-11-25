@@ -1,4 +1,4 @@
-import { isNonEmptyArray, isNotNil } from '@vxti/typed';
+import { isNonEmptyArray, isNonEmptyString, isNotNil } from '@vxti/typed';
 import { experimental_decide } from 'ai';
 import { exec } from 'child_process';
 import { type ExecException } from 'node:child_process';
@@ -195,7 +195,10 @@ export const shell = createTool({
   },
   outputToString({ exitCode, stderr, stdout }, _, { command }) {
     if (exitCode === 0) {
-      const lines = stdout.split('\n');
+      // Tools like vitest report through stderr even on success, so fall back
+      // to stderr when stdout is empty rather than rendering an empty fence.
+      const output = isNonEmptyString(stdout, true) ? stdout : stderr;
+      const lines = output.trimEnd().split('\n');
 
       const formatted = isNonEmptyArray(lines)
         ? `\`\`\`
