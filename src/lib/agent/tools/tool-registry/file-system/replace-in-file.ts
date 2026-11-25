@@ -43,14 +43,13 @@ const inputSchema = z.object({
       .string()
       .optional()
       .describe(
-        'Optional exact current content of the last line being replaced (`lineNumber` +' +
-          ' `count` - 1). Independent support for validating where the range ends, and' +
-          ' the reliable way to tell apart a `leadingAnchor` that repeats in the file.' +
-          ' The leading anchor is always present on its own, so this one stays optional;' +
-          ' supply it whenever the range spans more than one line. A blank' +
-          ' `trailingAnchor` carries no evidence and is ignored. When the claimed end' +
-          ' disagrees but the anchor matches one line either side of it, `count` is' +
-          ' corrected by one and reported as `countAdjustment`.'
+        'Exact current content of the last line being replaced' +
+          ' (`lineNumber` + `count` - 1), matched exactly, ignoring surrounding' +
+          ' whitespace, or with a copied `read_file` prefix stripped. Optional, but' +
+          ' supply it for any multi-line range and whenever the leading line is not' +
+          ' unique in the file: it pins where the range ends, so a nearer copy of a' +
+          ' repeated leading line is not chosen. An off-by-one `count` is corrected' +
+          ' and reported as `countAdjustment`; a blank value is ignored.'
       ),
     count: z
       .number()
@@ -95,48 +94,45 @@ export const replaceInFile = createTool({
   name: 'Replace in file',
   description:
     'Replaces a contiguous range of lines in `filePath` with `replacement`. The range' +
-    ' starts at the line matching `range.leadingAnchor` (exactly, or ignoring' +
-    ' surrounding whitespace) near `range.lineNumber`, and spans `range.count` lines' +
-    ' (inclusive). When `range.trailingAnchor` is supplied it must match the line the' +
-    ' range ends on.\n\n' +
-    'Use this tool when changing one or more consecutive lines in a file. To insert new' +
-    ' lines without losing existing content, replace a line at the insertion point with' +
-    ' `replacement` set to that same line plus the new lines.\n\n' +
+    ' starts at the line matching `range.leadingAnchor` near `range.lineNumber` and' +
+    ' spans `range.count` lines (inclusive). Use it for any change to one or more' +
+    ' consecutive lines; to insert lines without deleting content, replace the line' +
+    ' at the insertion point and begin `replacement` with that same line.\n\n' +
     'Rules:\n' +
     '  • `lineNumber` is 1-based; `count` must be >= 1.\n' +
-    '  • `leadingAnchor` must be the current content of the first replaced line. If that' +
-    '    line moved (e.g. after an earlier edit), the nearest matching line is used and' +
-    '    reported as `startLine`: matching is exact first, then ignoring surrounding' +
-    '    whitespace, with the hinted line preferred when it matches either way. The' +
-    '    edit is rejected if no line matches, or if several lines match equally near.\n' +
-    '  • `trailingAnchor` is optional *additional* evidence, never a second required' +
-    '    field: the leading anchor is always present on its own, and an edit that omits' +
-    '    it behaves exactly as before. When it is supplied, the' +
-    '    line at `startLine + count - 1` has to match it (exact, then ignoring' +
-    '    surrounding whitespace, then with a copied `read_file` prefix stripped) before' +
-    '    anything is written, and relocation only considers ranges whose two endpoints' +
-    '    both agree. That pins where the range ends, so a nearer copy of the leading' +
-    '    line can no longer be mistaken for the intended start. When the claimed end' +
-    '    disagrees but the anchor matches one line either side of it, `count` is' +
-    '    corrected by one instead of rejected, and the correction is reported as' +
-    '    `countAdjustment`. Evidence that agrees nowhere, or that stays ambiguous' +
-    '    between two ranges, rejects the edit without writing.\n' +
-    '  • A whitespace-only `leadingAnchor` matches only at the hinted line; it is never' +
-    '    relocated. A blank `trailingAnchor` carries no evidence and is ignored.\n' +
-    '  • Only the first line of an anchor is used, and a copied `read_file` prefix' +
-    '    (`<n>\\\\t`) is ignored, even when its line number is stale — but only' +
-    '    after an exact match against the anchor as sent has had its chance at' +
-    '    the hinted line, so content that legitimately opens with digits and a' +
-    '    tab is never relocated.\\n' +
+    '  • `leadingAnchor` is the exact current content of the first replaced line,' +
+    '    without the `<n>\\t` prefix `read_file` prints. Only its first line is used.' +
+    '    A match on the hinted line beats any other; otherwise an exact match beats a' +
+    '    whitespace-insensitive one, and the nearest to the hint wins (reported as' +
+    '    `startLine`). Rejected when no line matches or when several match equally' +
+    '    near.\n' +
+    '  • `trailingAnchor` is the exact content of the line the range ends on' +
+    '    (`lineNumber + count - 1`), matched exactly, ignoring surrounding' +
+    '    whitespace, or with a copied `read_file` prefix stripped. Optional, but' +
+    '    supply it for any multi-line range and whenever the leading line is not' +
+    '    unique in the file: only ranges whose end line agrees with it are' +
+    '    considered, which keeps a nearer copy of a repeated leading line from being' +
+    '    chosen. When the claimed end disagrees but the anchor matches exactly one' +
+    '    line either side of it, `count` is corrected by one and reported as' +
+    '    `countAdjustment`. When it agrees on both sides the range length is' +
+    '    ambiguous, and when the endpoints agree nowhere, the edit is rejected' +
+    '    without writing.\n' +
+    '  • A whitespace-only `leadingAnchor` matches only the hinted line and is never' +
+    '    relocated; a blank `trailingAnchor` is ignored.\n' +
+    '  • A copied `read_file` prefix (`<n>\\t`) is ignored in anchors, even when its' +
+    '    line number is stale — but only after the anchor as sent has had its chance' +
+    '    at the hinted line, so content that legitimately opens with digits and a' +
+    '    tab is never relocated. As a last resort, an anchor whose copied prefix' +
+    '    names a different line matches the content under the prefix, provided that' +
+    '    content is unique in the file.\n' +
     '  • The anchored range must not extend past the end of the file.\n' +
-    '  • `replacement` may span multiple lines separated by `\\n`, or be empty to delete' +
-    '    the range. A trailing `\\n` in `replacement` is a separator and is dropped.\n' +
-    "  • The file's original line ending and trailing-newline state are preserved.\n" +
-    '  • If `replacement` begins or ends with lines that exactly duplicate the file' +
-    '    lines immediately adjacent to the replaced range (misaligned context from a' +
-    '    diff-style hunk), those duplicate lines are dropped and reported as' +
-    '    `duplicatesRemoved` and `duplicatedSeamLines`. If you actually intended' +
-    '    those duplicates, re-send the edit with the range adjusted to include them.',
+    '  • `replacement` may span multiple lines separated by `\\n`, or be empty to' +
+    '    delete the range; a trailing `\\n` is a separator and is dropped. Lines at' +
+    '    the start or end of `replacement` that exactly duplicate the file lines' +
+    '    adjacent to the range (diff-style context pasted by mistake) are dropped' +
+    '    and reported as `duplicatesRemoved` and `duplicatedSeamLines`; if they were' +
+    '    intentional, re-send the edit with the range adjusted to include them.\n' +
+    "  • The file's line endings and trailing-newline state are preserved.",
   inputSchema,
   outputSchema,
 
