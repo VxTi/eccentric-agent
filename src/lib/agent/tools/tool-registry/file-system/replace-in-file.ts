@@ -1,4 +1,11 @@
-import { isEmptyString, isNil, isNonEmptyArray, isNotNil } from '@vxti/typed';
+import {
+  isEmptyArray,
+  isEmptyString,
+  isNil,
+  isNonEmptyArray,
+  isNotNil,
+  type NonEmptyArray,
+} from '@vxti/typed';
 import { readFile, writeFile } from 'fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
@@ -21,21 +28,35 @@ const inputSchema = z.object({
       .int()
       .min(1)
       .describe(
-        'The 1-based line number where the replacement range starts (inclusive), as last' +
-          ' seen in `read_file` output. Used as a hint; `anchor` decides the actual line.'
+        'The 1-based line number where the replacement range starts (inclusive), as' +
+          ' last seen in `read_file` output. Proximity hint for resolving' +
+          ' `range.leadingAnchor`; the anchors decide the actual line.'
       ),
-    anchor: z
+    leadingAnchor: z
       .string()
       .describe(
-        'The exact current content of the first line being replaced (without the line-number' +
-          ' prefix). Used to locate the range if lines shifted since you last read the file.'
+        'The exact current content of the first line being replaced (without the' +
+          ' line-number prefix). Always required: it locates the range if lines shifted' +
+          ' since you last read the file.'
+      ),
+    trailingAnchor: z
+      .string()
+      .optional()
+      .describe(
+        'Optional exact current content of the last line being replaced (`lineNumber` +' +
+          ' `count` - 1). Independent support for validating where the range ends, and' +
+          ' the reliable way to tell apart a `leadingAnchor` that repeats in the file.' +
+          ' The leading anchor is always present on its own, so this one stays optional;' +
+          ' supply it whenever the range spans more than one line. A blank' +
+          ' `trailingAnchor` carries no evidence and is ignored.'
       ),
     count: z
       .number()
       .int()
       .min(1)
       .describe(
-        'The number of consecutive lines to replace, starting at the anchored line. Must be >= 1.'
+        'The number of consecutive lines to replace, starting at the anchored line.' +
+          ' Must be >= 1.'
       ),
   }),
   replacement: z
@@ -65,21 +86,37 @@ export const replaceInFile = createTool({
   name: 'Replace in file',
   description:
     'Replaces a contiguous range of lines in `filePath` with `replacement`. The range' +
-    ' starts at the line matching `range.anchor` (exactly, or ignoring surrounding' +
-    ' whitespace) near `range.lineNumber`, and spans `range.count` lines (inclusive).\n\n' +
+    ' starts at the line matching `range.leadingAnchor` (exactly, or ignoring' +
+    ' surrounding whitespace) near `range.lineNumber`, and spans `range.count` lines' +
+    ' (inclusive). When `range.trailingAnchor` is supplied it must match the line the' +
+    ' range ends on.\n\n' +
     'Use this tool when changing one or more consecutive lines in a file. To insert new' +
     ' lines without losing existing content, replace a line at the insertion point with' +
     ' `replacement` set to that same line plus the new lines.\n\n' +
     'Rules:\n' +
     '  • `lineNumber` is 1-based; `count` must be >= 1.\n' +
-    '  • `anchor` must be the current content of the first replaced line. If that line' +
-    '    moved (e.g. after an earlier edit), the nearest matching line is used and' +
+    '  • `leadingAnchor` must be the current content of the first replaced line. If that' +
+    '    line moved (e.g. after an earlier edit), the nearest matching line is used and' +
     '    reported as `startLine`: matching is exact first, then ignoring surrounding' +
     '    whitespace, with the hinted line preferred when it matches either way. The' +
     '    edit is rejected if no line matches, or if several lines match equally near.\n' +
-    '  • A whitespace-only `anchor` matches only at the hinted line; it is never relocated.\n' +
-    '  • Only the first line of `anchor` is used, and a copied `read_file` prefix' +
-    '    (`<n>\\t`) is ignored, even when its line number is stale.\n' +
+    '  • `trailingAnchor` is optional *additional* evidence, never a second required' +
+    '    field: the leading anchor is always present on its own, and an edit that omits' +
+    '    it behaves exactly as before. When it is supplied, the' +
+    '    line at `startLine + count - 1` has to match it (exact, then ignoring' +
+    '    surrounding whitespace, then with a copied `read_file` prefix stripped) before' +
+    '    anything is written, and relocation only considers ranges whose two endpoints' +
+    '    both agree. That pins where the range ends, so a nearer copy of the leading' +
+    '    line can no longer be mistaken for the intended start. Evidence that does not' +
+    '    agree, or that stays ambiguous between two ranges, rejects the edit without' +
+    '    writing.\n' +
+    '  • A whitespace-only `leadingAnchor` matches only at the hinted line; it is never' +
+    '    relocated. A blank `trailingAnchor` carries no evidence and is ignored.\n' +
+    '  • Only the first line of an anchor is used, and a copied `read_file` prefix' +
+    '    (`<n>\\\\t`) is ignored, even when its line number is stale — but only' +
+    '    after an exact match against the anchor as sent has had its chance at' +
+    '    the hinted line, so content that legitimately opens with digits and a' +
+    '    tab is never relocated.\\n' +
     '  • The anchored range must not extend past the end of the file.\n' +
     '  • `replacement` may span multiple lines separated by `\\n`, or be empty to delete' +
     '    the range. A trailing `\\n` in `replacement` is a separator and is dropped.\n' +
@@ -131,7 +168,7 @@ function describeRange(lineNumber: number, count: number): string {
 
 async function handleReplaceInFile({
   filePath,
-  range: { lineNumber, anchor, count },
+  range: { lineNumber, leadingAnchor, trailingAnchor, count },
   replacement,
 }: z.infer<typeof inputSchema>) {
   const {
@@ -152,17 +189,16 @@ async function handleReplaceInFile({
   const lines = original.split(LINE_BREAK);
   if (hadTrailingNewline) lines.pop();
 
-  const located = locateRangeStart(lines, lineNumber, anchor);
+  const located = locateRange(lines, {
+    hintLine: lineNumber,
+    leadingAnchor,
+    trailingAnchor,
+    count,
+  });
   if (!located.ok) return Result.Error(located.error);
-  const startLine = located.data;
 
+  const startLine = located.data;
   const endLine = startLine + count - 1;
-  if (endLine > lines.length) {
-    return Result.Error(
-      `Range starting at line ${startLine} with \`count\` ${count} exceeds file length` +
-        ` (${lines.length} line(s)).`
-    );
-  }
 
   const trimmed = trimDuplicatedSeams(
     lines,
@@ -204,65 +240,224 @@ function splitReplacement(replacement: string): string[] {
   return lines;
 }
 
+/** The endpoints and span of one edit, as the caller described them. */
+interface RangeQuery {
+  hintLine: number;
+  leadingAnchor: string;
+  trailingAnchor: string | undefined;
+  count: number;
+}
+
+/** How strongly a file line agrees with an anchor, strongest evidence first. */
+type AnchorStrength = 'exact' | 'whitespace' | 'stale-prefix';
+
+const ANCHOR_STRENGTH_RANK: Record<AnchorStrength, number> = {
+  exact: 0,
+  whitespace: 1,
+  'stale-prefix': 2,
+};
+
+/** An anchor reduced to the forms a single file line can agree with it. */
+interface AnchorEvidence {
+  /** The anchor's first line, minus a `read_file` prefix when it was current. */
+  anchor: string;
+  /** `anchor` without its surrounding whitespace. */
+  trimmed: string;
+  /** `anchor` minus a copied `read_file` `<n>\t` prefix, when it carried one. */
+  withoutPrefix: string | null;
+}
+
+/** A leading-anchor match, scored by how near the hinted line it sits. */
+interface RangeCandidate {
+  startLine: number;
+  strength: AnchorStrength;
+  distance: number;
+}
+
 /**
- * The hinted line wins when it matches; otherwise the nearest exact match,
- * then the nearest whitespace-insensitive match, so that edits planned from a
- * read made before earlier edits still land on the intended line.
+ * Resolves the first line of the range from its endpoints.
+ *
+ * The hinted line wins when it matches — first against the anchor exactly as
+ * sent, before any `read_file` prefix is stripped — otherwise the nearest exact
+ * match, then the nearest whitespace-insensitive match, so that edits planned
+ * from a read made before earlier edits still land on the intended line.
+ *
+ * A trailing anchor, when supplied, is independent evidence about where the
+ * range ends rather than a second name for its start. Relocation therefore only
+ * offers ranges whose end line agrees with it, which is what keeps a nearer copy
+ * of a repeated leading line from being mistaken for the intended start. An edit
+ * whose endpoints disagree, or that the endpoints cannot decide between, is
+ * reported rather than written.
+ *
+ * Without a trailing anchor nothing is filtered up front: the nearest leading
+ * match is chosen first, and only then is its span checked against the file
+ * length — the pre-`trailingAnchor` behavior, unchanged.
  */
-function locateRangeStart(
-  lines: string[],
-  lineNumber: number,
-  rawAnchor: string
-): Result<number> {
-  const hintedLine = lines[lineNumber - 1];
-  if (hintedLine === rawAnchor) return Result.Ok(lineNumber);
+function locateRange(lines: string[], query: RangeQuery): Result<number> {
+  const leading = toEvidence(
+    normalizeAnchor(query.leadingAnchor, query.hintLine)
+  );
+  const trailing = resolveTrailingAnchor(query);
+  const endOffset = query.count - 1;
 
-  const anchor = normalizeAnchor(rawAnchor, lineNumber);
-  const trimmedAnchor = anchor.trim();
-  if (hintedLine?.trim() === trimmedAnchor) return Result.Ok(lineNumber);
+  // A blank leading anchor describes no content, so the only line it can confirm
+  // is the hinted one; relocating it would guess the range instead of match it.
+  const blankLeading = isEmptyString(leading.trimmed);
+  const stalePrefix = uniqueStalePrefix(lines, leading);
 
-  if (isEmptyString(trimmedAnchor)) {
-    const reason = isNil(hintedLine)
-      ? `line ${lineNumber} is out of range: the file has only ${lines.length} line(s)`
-      : `line ${lineNumber} does not match the blank \`anchor\``;
+  const leadingMatches: RangeCandidate[] = [];
+  const candidates: RangeCandidate[] = [];
+  const pastEnd: number[] = [];
+
+  lines.forEach((line, index) => {
+    const startLine = index + 1;
+    const isHinted = startLine === query.hintLine;
+
+    // The anchor as the caller sent it outranks every normalized form, so a
+    // line that legitimately opens with digits and a tab is never mistaken for
+    // a copied `read_file` prefix and relocated to the line holding the
+    // stripped content — the pre-normalization behavior, unchanged.
+    const strength =
+      isHinted && line === query.leadingAnchor
+        ? 'exact'
+        : blankLeading
+          ? isHinted && isEmptyString(line.trim())
+            ? 'exact'
+            : null
+          : leadingStrength(line, leading, stalePrefix);
+    if (isNil(strength)) return;
+
+    const match: RangeCandidate = {
+      startLine,
+      strength,
+      distance: Math.abs(startLine - query.hintLine),
+    };
+    leadingMatches.push(match);
+
+    // Without a trailing anchor the original behavior applies: every leading
+    // match is a candidate, the nearest one is chosen first, and only then is
+    // the chosen range checked against the file length — so a farther match
+    // that fits is never edited in place of a nearer one that overruns.
+    if (isNil(trailing)) {
+      candidates.push(match);
+      return;
+    }
+
+    // The range has to fit in the file, and the line the caller named as its
+    // end has to corroborate `count`.
+    if (startLine + endOffset > lines.length) {
+      pastEnd.push(startLine);
+      return;
+    }
+    if (!endpointAgrees(lines[startLine + endOffset - 1], trailing)) return;
+    candidates.push(match);
+  });
+
+  if (isNonEmptyArray(candidates)) {
+    const chosen = selectCandidate(candidates, query, trailing);
+    if (!chosen.ok) return chosen;
+
+    // The file-length check runs after the nearest match is chosen, exactly as
+    // it did before `trailingAnchor` existed.
+    if (isNil(trailing) && chosen.data + endOffset > lines.length)
+      return Result.Error(describeOverrun(lines, [chosen.data], query));
+
+    return chosen;
+  }
+  if (isEmptyArray(leadingMatches)) {
     return Result.Error(
-      `A blank \`anchor\` cannot be relocated (${reason}). Re-read the file and anchor` +
-        ' on a non-blank line.'
+      blankLeading
+        ? describeBlankAnchor(lines, query)
+        : describeMissingLeadingAnchor(lines, query)
     );
   }
-
-  const matchers: Array<(line: string) => boolean> = [
-    line => line === anchor,
-    line => line.trim() === trimmedAnchor,
-  ];
-
-  for (const matches of matchers) {
-    const nearest = findNearestMatchingLines(lines, lineNumber, matches);
-    if (nearest.length > 1) {
-      return Result.Error(
-        `\`anchor\` is ambiguous: lines ${nearest.join(', ')} match and are equally` +
-          ` near line ${lineNumber}. Re-read the file and anchor on a line that is` +
-          ' unique in the file.'
-      );
-    }
-    const [match] = nearest;
-    if (isNotNil(match)) return Result.Ok(match);
+  if (pastEnd.length === leadingMatches.length) {
+    return Result.Error(describeOverrun(lines, pastEnd, query));
   }
 
-  const stalePrefixMatch = findUniqueLineWithoutReadFilePrefix(lines, anchor);
-  if (isNotNil(stalePrefixMatch)) return Result.Ok(stalePrefixMatch);
+  // A leading match fits the file, so only the trailing endpoint can have ruled
+  // every candidate range out.
+  return Result.Error(describeDisagreement(lines, leadingMatches, query));
+}
 
-  const found = isNil(hintedLine)
-    ? `the file has only ${lines.length} line(s)`
-    : `line ${lineNumber} is \`${hintedLine}\``;
-  return Result.Error(
-    `No line matches \`anchor\` (${found}). The file may have changed; re-read it and retry.`
+/**
+ * Chooses the range the endpoints point at, or reports why they cannot decide.
+ * The hinted line wins over any relocation, then the strongest agreement with
+ * `leadingAnchor`, then the closest one.
+ */
+function selectCandidate(
+  candidates: NonEmptyArray<RangeCandidate>,
+  query: RangeQuery,
+  trailing: AnchorEvidence | null
+): Result<number> {
+  candidates.sort(compareCandidates);
+  const best = candidates[0];
+
+  const equallyGood = candidates.filter(
+    candidate => compareCandidates(candidate, best) === 0
   );
+  if (equallyGood.length > 1)
+    return Result.Error(describeAmbiguity(equallyGood, query, trailing));
+
+  return Result.Ok(best.startLine);
+}
+
+/**
+ * Preferred order for two ranges that match `leadingAnchor`: the hinted line
+ * beats any relocation, then the strongest agreement, then the closest one.
+ */
+function compareCandidates(a: RangeCandidate, b: RangeCandidate): number {
+  const byHint = (a.distance === 0 ? 0 : 1) - (b.distance === 0 ? 0 : 1);
+  if (byHint !== 0) return byHint;
+
+  const byStrength =
+    ANCHOR_STRENGTH_RANK[a.strength] - ANCHOR_STRENGTH_RANK[b.strength];
+  if (byStrength !== 0) return byStrength;
+
+  return a.distance - b.distance;
+}
+
+/** How strongly `line` agrees with the anchor naming the start of the range. */
+function leadingStrength(
+  line: string,
+  anchor: AnchorEvidence,
+  stalePrefix: string | null
+): AnchorStrength | null {
+  if (line === anchor.anchor) return 'exact';
+  if (line.trim() === anchor.trimmed) return 'whitespace';
+  if (isNotNil(stalePrefix) && line === stalePrefix) return 'stale-prefix';
+  return null;
+}
+
+/**
+ * Whether `line` corroborates the anchor naming the end of the range.
+ *
+ * The same agreements the leading anchor accepts: exact, ignoring surrounding
+ * whitespace, and — for a pasted `read_file` prefix — the content underneath it.
+ * Here they judge one known line rather than choose between candidates, so a
+ * stripped prefix needs no uniqueness guard of its own.
+ */
+function endpointAgrees(
+  line: string | undefined,
+  anchor: AnchorEvidence
+): boolean {
+  if (isNil(line)) return false;
+
+  const forms = isNotNil(anchor.withoutPrefix)
+    ? [anchor.anchor, anchor.withoutPrefix]
+    : [anchor.anchor];
+
+  return forms.some(form => line === form || line.trim() === form.trim());
 }
 
 /**
  * Models often paste several lines, or the `<n>\t` prefix `read_file` prints,
- * as the anchor; neither can ever equal a single file line.
+ * as an anchor; neither can ever equal a single file line. The prefix is only
+ * stripped when it names the line the anchor is expected to sit on, so a stale
+ * copy survives for `toEvidence` to repair as a last resort. Stripping happens
+ * only after an exact match against the anchor as sent has had its chance at
+ * the hinted line, so content that legitimately opens with digits and a tab is
+ * never rewritten onto an unrelated line.
  */
 function normalizeAnchor(anchor: string, lineNumber: number): string {
   const [firstLine = ''] = anchor.split(LINE_BREAK);
@@ -274,47 +469,130 @@ function normalizeAnchor(anchor: string, lineNumber: number): string {
     : firstLine;
 }
 
-/**
- * Last-resort repair for an anchor copied from an older `read_file` whose
- * `<n>\t` prefix no longer matches the hinted line number. Only an exact
- * match unique in the whole file is accepted, so content that legitimately
- * starts with digits and a tab can never be rewritten onto an unrelated line.
- */
-function findUniqueLineWithoutReadFilePrefix(
-  lines: string[],
-  anchor: string
-): number | undefined {
+function toEvidence(anchor: string): AnchorEvidence {
   const withoutPrefix = anchor.replace(READ_FILE_PREFIX, '');
-  if (withoutPrefix === anchor || isEmptyString(withoutPrefix))
-    return undefined;
-  const matches = lines.flatMap((line, index) =>
-    line === withoutPrefix ? [index + 1] : []
-  );
-  return matches.length === 1 ? matches[0] : undefined;
+
+  return {
+    anchor,
+    trimmed: anchor.trim(),
+    withoutPrefix:
+      withoutPrefix === anchor || isEmptyString(withoutPrefix)
+        ? null
+        : withoutPrefix,
+  };
 }
 
-/** All matching 1-based line numbers at the minimum distance from `hintLine`. */
-function findNearestMatchingLines(
+/**
+ * Last-resort repair for an anchor copied from an older `read_file` whose
+ * `<n>\t` prefix no longer matches the hinted line number. Only a form that is
+ * exact and unique in the whole file qualifies, so content that legitimately
+ * opens with digits and a tab can never be rewritten onto an unrelated line.
+ */
+function uniqueStalePrefix(
   lines: string[],
-  hintLine: number,
-  matches: (line: string) => boolean
-): number[] {
-  let nearest: number[] = [];
-  let nearestDistance = Infinity;
+  anchor: AnchorEvidence
+): string | null {
+  const target = anchor.withoutPrefix;
+  if (isNil(target)) return null;
 
-  lines.forEach((line, index) => {
-    if (!matches(line)) return;
-    const lineNumber = index + 1;
-    const distance = Math.abs(lineNumber - hintLine);
-    if (distance < nearestDistance) {
-      nearest = [lineNumber];
-      nearestDistance = distance;
-    } else if (distance === nearestDistance) {
-      nearest.push(lineNumber);
-    }
-  });
+  return lines.filter(line => line === target).length === 1 ? target : null;
+}
 
-  return nearest;
+/**
+ * The trailing anchor as endpoint evidence, or null when there is nothing to
+ * check: an omitted anchor, or a blank one, says nothing about where the range
+ * ends. Its copied `read_file` prefix is stripped against the line the range is
+ * claimed to end on, so a pasted `<n>\t` is ignored the same way the leading
+ * anchor ignores it.
+ */
+function resolveTrailingAnchor(query: RangeQuery): AnchorEvidence | null {
+  if (isNil(query.trailingAnchor)) return null;
+
+  const anchor = normalizeAnchor(
+    query.trailingAnchor,
+    query.hintLine + query.count - 1
+  );
+  return isEmptyString(anchor.trim()) ? null : toEvidence(anchor);
+}
+
+function describeOverrun(
+  lines: string[],
+  pastEnd: number[],
+  query: RangeQuery
+): string {
+  const nearest = pastEnd.reduce((best, line) =>
+    Math.abs(line - query.hintLine) < Math.abs(best - query.hintLine)
+      ? line
+      : best
+  );
+
+  return (
+    `Range starting at line ${nearest} with \`count\` ${query.count} exceeds file` +
+    ` length (${lines.length} line(s)).`
+  );
+}
+
+function describeBlankAnchor(lines: string[], query: RangeQuery): string {
+  const hinted = lines[query.hintLine - 1];
+  const reason = isNil(hinted)
+    ? `line ${query.hintLine} is out of range: the file has only ${lines.length} line(s)`
+    : `line ${query.hintLine} does not match the blank \`leadingAnchor\``;
+
+  return (
+    `A blank \`leadingAnchor\` cannot be relocated (${reason}). Re-read the file and` +
+    ' anchor on a non-blank line.'
+  );
+}
+
+function describeMissingLeadingAnchor(
+  lines: string[],
+  query: RangeQuery
+): string {
+  const hinted = lines[query.hintLine - 1];
+  const found = isNil(hinted)
+    ? `the file has only ${lines.length} line(s)`
+    : `line ${query.hintLine} is \`${hinted}\``;
+
+  return (
+    `No line matches \`leadingAnchor\` (${found}). The file may have changed; re-read` +
+    ' it and retry.'
+  );
+}
+
+function describeAmbiguity(
+  candidates: RangeCandidate[],
+  query: RangeQuery,
+  trailing: AnchorEvidence | null
+): string {
+  const matched = candidates.map(candidate => candidate.startLine).join(', ');
+
+  return (
+    `\`leadingAnchor\` is ambiguous: lines ${matched} match and are equally near` +
+    ` line ${query.hintLine}${
+      isNotNil(trailing)
+        ? ', and `trailingAnchor` agrees at every one of them'
+        : ''
+    }. Re-read the file and anchor on a line that is unique in the file.`
+  );
+}
+
+function describeDisagreement(
+  lines: string[],
+  leadingMatches: RangeCandidate[],
+  query: RangeQuery
+): string {
+  const startLine =
+    [...leadingMatches].sort(compareCandidates)[0]?.startLine ?? query.hintLine;
+  const endLine = startLine + query.count - 1;
+
+  return (
+    `The endpoints of this range disagree: \`leadingAnchor\` matches at line` +
+    ` ${startLine}, but the line \`count\` ${query.count} ends that range on — line` +
+    ` ${endLine}, which is \`${lines[endLine - 1] ?? ''}\` — does not agree with` +
+    ' `trailingAnchor`, and no other range whose first line matches `leadingAnchor`' +
+    ' has both endpoints in agreement. Re-read the file and fix the anchors or' +
+    ' `count`.'
+  );
 }
 
 /**

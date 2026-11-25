@@ -1,7 +1,6 @@
 'use strict';
 
 import {
-  hasArrayLength,
   isEmptyString,
   isNonEmptyArray,
   isNonEmptyString,
@@ -17,6 +16,7 @@ import supportsHyperlinks from 'supports-hyperlinks';
 import ansiRegex from 'ansi-regex';
 import {
   generateSideBySideDiff,
+  splitDiffSides,
   type DiffLine,
 } from '../../lib/utils/diff-utils';
 import { Position } from '../../lib/utils/string-utils';
@@ -155,12 +155,15 @@ export class TerminalRenderer extends Renderer {
     let renderedContent: string;
 
     if (isNotNil(contentLang)) {
-      const parts = text.split(DIFF_SEPARATOR);
+      // `splitDiffSides` strips the envelope breaks the diff format puts around
+      // the marker; without them the new side gains a phantom leading row and
+      // every line number printed beside it shifts by one.
+      const sides = splitDiffSides(text);
 
-      renderedContent = hasArrayLength(parts, 2)
+      renderedContent = isNotNil(sides)
         ? this.renderDiff(
-            parts[0],
-            parts[1],
+            sides[0],
+            sides[1],
             contentLang,
             this.width - (this.config.indentation ?? DEFAULT_INDENTATION)
           )

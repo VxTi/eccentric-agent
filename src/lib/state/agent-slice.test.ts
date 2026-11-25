@@ -46,7 +46,7 @@ describe('agentSlice setMessage tool-call collapsing', () => {
     const collapsed = state.messages[1] as GenericMessage;
     expect(collapsed.collapsed?.count).toBe(2);
     expect(collapsed.collapsed?.tools).toEqual({ read_file: 2 });
-    expect(collapsed.content).toContain('read 2 files');
+    expect(collapsed.content).toContain('Read 2 files');
   });
 
   it('keeps the loading message expanded until it completes, then collapses it', () => {
@@ -63,7 +63,7 @@ describe('agentSlice setMessage tool-call collapsing', () => {
     expect(state.messages).toHaveLength(1);
     const collapsed = state.messages[0] as GenericMessage;
     expect(collapsed.collapsed?.count).toBe(2);
-    expect(collapsed.content).toContain('looked for 2 patterns');
+    expect(collapsed.content).toContain('Looked for 2 patterns');
   });
 
   it('does not collapse across a non-tool message', () => {
@@ -79,13 +79,13 @@ describe('agentSlice setMessage tool-call collapsing', () => {
   });
 
   it('falls back to a name ×count summary for tools without a phrase', () => {
-    let state = stateWith([toolMessage('a', 'delegate_task')]);
+    let state = stateWith([toolMessage('a', 'web_fetch')]);
 
-    state = dispatchSetMessage(state, toolMessage('b', 'delegate_task'));
+    state = dispatchSetMessage(state, toolMessage('b', 'web_fetch'));
 
     const collapsed = state.messages.at(-1) as GenericMessage;
-    expect(collapsed.collapsed?.tools).toEqual({ delegate_task: 2 });
-    expect(collapsed.content).toContain('delegate_task ×2');
+    expect(collapsed.collapsed?.tools).toEqual({ web_fetch: 2 });
+    expect(collapsed.content).toContain('Read 2 webpages');
   });
 
   it('continues growing an existing collapsed group', () => {

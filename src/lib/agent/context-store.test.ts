@@ -59,7 +59,7 @@ function failedEditMsg(id: string): ModelMessage {
         toolName: 'replace_in_file',
         output: {
           type: 'json',
-          value: { ok: false, data: 'No line matches `anchor`.' },
+          value: { ok: false, data: 'No line matches `leadingAnchor`.' },
         },
       },
     ],

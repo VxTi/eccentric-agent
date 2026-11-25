@@ -1,4 +1,4 @@
-import { isNotNil } from '@vxti/typed';
+import { hasArrayLength, isNotNil } from '@vxti/typed';
 import { diffTrimmedLines } from 'diff';
 import {
   DIFF_LANG,
@@ -16,6 +16,14 @@ export interface DiffLine {
 type SideBySideDiff = [DiffLine, DiffLine];
 
 const DEFAULT_CONTEXT_LINES = 2;
+
+/** Shortest fence `formatDiffMd` will emit, and the CommonMark minimum. */
+const MIN_DIFF_FENCE_LENGTH = 3;
+/** A backtick run that opens a line can close a fenced block. */
+const LINE_INITIAL_BACKTICKS = /^ {0,3}(`+)/gm;
+/** The breaks `formatDiffMd` spends on keeping the marker on its own line. */
+const LEADING_BREAK = /^\r?\n/;
+const TRAILING_BREAK = /\r?\n$/;
 
 /**
  * Splits one change part into the lines it covers.
@@ -163,6 +171,40 @@ function collapseUnchangedRegions(
   return result;
 }
 
+/**
+ * Serialises a diff for `TerminalRenderer.code`: both sides inside a fenced
+ * `diff` block, divided by {@link DIFF_SEPARATOR}.
+ *
+ * The fence grows past every backtick run that opens a line of either side. A
+ * fixed three-backtick fence is closed by the payload itself as soon as the
+ * file is Markdown (or otherwise holds a delimiter at the start of a line),
+ * and marked then lexes the remainder as ordinary text: the two sides never
+ * reach {@link generateSideBySideDiff}, so nothing is collapsed and a one-line
+ * edit prints the entire file. That is the bug this guards against.
+ */
 export function formatDiffMd(previous: string, current: string): string {
-  return `\`\`\`${DIFF_LANG}\n${previous}\n${DIFF_SEPARATOR}\n${current}\n\`\`\`\n`;
+  const longestRun = [
+    ...`${previous}\n${current}`.matchAll(LINE_INITIAL_BACKTICKS),
+  ].reduce((longest, [run]) => Math.max(longest, run.length), 0);
+  const fence = '`'.repeat(Math.max(MIN_DIFF_FENCE_LENGTH, longestRun + 1));
+
+  return `${fence}${DIFF_LANG}\n${previous}\n${DIFF_SEPARATOR}\n${current}\n${fence}\n`;
+}
+
+/**
+ * Recovers the two sides from a {@link formatDiffMd} payload, returning null
+ * whenever the text is not a two-sided diff.
+ *
+ * The breaks that keep the marker alone on its line belong to the envelope, not
+ * to either side: left in place they add a blank row at the top of the new side
+ * and shift every line number printed beside it by one.
+ */
+export function splitDiffSides(text: string): [string, string] | null {
+  const sides = text.split(DIFF_SEPARATOR);
+  if (!hasArrayLength(sides, 2)) return null;
+
+  return [
+    sides[0].replace(TRAILING_BREAK, ''),
+    sides[1].replace(LEADING_BREAK, ''),
+  ];
 }

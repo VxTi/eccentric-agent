@@ -116,7 +116,11 @@ describe('read_file', () => {
     const replaceResult = await replaceInFile.handle(
       {
         filePath,
-        range: { lineNumber: labeledLine, anchor: seenContent, count: 1 },
+        range: {
+          lineNumber: labeledLine,
+          leadingAnchor: seenContent,
+          count: 1,
+        },
         replacement: 'REPLACED',
       },
       channel,
