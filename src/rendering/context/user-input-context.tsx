@@ -28,6 +28,11 @@ import {
   getInputSuggestions,
   type Suggestions,
 } from '../../lib/input-suggestions';
+import {
+  type CursorPosition,
+  getCursorPosition,
+  moveCursorVertically,
+} from '../../lib/cursor-position';
 import { type Optional, wrapOptional } from '../../lib/optional';
 import { useAppSelector } from '../../lib/state';
 import { formatReferencedFiles } from '../components/user-input/input-field';
@@ -43,14 +48,18 @@ export interface InputRequestState {
   suggestionIndex: number;
 }
 
-interface InputState {
-  cursorOffset: number;
+export interface InputState {
   value: string;
+  offset: number;
+  cursor: CursorPosition;
 }
+
+// The state passed to setInput; cursor is derived from value and offset on read.
+type InputStateUpdate = Omit<InputState, 'cursor'>;
 
 export interface InputAreaContextInstance {
   input: InputState;
-  setInput: Dispatch<SetStateAction<InputState>>;
+  setInput: Dispatch<SetStateAction<InputStateUpdate>>;
   inputRequest?: InputRequestState | undefined;
   setInputRequest: Dispatch<SetStateAction<InputRequestState | undefined>>;
   inputRef: RefObject<DOMElement | null>;
@@ -89,11 +98,20 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const [input, setInput] = useState<InputState>({
-    cursorOffset: 0,
+  const [inputState, setInput] = useState<InputStateUpdate>({
+    offset: 0,
     value: '',
   });
-  const { value, cursorOffset } = input;
+  const safeOffset = Math.max(
+    0,
+    Math.min(inputState.offset, inputState.value.length)
+  );
+  const input: InputState = {
+    ...inputState,
+    offset: safeOffset,
+    cursor: getCursorPosition(inputState.value, safeOffset),
+  };
+  const { value, offset } = input;
 
   const { controller } = useAppSelector(state => state.app);
   const historyEntries = useAppSelector(state => state.chatHistory.entries);
@@ -107,7 +125,7 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const timeout = setTimeout(() => {
-      getInputSuggestions(value, cursorOffset)
+      getInputSuggestions(value, offset)
         .then(res => {
           if (!cancelled) setSuggestions(res);
         })
@@ -120,7 +138,7 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [value, cursorOffset]);
+  }, [value, offset]);
   useEffect(() => {
     return eventOn(
       EventName.REQUEST_INPUT,
@@ -136,7 +154,7 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
   const handleSubmitMessage = () => {
     submitMessage(formatReferencedFiles(value));
     historyIndex.current = null;
-    setInput({ value: '', cursorOffset: 0 });
+    setInput({ value: '', offset: 0 });
   };
 
   /**
@@ -163,7 +181,7 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
         if (!isNonEmptyString(valueAtIndex)) return;
         setInput({
           value: valueAtIndex,
-          cursorOffset: valueAtIndex.length,
+          offset: valueAtIndex.length,
         });
         return;
       }
@@ -179,9 +197,9 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
         index < historyEntries.length
           ? {
               value: valueAtIndex,
-              cursorOffset: valueAtIndex.length,
+              offset: valueAtIndex.length,
             }
-          : { value: '', cursorOffset: 0 }
+          : { value: '', offset: 0 }
       );
     },
     [historyEntries, value]
@@ -189,11 +207,8 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
 
   usePaste(text => {
     setInput(prev => ({
-      value:
-        prev.value.slice(0, cursorOffset) +
-        text +
-        prev.value.slice(cursorOffset),
-      cursorOffset: cursorOffset + text.length,
+      value: prev.value.slice(0, offset) + text + prev.value.slice(offset),
+      offset: offset + text.length,
     }));
   });
 
@@ -224,22 +239,26 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (key.return) {
+      if (key.return && !key.shift) {
         handleSubmitMessage();
         return;
       }
 
-      // History recall owns the arrows when no suggestion list is open; the
-      // list navigates its entries with Up/Down while it is visible.
+      // History recall owns the arrows while it is in progress, and when the
+      // input is single-line. Multi-line input navigates between lines with
+      // Up/Down in handleInput instead, so recall only resumes once editing
+      // has abandoned it.
+      const isRecallingHistory = historyIndex.current !== null;
       if (
         !isNonEmptyArray(suggestions?.values) &&
-        (key.upArrow || key.downArrow)
+        (key.upArrow || key.downArrow) &&
+        (isRecallingHistory || !value.includes('\n'))
       ) {
         browseHistory(key.upArrow);
         return;
       }
 
-      const change = handleInput(inputChar, value, cursorOffset, key);
+      const change = handleInput(inputChar, value, offset, key);
 
       if (change.hasValue) {
         const { offset, value } = change.value();
@@ -251,7 +270,7 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
         }
 
         setInput(prev => ({
-          cursorOffset: offset,
+          offset,
           value: value ?? prev.value,
         }));
       }
@@ -300,6 +319,15 @@ function handleInput(
     // Word deletion: Option+Delete (meta+backspace) removes the word before
     // the cursor; Option+fn+Delete (meta+delete) removes the word after it.
     const deleteWord = skipWord ? (key.backspace ? -1 : key.delete ? 1 : 0) : 0;
+
+    if (key.upArrow || key.downArrow) {
+      const offset = moveCursorVertically(
+        input,
+        cursorOffset,
+        key.upArrow ? -1 : 1
+      );
+      return isNil(offset) ? undefined : { offset };
+    }
 
     const direction = key.leftArrow
       ? -1
@@ -350,11 +378,11 @@ function handleInput(
       };
     }
 
-    if (inputChar.length !== 1) return;
+    const insert = key.return && key.shift ? '\n' : inputChar;
 
     // Handle regular input
     const newValue =
-      input.slice(0, cursorOffset) + inputChar + input.slice(cursorOffset);
+      input.slice(0, cursorOffset) + insert + input.slice(cursorOffset);
     return {
       value: newValue,
       offset: cursorOffset + 1,

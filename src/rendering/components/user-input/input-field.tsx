@@ -47,9 +47,8 @@ export function InputField(): JSX.Element {
 
 function InputText(): ReactNode {
   const {
-    input: { value, cursorOffset },
+    input: { value, cursor },
   } = useInputArea();
-  const safeCursor = Math.max(0, Math.min(cursorOffset, value.length));
 
   const [blinkState, setBlinkState] = useState<boolean>(false);
 
@@ -73,17 +72,46 @@ function InputText(): ReactNode {
     );
   }
 
-  const characters = value.split('');
+  return (
+    <Box flexDirection="column" flexShrink={1}>
+      {value.split('\n').map((line, lineIndex) => (
+        <InputLine
+          key={lineIndex}
+          content={line}
+          isContinuation={lineIndex > 0}
+          showCursor={blinkState && lineIndex === cursor.line}
+          cursorColumn={lineIndex === cursor.line ? cursor.column : undefined}
+        />
+      ))}
+    </Box>
+  );
+}
+
+interface InputLineProps {
+  content: string;
+  cursorColumn: number | undefined;
+  isContinuation: boolean;
+  showCursor: boolean;
+}
+
+function InputLine({
+  content,
+  cursorColumn,
+  isContinuation,
+  showCursor,
+}: InputLineProps) {
+  const isCursorAtLineEnd =
+    isNotNil(cursorColumn) && cursorColumn >= content.length;
 
   return (
     <Box flexDirection="row" flexWrap="wrap" flexShrink={1}>
-      <CursorPrefix />
-      {characters.map((char, index) => (
-        <Text key={index} inverse={blinkState && index === safeCursor}>
+      {isContinuation ? <Text>{'  '}</Text> : <CursorPrefix />}
+      {content.split('').map((char, index) => (
+        <Text key={index} inverse={showCursor && index === cursorColumn}>
           {char}
         </Text>
       ))}
-      {safeCursor === value.length && <Text inverse={blinkState}> </Text>}
+      {isCursorAtLineEnd && <Text inverse={showCursor}> </Text>}
     </Box>
   );
 }

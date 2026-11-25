@@ -52,7 +52,7 @@ interface SuggestionWindowState {
 
 export function InputSuggestions(): ReactNode {
   const {
-    input: { value, cursorOffset },
+    input: { value, offset },
     setInput,
     suggestions,
     setSuggestions,
@@ -69,14 +69,14 @@ export function InputSuggestions(): ReactNode {
   // off the input (rather than the list identity) keeps them in sync.
   useEffect(() => {
     setSuggestionIndex(0);
-  }, [value, cursorOffset]);
+  }, [value, offset]);
 
   const handlePickSuggestion = useCallback(
     (type: SuggestionType, suggestion: string) => {
       switch (type) {
         case SuggestionType.FILE: {
-          const beforeCursor = value.slice(0, cursorOffset);
-          const afterCursor = value.slice(cursorOffset);
+          const beforeCursor = value.slice(0, offset);
+          const afterCursor = value.slice(offset);
           const tokenStart = FILE_TOKEN_PATTERN.exec(beforeCursor)?.index ?? -1;
           const prefix =
             tokenStart >= 0 ? beforeCursor.slice(0, tokenStart) : beforeCursor;
@@ -84,18 +84,18 @@ export function InputSuggestions(): ReactNode {
 
           setInput(() => ({
             value: prefix + insertion + afterCursor,
-            cursorOffset: prefix.length + insertion.length,
+            offset: prefix.length + insertion.length,
           }));
           break;
         }
         case SuggestionType.COMMAND: {
-          setInput({ value: '', cursorOffset: 0 });
+          setInput({ value: '', offset: 0 });
           processCommand(suggestion);
           break;
         }
       }
     },
-    [cursorOffset, setInput, value]
+    [offset, setInput, value]
   );
 
   useInput(
