@@ -22,6 +22,7 @@ The package manager is `pnpm`.
 | Tests      | `pnpm run test`        | Vitest, single run; `-u` rewrites snapshots.   |
 | Build      | `pnpm run build`       | esbuild bundle to `dist/index.js` (ESM, Node). |
 | App        | `pnpm run start`       | Runs `src/main.tsx` via vite-node.             |
+| Sanity     | `pnpm run sanity`      | Runs all sanity checks.                        |
 
 ## When to run what
 

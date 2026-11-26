@@ -105,7 +105,10 @@ export class Agent extends AgentBase {
     // after the status change still finds a controller to abort.
     const controller = new AbortController();
     this._requestController = controller;
-    this.status.set(StatusFlag.STREAMING);
+    this.status.update({
+      set: [StatusFlag.STREAMING],
+      clear: [StatusFlag.ERROR_STREAMING],
+    });
 
     this._systemPrompt ??= await constructSystemPrompt({
       mcpServers: this._mcpServers,

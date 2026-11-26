@@ -9,6 +9,7 @@
     "test": "vitest run -u",
     "check:types": "tsc --noEmit",
     "start": "vite-node src/main.tsx",
+    "sanity": "pnpm run lint && pnpm run check:types && pnpm run test",
     "build": "esbuild src/main.tsx --bundle --packages=external --minify --platform=node --format=esm --outfile=./dist/index.js"
   },
   "devDependencies": {

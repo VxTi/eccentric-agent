@@ -23,16 +23,16 @@ export class BitSet<
   }
 
   public clearAndSet(...flags: NonEmptyArray<StatusFlag>): void {
-    this._flags = this._noneFlag;
-    this.set(...flags);
+    const result = flags.reduce<number>(
+      (acc, flag) => acc | flag,
+      this._noneFlag
+    );
+    this.commit(result);
   }
 
   public set(...flags: NonEmptyArray<StatusFlag>): void {
-    this._flags = flags.reduce<T>(
-      (acc, flag) => (acc | flag) as T,
-      this._noneFlag
-    );
-    this.emit('flag-change', this._flags);
+    const result = flags.reduce<number>((acc, flag) => acc | flag, this._flags);
+    this.commit(result);
   }
 
   public get flags(): T {
@@ -40,22 +40,32 @@ export class BitSet<
   }
 
   public clear(...flags: NonEmptyArray<StatusFlag>): void {
-    const result =
-      this._flags &
-      ~flags.reduce<number>((acc, flag) => acc | flag, this._noneFlag);
-
-    this._flags = result as T;
+    const mask = flags.reduce<number>((acc, flag) => acc | flag, 0);
+    this.commit(this._flags & ~mask);
   }
 
   public update<A extends T, B extends Exclude<T, A>>(props: {
     set: NonEmptyArray<A>;
     clear: NonEmptyArray<B>;
   }): void {
-    this.clear(...props.clear);
-    this.set(...props.set);
+    const clearMask = props.clear.reduce<number>((acc, flag) => acc | flag, 0);
+    let result = this._flags & ~clearMask;
+    result = props.set.reduce<number>((acc, flag) => acc | flag, result);
+    this.commit(result);
   }
 
   public clearAll(): void {
-    this._flags = this._noneFlag;
+    this.commit(this._noneFlag);
+  }
+
+  /**
+   * Applies a new flag state atomically: assigns the state and emits a single
+   * `flag-change` event, but only when the resulting state actually differs
+   * from the current one.
+   */
+  private commit(next: number): void {
+    if (next === this._flags) return;
+    this._flags = next as T;
+    this.emit('flag-change', this._flags);
   }
 }

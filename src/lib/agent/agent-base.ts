@@ -21,14 +21,14 @@ import { makeToolSet, toolRegistry } from './tools';
 
 export const enum StatusFlag {
   NONE = 0,
-  STREAMING = 1,
-  COMPACTING_CONTEXT = 2,
-  COMPACTING_CONTEXT_FAILED = 3,
-  LOADING_SKILLS = 4,
-  ERROR_LOADING_SKILLS = 5,
-  LOADING_MCPS = 6,
-  ERROR_LOADING_MCPS = 7,
-  ERROR_STREAMING = 8,
+  STREAMING = 1 << 0,
+  COMPACTING_CONTEXT = 1 << 1,
+  COMPACTING_CONTEXT_FAILED = 1 << 2,
+  LOADING_SKILLS = 1 << 3,
+  ERROR_LOADING_SKILLS = 1 << 4,
+  LOADING_MCPS = 1 << 5,
+  ERROR_LOADING_MCPS = 1 << 6,
+  ERROR_STREAMING = 1 << 7,
 }
 
 export enum ReasoningEffort {
@@ -171,7 +171,10 @@ export abstract class AgentBase extends EventEmitter<AgentEventMap> {
       skills.forEach(skill => this.loadSkill(skill));
       return true;
     } catch {
-      this._status.set(StatusFlag.ERROR_LOADING_SKILLS);
+      this._status.update({
+        set: [StatusFlag.ERROR_LOADING_SKILLS],
+        clear: [StatusFlag.LOADING_SKILLS],
+      });
       return false;
     }
   }
