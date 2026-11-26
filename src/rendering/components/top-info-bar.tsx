@@ -9,15 +9,9 @@ const reasoningEffortChars = ['○', '◔', '◑', '◕', '●'];
 
 export function TopInfoBar() {
   const {
-    git: { currentBranch, repoName },
-    loading,
-  } = useAppSelector(state => state.fileSystem);
-  const {
     reasoningEffort,
     agent: { model },
   } = useAgent();
-
-  if (loading || isNil(currentBranch) || isNil(repoName)) return;
 
   return (
     <Box
@@ -28,13 +22,7 @@ export function TopInfoBar() {
     >
       <Box gap={2}>
         <QueuedMessages />
-        <Box gap={1}>
-          <Text color="gray">{repoName}</Text>
-          <Text dimColor color="gray">
-            •
-          </Text>
-          <Text>{currentBranch}</Text>
-        </Box>
+        <GitInfo />
       </Box>
       <Box gap={1}>
         <Text color="blueBright" bold>
@@ -48,6 +36,24 @@ export function TopInfoBar() {
           {reasoningEffort}
         </Text>
       </Box>
+    </Box>
+  );
+}
+
+function GitInfo() {
+  const {
+    git: { currentBranch, repoName },
+    loading,
+  } = useAppSelector(state => state.fileSystem);
+  if (loading || isNil(currentBranch) || isNil(repoName)) return;
+
+  return (
+    <Box gap={1}>
+      <Text color="gray">{repoName}</Text>
+      <Text dimColor color="gray">
+        •
+      </Text>
+      <Text>{currentBranch}</Text>
     </Box>
   );
 }
