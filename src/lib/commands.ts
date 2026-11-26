@@ -122,20 +122,10 @@ export function processCommand(command: string) {
       break;
     }
     case 'system-prompt':
-      void agent
-        .buildSystemPrompt()
-        .then(systemPrompt =>
-          emitMessage({
-            type: MessageType.GENERIC,
-            content: `Here is the system prompt:\n\n${systemPrompt}`,
-          })
-        )
-        .catch(() => {
-          emitMessage({
-            type: MessageType.GENERIC,
-            content: `Something went wrong whilst creating the system prompt`,
-          });
-        });
+      emitMessage({
+        type: MessageType.GENERIC,
+        content: `Here is the system prompt:\n\n${agent.systemPrompt}`,
+      });
       break;
     default: {
       const skill = agent.skills.find(

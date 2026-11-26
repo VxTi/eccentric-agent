@@ -272,7 +272,7 @@ export function getMCPServer(name: string): MCP {
     mcpServers.filter((server: MCP) => server.params.name === name)
   );
 
-  if (!mcp) {
+  if (isNil(mcp)) {
     throw new Error(`MCP "${name}" was not found`);
   }
   return mcp;

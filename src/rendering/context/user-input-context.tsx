@@ -217,10 +217,11 @@ export function UserInputProvider({ children }: { children: ReactNode }) {
       // Ctrl+C interrupts an in-flight turn so the user can redirect the agent
       // with a follow-up message; only once the agent is idle does it quit.
       if (key.ctrl && inputChar === 'c') {
-        if (agent.status.loading) {
+        if (agent.streaming) {
           agent.cancel();
           return;
         }
+
         controller.abort();
         return;
       }

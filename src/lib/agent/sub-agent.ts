@@ -18,6 +18,7 @@ import {
 } from './tools';
 import { type NotifierChannel } from '../events/notifier';
 import { Result } from '../result';
+import { ReasoningEffort, throwIfAborted } from './agent-base';
 
 const AGENT_MAX_LOOP_ITERATIONS = 200;
 
@@ -117,7 +118,7 @@ export class SubAgent {
         model: getAppropriateModel(this.complexity),
         messages: this.messages,
         abortSignal: this.signal,
-        reasoning: 'medium',
+        reasoning: ReasoningEffort.MEDIUM,
         onStepEnd: step => {
           this.messages.push(...step.response.messages);
         },
@@ -157,9 +158,10 @@ export class SubAgent {
   }
 
   private throwIfAborted(): void {
-    if (this.signal.aborted) {
-      throw new Error('Sub-agent aborted before accomplishing its goal.');
-    }
+    throwIfAborted(
+      this.signal,
+      'Sub-agent aborted before accomplishing its goal.'
+    );
   }
 
   private pushErrorNotice(content: string): void {

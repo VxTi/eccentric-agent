@@ -1,4 +1,3 @@
-import chalk from 'chalk';
 import {
   createContext,
   type ReactNode,
@@ -7,11 +6,8 @@ import {
   useMemo,
   useState,
 } from 'react';
-import {
-  type Agent,
-  type AgentStatus,
-  type ReasoningEffort,
-} from '../../lib/agent/agent';
+import { type Agent, type ReasoningEffort } from '../../lib/agent/agent';
+import { AgentEvents } from '../../lib/agent/agent-base';
 import { EventName, eventOn } from '../../lib/events/events';
 import { Features } from '../../lib/feaures';
 import {
@@ -20,19 +16,14 @@ import {
   fetchGitInfo,
   setAutoApprove,
   setMessage,
-  setReasoning,
 } from '../../lib/state';
 import type { Message } from '../../lib/types/messages';
-import { basicHighlightFormatting } from '../terminal-markdown-renderer/markdown-renderer';
 import { isNonEmptyString } from '@vxti/typed';
-
-const THINKING_TEXT = basicHighlightFormatting('Thinking...');
 
 export interface AgentContextInstance {
   agent: Agent;
   submitMessage: (input: string) => void;
   messages: Message[];
-  status: AgentStatus;
   reasoningEffort: ReasoningEffort;
   autoApprove: boolean;
   queuedMessageCount: number;
@@ -57,14 +48,9 @@ export function AgentProvider({
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>(
     agent.reasoningEffort
   );
-  const [queuedMessageCount, setQueuedMessageCount] = useState(
-    agent.queuedMessageCount
+  const [queuedMessageCount, setQueuedMessageCount] = useState<number>(
+    agent.messageQueue.remaining()
   );
-
-  const [status, setStatus] = useState<AgentStatus>({
-    loading: false,
-    text: '',
-  });
 
   // Load the repo's gitignore set so the system prompt excludes ignored paths
   // such as node_modules, then feed it to the agent.
@@ -73,7 +59,7 @@ export function AgentProvider({
   }, [dispatch]);
 
   useEffect(() => {
-    agent.setGitIgnore(gitIgnored);
+    agent.setGitIgnored(gitIgnored);
   }, [agent, gitIgnored]);
 
   // Integrate the store's agent with the UI: mirror its events into React /
@@ -82,28 +68,11 @@ export function AgentProvider({
   useEffect(() => {
     void agent.loadSkills();
 
-    if (Features.MCP) {
-      setStatus({
-        loading: true,
-        text: basicHighlightFormatting('Connecting with MCP server...'),
-      });
-      void agent.loadMcpServers().then(ok => {
-        if (ok) {
-          setStatus({ text: '', loading: false });
-          return;
-        }
-        setStatus({
-          text: chalk.red('Failed to load MCP config'),
-          loading: false,
-        });
-        setTimeout(() => setStatus({ text: '', loading: false }), 5000);
-      });
-    }
+    if (Features.MCP) void agent.loadMcpServers();
 
     const onMessage = (message: Message): void => {
       dispatch(setMessage(message));
     };
-    const onStatus = (next: AgentStatus): void => setStatus(next);
 
     const onReasoningEffortChange = (effort: ReasoningEffort): void => {
       setReasoningEffort(effort);
@@ -117,38 +86,21 @@ export function AgentProvider({
       setQueuedMessageCount(count);
     };
 
-    agent.on('reasoning-effort-change', onReasoningEffortChange);
-    agent.on('auto-mode-change', onAutoModeChange);
-    agent.on('queue-change', onQueueChange);
-    agent.on('message-delta', onMessage);
-    agent.on('status-change', onStatus);
+    agent.on(AgentEvents.REASONING_EFFORT_CHANGE, onReasoningEffortChange);
+    agent.on(AgentEvents.AUTO_MODE_CHANGE, onAutoModeChange);
+    agent.on(AgentEvents.MESSAGE_QUEUE_SIZE_CHANGE, onQueueChange);
+    agent.on(AgentEvents.MESSAGE_DELTA, onMessage);
 
-    // Tool output, reasoning and command feedback are emitted onto the global
-    // event bus rather than through the agent instance, so mirror those too.
     const offAgentMessage = eventOn(EventName.AGENT_MESSAGE, ({ detail }) =>
       dispatch(setMessage(detail))
     );
 
-    // Reasoning reaches the UI as a start/end flag rather than as status text,
-    // so fold it into the status line: a fixed indicator while the model thinks,
-    // and back to whatever the agent last reported once it stops.
-    const offReasoning = eventOn(EventName.AGENT_REASONING, ({ detail }) => {
-      dispatch(setReasoning(detail));
-      setStatus(prev =>
-        detail.active
-          ? { loading: true, text: THINKING_TEXT }
-          : { ...prev, text: '' }
-      );
-    });
-
     return () => {
-      agent.off('message-delta', onMessage);
-      agent.off('status-change', onStatus);
-      agent.off('reasoning-effort-change', onReasoningEffortChange);
-      agent.off('auto-mode-change', onAutoModeChange);
-      agent.off('queue-change', onQueueChange);
+      agent.off(AgentEvents.MESSAGE_DELTA, onMessage);
+      agent.off(AgentEvents.REASONING_EFFORT_CHANGE, onReasoningEffortChange);
+      agent.off(AgentEvents.AUTO_MODE_CHANGE, onAutoModeChange);
+      agent.off(AgentEvents.MESSAGE_QUEUE_SIZE_CHANGE, onQueueChange);
       offAgentMessage();
-      offReasoning();
     };
   }, [agent, dispatch]);
 
@@ -171,7 +123,6 @@ export function AgentProvider({
       agent,
       submitMessage,
       messages,
-      status,
       autoApprove,
       queuedMessageCount,
       toggleAutoApprove,
@@ -181,7 +132,6 @@ export function AgentProvider({
       agent,
       submitMessage,
       messages,
-      status,
       autoApprove,
       queuedMessageCount,
       toggleAutoApprove,

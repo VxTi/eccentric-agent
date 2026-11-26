@@ -1,12 +1,12 @@
+import { isActiveSkill, type StatefulSkillMap } from './agent-base';
 import type { MCP } from './mcp/mcp';
-import {
-  type AgentSkill,
-  SkillInclusion,
-  type SkillName,
-} from './skills/model';
-import type { FileCache } from '../file-cache';
 import { type TaskList, TaskStatus } from '../tasks';
-import { type Nullable, isNil } from '@vxti/typed';
+import {
+  type Nullable,
+  isNil,
+  isNonEmptyString,
+  isEmptyArray,
+} from '@vxti/typed';
 import { first, compact } from 'lodash-es';
 import fs from 'node:fs';
 import { CONSTANT_SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT } from '../constants';
@@ -45,38 +45,31 @@ Spend a tool call only when it yields information you do not already have.
   \`complexity\` tier so simple work runs on a cheaper model. For a couple of files, read them
   yourself — spinning up an agent costs more than it saves.`;
 
-interface Props {
+interface StaticPromptProps {
   mcpServers: Set<MCP>;
-  skills: Map<SkillName, AgentSkill>;
-  taskList: TaskList;
-  activeSkills: Map<SkillName, AgentSkill>;
-  fileCache: FileCache;
+  skills: StatefulSkillMap;
   cwd: string;
   gitIgnore: Set<string>;
 }
 
+interface StateReminderProps {
+  taskList: TaskList;
+  skills: StatefulSkillMap;
+}
+
+/**
+ * Everything that is stable for the lifetime of a session. Built once so
+ * providers can cache the prefix; anything that changes during a conversation
+ * belongs in the dynamic fragment instead.
+ */
 export async function constructSystemPrompt({
   mcpServers,
   cwd,
   gitIgnore,
-  taskList,
-  activeSkills,
   skills,
-}: Props): Promise<string> {
+}: StaticPromptProps): Promise<string> {
   const systemPrompt = await loadSystemPrompt({ cwd, ignored: gitIgnore });
-
-  const mcpServerNames = (
-    await Promise.all(
-      mcpServers.values().map(async mcp => {
-        const { tools } = await mcp.withAuth(() =>
-          mcp.params.client.listTools()
-        );
-        return `- ${mcp.params.name}\n    With tools:\n${tools.map(t => `   - ${t.name}`).join('\n')}`;
-      })
-    )
-  ).join('\n');
-
-  const taskFragment = constructTaskListSystemPromptFragment(taskList);
+  const mcpServerNames = await describeMcpServers(mcpServers);
 
   return compact([
     systemPrompt,
@@ -84,36 +77,77 @@ export async function constructSystemPrompt({
     'Some important information:',
     `- The working dir is '${cwd}'.`,
     `- The current user is ${process.env.USER ?? process.env.USERNAME}.`,
-    `- The current date is ${new Date().toLocaleString()}.\n`,
+    `- The current date is ${new Date().toLocaleDateString()}.\n`,
     OPERATING_GUIDE,
     constructSkillsSystemPromptFragment(skills),
-    constructActiveSkillsSystemPromptFragment(activeSkills),
     `The following MCP servers are available:\n${mcpServerNames}\nUse 'list_mcp_tools' to discover tools (no 'toolName' → name+description list; with a specific 'toolName' → that tool's full input/output schema). Always fetch the schema for a specific tool before invoking it via 'call_mcp_tool'.`,
-    taskFragment,
   ]).join('\n\n');
 }
 
-function constructActiveSkillsSystemPromptFragment(
-  activeSkills: Map<SkillName, AgentSkill>
-): string | undefined {
-  if (activeSkills.size === 0) return undefined;
+/**
+ * Live session state (active skills, task list), injected as a trailing
+ * message on every request instead of living in the system prompt. The task
+ * list changes on nearly every agentic turn; from inside the system prompt
+ * that change would invalidate the provider's cache read for the entire
+ * conversation history, while a trailing message only ever costs the small
+ * tail itself.
+ *
+ * Returns null when there is nothing to report, so no reminder message is
+ * sent at all.
+ */
+export function constructStateReminderMessage({
+  taskList,
+  skills,
+}: StateReminderProps): Nullable<string> {
+  const body = compact([
+    constructActiveSkillsReminderFragment(skills),
+    constructTaskListReminderFragment(taskList),
+  ]).join('\n\n');
 
-  return Array.from(activeSkills.entries())
-    .map(([, skill]) => skill.content)
-    .join('\n\n---');
+  if (!isNonEmptyString(body)) return null;
+  return [
+    '<system-reminder>',
+    'Live session state, injected with this request. Not part of the',
+    'conversation — never respond to this block directly.',
+    '',
+    body,
+    '</system-reminder>',
+  ].join('\n');
+}
+
+async function describeMcpServers(mcpServers: Set<MCP>): Promise<string> {
+  const descriptions = await Promise.all(
+    Array.from(mcpServers).map(async mcp => {
+      const { tools } = await mcp.withAuth(() => mcp.params.client.listTools());
+      return `- ${mcp.params.name}\n    With tools:\n${tools
+        .map(t => `   - ${t.name}`)
+        .join('\n')}`;
+    })
+  );
+  return descriptions.join('\n');
+}
+
+function constructActiveSkillsReminderFragment(
+  skills: StatefulSkillMap
+): string | undefined {
+  const active = Array.from(skills.values().filter(isActiveSkill));
+  if (isEmptyArray(active)) return undefined;
+
+  return active.map(sk => sk.content).join('\n\n---');
 }
 
 function constructSkillsSystemPromptFragment(
-  skills: Map<SkillName, AgentSkill>
+  skills: StatefulSkillMap
 ): string | undefined {
-  if (skills.size === 0) return undefined;
-
-  const skillsSummary = skills
+  const inactiveSkills = skills
     .values()
     // Exclude always-included skills, as these are already included in the agent's system prompt
-    .filter(skill => skill.inclusion !== SkillInclusion.ALWAYS)
+    .filter(skill => !isActiveSkill(skill))
+    .toArray();
+  if (isEmptyArray(inactiveSkills)) return undefined;
+
+  const skillsSummary = inactiveSkills
     .map(skill => `- Name: ${skill.name}.\nDescription:\n${skill.description}`)
-    .toArray()
     .join('\n---\n');
   return [
     'You have access to the following skills, which are described by `name` and `description`. Use the \`use_skill\`' +
@@ -122,7 +156,7 @@ function constructSkillsSystemPromptFragment(
   ].join('\n\n');
 }
 
-function constructTaskListSystemPromptFragment(
+function constructTaskListReminderFragment(
   taskList: TaskList
 ): Nullable<string> {
   if (!taskList.hasTasks) return null;
