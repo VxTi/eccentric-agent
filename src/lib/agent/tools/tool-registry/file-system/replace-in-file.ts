@@ -5,17 +5,13 @@ import path from 'node:path';
 import * as z from 'zod';
 import { Result } from '../../../../result';
 import { store } from '../../../../state';
-import {
-  diffLanguageForFile,
-  generateSideBySideDiff,
-} from '../../../../utils/diff-utils';
+import { makeDiffMessagePart } from '../../../../utils/diff-utils';
 import {
   detectLineEnding,
   levenshteinDistance,
   toUnixLineEndings,
 } from '../../../../utils/string-utils';
 import { createTool } from '../../tool-definition';
-import { MessagePartType } from '../../../../types/messages';
 
 const inputSchema = z.object({
   filePath: z
@@ -130,15 +126,10 @@ export const replaceInFile = createTool({
   },
 
   outputToParts({ filePath }, __, { previous, current }) {
-    return [
-      {
-        type: MessagePartType.DIFF,
-        previous,
-        current,
-        rows: generateSideBySideDiff(previous, current),
-        language: diffLanguageForFile(filePath),
-      },
-    ];
+    // Normalize at emit time so row values never carry '\r' into the renderer.
+    const before = toUnixLineEndings(previous);
+    const after = toUnixLineEndings(current);
+    return [makeDiffMessagePart(filePath, before, after)];
   },
 });
 

@@ -708,7 +708,7 @@ describe('replace_in_file', () => {
         (part): part is DiffMessagePart => part.type === MessagePartType.DIFF
       );
       expect(diffPart?.type).toBe(MessagePartType.DIFF);
-      expect(diffPart?.rows?.length).toBeGreaterThan(0);
+      expect(diffPart?.rows.length).toBeGreaterThan(0);
       expect(renderMessageLines(report, parts, 120)).toMatchSnapshot();
     });
 

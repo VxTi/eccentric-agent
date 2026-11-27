@@ -7,8 +7,8 @@ import {
   highlight as highlightCli,
 } from 'cli-highlight';
 import ansiRegex from 'ansi-regex';
-import { generateSideBySideDiff, type DiffLine } from '../lib/utils/diff-utils';
-import { Position, toUnixLineEndings } from '../lib/utils/string-utils';
+import type { DiffLine } from '../lib/utils/diff-utils';
+import { Position } from '../lib/utils/string-utils';
 import type { DiffMessagePart } from '../lib/types/messages';
 import { githubDark } from './terminal-markdown-renderer/code-highlight-theme';
 
@@ -25,15 +25,6 @@ const ANSI_FRAGMENT_RE = new RegExp(`(${ESC}\\[[0-9;]*m)`);
 /** Whole-side highlight results kept per `DiffRenderer` instance. */
 const MAX_HIGHLIGHT_CACHE_ENTRIES = 16;
 
-/**
- * The highlighted text for one line of a diff side, addressed by the 1-based
- * line number the diff algorithm recorded against it.
- */
-function diffSideLine(side: string[], lineNumber: number | undefined): string {
-  if (!isNotNil(lineNumber)) return '';
-  return side[lineNumber - 1] ?? '';
-}
-
 /** Characters a two-sided row spends on everything that is not cell content. */
 const DIFF_COLUMN_OVERHEAD = 5; // '<num> <cell> | <num> <cell>'
 
@@ -47,8 +38,8 @@ interface DiffRowLayout {
 interface SideBySideRowParams {
   left: DiffLine;
   right: DiffLine;
-  oldLines: string[];
-  newLines: string[];
+  oldText: string;
+  newText: string;
 }
 
 const DIFF_REMOVED_MARKER = '- ';
@@ -119,21 +110,16 @@ export class DiffRenderer {
   }
 
   public renderDiff(part: DiffMessagePart): string {
-    // CRLF endings never reach the grid: a carriage return inside a cell is
-    // rendered as a cursor return and garbles the row. The diff sides are the
-    // only path file content takes into the renderer.
-    const previous = toUnixLineEndings(part.previous);
-    const current = toUnixLineEndings(part.current);
-    const { language = DEFAULT_LANG } = part;
-    // Rows pre-computed at emit time are honoured verbatim; an empty list
-    // means the tool found no changes, so nothing is rendered.
-    const rows = part.rows ?? generateSideBySideDiff(previous, current);
+    const { language = DEFAULT_LANG, lineCounts } = part;
+    // Rows always come pre-computed from the emitting tool; an empty list
+    // means no changes, so nothing is rendered.
+    const rows = part.rows;
     if (!isNonEmptyArray(rows)) return '';
 
     const availableWidth = this.shellWidth;
 
     const numberWidth = String(
-      Math.max(previous.split('\n').length, current.split('\n').length)
+      Math.max(lineCounts.previous, lineCounts.current)
     ).length;
 
     // Floor the cell width so a narrow terminal stays legible instead of
@@ -149,22 +135,44 @@ export class DiffRenderer {
       ),
     };
 
-    // Highlight each side as a single block, then index it by line number.
-    // Highlighting per line loses the state of any token that spans a line
-    // break (block comment, template literal, multi-line literal), which is
-    // most of what a diff of real code contains. Results are cached per side
+    // Highlight each side as a single block of the visible rows joined, then
+    // index it by row occurrence. Highlighting per line loses the state of any
+    // token that spans a line break (block comment, template literal,
+    // multi-line literal), which is most of what a diff of real code contains;
+    // the visible rows are still one block, so tokens spanning consecutive
+    // visible lines keep their state. Collapsed gaps carry no content, so
+    // token state does not carry across a gap. Results are cached per side
     // string: re-parses (terminal resize, remount) re-layout but must not
     // re-highlight.
-    const oldLines = this.highlightDiffSideCached(previous, language);
-    const newLines = this.highlightDiffSideCached(current, language);
+    const leftSource = rows
+      .flatMap(([left]) =>
+        isNotNil(left.lineNumberOriginal) ? [left.value] : []
+      )
+      .join('\n');
+    const rightSource = rows
+      .flatMap(([, right]) =>
+        isNotNil(right.lineNumberModified) ? [right.value] : []
+      )
+      .join('\n');
+    const oldLines = this.highlightDiffSideCached(leftSource, language);
+    const newLines = this.highlightDiffSideCached(rightSource, language);
 
+    let leftLine = 0;
+    let rightLine = 0;
     const lines = rows.map(([left, right]) => {
       if (left.collapsed || right.collapsed) {
         return this.collapsedRow(layout);
       }
 
+      const oldText = isNotNil(left.lineNumberOriginal)
+        ? (oldLines[leftLine++] ?? '')
+        : '';
+      const newText = isNotNil(right.lineNumberModified)
+        ? (newLines[rightLine++] ?? '')
+        : '';
+
       return this.finishDiffRow(
-        this.sideBySideDiffRow({ left, right, oldLines, newLines }, layout)
+        this.sideBySideDiffRow({ left, right, oldText, newText }, layout)
       );
     });
 
@@ -242,28 +250,18 @@ export class DiffRenderer {
   }
 
   private sideBySideDiffRow(
-    { left, right, oldLines, newLines }: SideBySideRowParams,
+    { left, right, oldText, newText }: SideBySideRowParams,
     layout: DiffRowLayout
   ): string {
     // Mirrors `collapsedRow`'s '<num> <cell> | <num> <cell>' layout: the
     // column separator sits between the two halves, not inside them.
     const oldHalf = [
       this.diffNumber(left.lineNumberOriginal, layout.numberWidth),
-      this.diffCell(
-        diffSideLine(oldLines, left.lineNumberOriginal),
-        left,
-        layout.colWidth,
-        Position.END
-      ),
+      this.diffCell(oldText, left, layout.colWidth, Position.END),
     ].join(' ');
     const newHalf = [
       this.diffNumber(right.lineNumberModified, layout.numberWidth),
-      this.diffCell(
-        diffSideLine(newLines, right.lineNumberModified),
-        right,
-        layout.colWidth,
-        Position.START
-      ),
+      this.diffCell(newText, right, layout.colWidth, Position.START),
     ].join(' ');
     return `${oldHalf} | ${newHalf}`;
   }

@@ -1,7 +1,12 @@
 import { DiffRenderer } from './diff-renderer';
 import { buildGithubDarkTheme } from './terminal-markdown-renderer/code-highlight-theme';
 import { MessagePartType, type DiffMessagePart } from '../lib/types/messages';
-import type { SideBySideDiff } from '../lib/utils/diff-utils';
+import {
+  generateSideBySideDiff,
+  lineCount,
+  type SideBySideDiff,
+} from '../lib/utils/diff-utils';
+import { toUnixLineEndings } from '../lib/utils/string-utils';
 import chalk, { type ChalkInstance } from 'chalk';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -10,13 +15,12 @@ const WIDTH = 80;
 const part = (
   previous: string,
   current: string,
-  rows?: SideBySideDiff[],
+  rows: SideBySideDiff[] = generateSideBySideDiff(previous, current),
   language?: string
 ): DiffMessagePart => ({
   type: MessagePartType.DIFF,
-  previous,
-  current,
   rows,
+  lineCounts: { previous: lineCount(previous), current: lineCount(current) },
   language,
 });
 
@@ -107,8 +111,13 @@ describe('DiffRenderer', () => {
     });
 
     it('renders CRLF content without carrying carriage returns into the grid', () => {
+      // The emitting tool normalizes CRLF before the diff ever reaches the
+      // renderer, so the renderer only ever sees Unix line endings here.
       const rendered = renderer.renderDiff(
-        part('one\r\ntwo\r\nthree\r\n', 'one\r\nTWO!\r\nthree\r\n')
+        part(
+          toUnixLineEndings('one\r\ntwo\r\nthree\r\n'),
+          toUnixLineEndings('one\r\nTWO!\r\nthree\r\n')
+        )
       );
 
       expect(rendered).not.toContain('\r');

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderMessageLines } from './markdown-renderer';
-import { generateSideBySideDiff } from '../../lib/utils/diff-utils';
+import { generateSideBySideDiff, lineCount } from '../../lib/utils/diff-utils';
 import {
   MessagePartType,
   type DiffMessagePart,
@@ -11,9 +11,8 @@ const current = 'line 1\nchanged\nline 3\n';
 
 const diffPart: DiffMessagePart = {
   type: MessagePartType.DIFF,
-  previous,
-  current,
   rows: generateSideBySideDiff(previous, current),
+  lineCounts: { previous: lineCount(previous), current: lineCount(current) },
 };
 
 describe('renderMessageLines', () => {
@@ -61,14 +60,14 @@ describe('renderMessageLines', () => {
       { length: 12 },
       (_, i) => `line ${i + 1}`
     ).join('\n');
+    const wideCurrent = twelveLines.replace('line 6', 'changed');
     const wideDiff: DiffMessagePart = {
       ...diffPart,
-      previous: twelveLines,
-      current: twelveLines.replace('line 6', 'changed'),
-      rows: generateSideBySideDiff(
-        twelveLines,
-        twelveLines.replace('line 6', 'changed')
-      ),
+      rows: generateSideBySideDiff(twelveLines, wideCurrent),
+      lineCounts: {
+        previous: lineCount(twelveLines),
+        current: lineCount(wideCurrent),
+      },
     };
 
     const lines = renderMessageLines('headline', [wideDiff], 120);

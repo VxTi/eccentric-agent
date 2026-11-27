@@ -2,14 +2,11 @@ import * as z from 'zod';
 import path from 'node:path';
 import { Result } from '../../../../result';
 import { store } from '../../../../state';
-import {
-  diffLanguageForFile,
-  generateSideBySideDiff,
-} from '../../../../utils/diff-utils';
+import { makeDiffMessagePart } from '../../../../utils/diff-utils';
 import { mkdir, writeFile } from 'fs/promises';
 import { existsAsync } from '../../../../utils/fs';
+import { toUnixLineEndings } from '../../../../utils/string-utils';
 import { createTool } from '../../tool-definition';
-import { MessagePartType } from '../../../../types/messages';
 
 const inputSchema = z.object({
   path: z.string().describe('The absolute path of the file to create'),
@@ -62,15 +59,10 @@ export const createFile = createTool({
   },
 
   outputToParts(_, __, { filePath, newContent }) {
-    return [
-      {
-        type: MessagePartType.DIFF,
-        previous: '',
-        current: newContent,
-        rows: generateSideBySideDiff('', newContent),
-        language: diffLanguageForFile(filePath),
-      },
-    ];
+    // Normalizing keeps behavior consistent with the old renderer, which
+    // normalized before highlighting; row values never carry '\r'.
+    const after = toUnixLineEndings(newContent);
+    return [makeDiffMessagePart(filePath, '', after)];
   },
 });
 

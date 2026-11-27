@@ -27,7 +27,6 @@ export interface UserMessage extends IMessage {
 
 export interface AssistantMessage extends IMessage {
   type: MessageType.ASSISTANT;
-  metadata?: object;
 }
 
 export enum MessagePartType {
@@ -42,12 +41,13 @@ export interface TextMessagePart {
 
 export interface DiffMessagePart {
   type: MessagePartType.DIFF;
-  /** The file content before and after the edit; the sole copy the UI holds. */
-  previous: string;
-  current: string;
-  /** Side-by-side rows pre-computed from `previous`/`current` at emit time;
-   *  derived by the renderer when absent. An empty list renders nothing. */
-  rows?: SideBySideDiff[];
+  /** Side-by-side rows pre-computed at emit time from the file contents; an
+   *  empty list means no changes and renders nothing. */
+  rows: SideBySideDiff[];
+  /** Total line count of each side BEFORE collapsing, needed because collapsed
+   *  regions hide the tail, so the widest line number cannot be derived from
+   *  `rows`. */
+  lineCounts: { previous: number; current: number };
   language?: string;
 }
 

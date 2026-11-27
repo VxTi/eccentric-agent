@@ -2,6 +2,7 @@ import { isNonEmptyString, isNotNil } from '@vxti/typed';
 import { supportsLanguage } from 'cli-highlight';
 import { diffTrimmedLines } from 'diff';
 import { extname } from 'node:path';
+import { type DiffMessagePart, MessagePartType } from '../types/messages';
 
 export interface DiffLine {
   value: string;
@@ -14,6 +15,15 @@ export interface DiffLine {
 export type SideBySideDiff = [DiffLine, DiffLine];
 
 const DEFAULT_CONTEXT_LINES = 2;
+
+/**
+ * Line count with the renderer's historic `split('\n').length` semantics (a
+ * trailing newline counts as an extra line), keeping the number-column width
+ * stable.
+ */
+export function lineCount(text: string): number {
+  return text.split('\n').length;
+}
 
 export function generateSideBySideDiff(
   original: string,
@@ -170,4 +180,17 @@ export function diffLanguageForFile(filePath: string): string | undefined {
   return isNonEmptyString(extension) && supportsLanguage(extension)
     ? extension
     : undefined;
+}
+
+export function makeDiffMessagePart(
+  filePath: string,
+  before: string,
+  after: string
+): DiffMessagePart {
+  return {
+    type: MessagePartType.DIFF,
+    rows: generateSideBySideDiff(before, after),
+    lineCounts: { previous: lineCount(before), current: lineCount(after) },
+    language: diffLanguageForFile(filePath),
+  };
 }
