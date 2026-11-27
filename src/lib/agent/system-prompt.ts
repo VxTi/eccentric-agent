@@ -91,15 +91,15 @@ export async function constructSystemPrompt({
 }
 
 /**
- * Live session state (active skills, task list), injected as a trailing
- * message on every request instead of living in the system prompt. The task
- * list changes on nearly every agentic turn; from inside the system prompt
- * that change would invalidate the provider's cache read for the entire
- * conversation history, while a trailing message only ever costs the small
- * tail itself.
+ * Live session state (active skills, task list), recorded into the
+ * conversation history once per state change instead of living in the system
+ * prompt. The task list changes on nearly every agentic turn; from inside
+ * the system prompt that change would invalidate the provider's cache read
+ * for the entire conversation history, while an appended message becomes
+ * part of the cached prefix after it is recorded.
  *
- * Returns null when there is nothing to report, so no reminder message is
- * sent at all.
+ * Returns null when there is nothing to report, so no reminder is recorded
+ * at all.
  */
 export function constructStateReminderMessage({
   taskList,
@@ -113,8 +113,9 @@ export function constructStateReminderMessage({
   if (!isNonEmptyString(body)) return null;
   return [
     '<system-reminder>',
-    'Live session state, injected with this request. Not part of the',
-    'conversation — never respond to this block directly.',
+    'Live session state, recorded at this point in the conversation.',
+    'Any later system-reminder supersedes this one — never respond to',
+    'this block directly.',
     '',
     body,
     '</system-reminder>',

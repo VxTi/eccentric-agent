@@ -127,9 +127,7 @@ export class Agent extends AgentBase {
           ...this._context.messages,
         ],
         prepareStep: ({ messages }) => ({
-          messages: this.maybeAppendAgentStateReminder(
-            this._context.materialize(messages)
-          ),
+          messages: this._context.materialize(messages),
         }),
         reasoning: this._reasoningEffort,
         tools: this._toolset,
@@ -182,6 +180,9 @@ export class Agent extends AgentBase {
       return;
     } finally {
       this._requestController = undefined;
+      // The turn is over: persist the current session state so the reminder
+      // lands in the cached prefix instead of being re-sent every step.
+      this.persistStateReminder();
     }
 
     this.status.clear(StatusFlag.STREAMING);

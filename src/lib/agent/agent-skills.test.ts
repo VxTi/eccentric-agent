@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { Agent } from './agent';
 import { AgentEvents } from './agent-base';
+import { constructStateReminderMessage } from './system-prompt';
 import { SkillInclusion, type AgentSkill } from './skills/model';
 
 vi.mock('./skills/discovery', () => ({
@@ -66,7 +67,9 @@ function systemPromptOfCall(callIndex: number): string {
 
 afterEach(() => {
   streamTextMock.mockReset();
+  stateReminderMock.mockReset();
   promptCounter = 0;
+  syncCount = 0;
 });
 
 describe('AgentBase.loadSkill', () => {
@@ -163,5 +166,69 @@ describe('Agent system prompt invalidation', () => {
 
     expect(systemPromptOfCall(0)).toBe('system prompt #1');
     expect(systemPromptOfCall(1)).toBe('system prompt #1');
+  });
+});
+
+const stateReminderMock = constructStateReminderMessage as unknown as Mock;
+
+let syncCount = 0;
+function remindersPerTurnEnd(...values: (string | null)[]): void {
+  syncCount = 0;
+  stateReminderMock.mockImplementation(() => {
+    const value = values[Math.min(syncCount, values.length - 1)];
+    syncCount++;
+    return value ?? null;
+  });
+}
+
+function reminderContentsOfCall(callIndex: number): string[] {
+  const [request] = streamTextMock.mock.calls[callIndex] as [
+    { messages: { role: string; content: string }[] },
+  ];
+  return request.messages
+    .filter(
+      message =>
+        message.role === 'user' && message.content.startsWith('REMINDER')
+    )
+    .map(message => message.content);
+}
+
+describe('Agent state reminder persistence', () => {
+  it('records the reminder once at the end of a turn instead of on every step', async () => {
+    remindersPerTurnEnd('REMINDER');
+    streamTextMock.mockImplementation(() => fakeSuccessfulStream());
+    const agent = createAgent();
+
+    await agent.submitMessage('first turn');
+    expect(reminderContentsOfCall(0)).toEqual([]);
+
+    await agent.submitMessage('second turn');
+    expect(reminderContentsOfCall(1)).toEqual(['REMINDER']);
+  });
+
+  it('does not duplicate the reminder when the state is unchanged', async () => {
+    remindersPerTurnEnd('REMINDER');
+    streamTextMock.mockImplementation(() => fakeSuccessfulStream());
+    const agent = createAgent();
+
+    await agent.submitMessage('first turn');
+    await agent.submitMessage('second turn');
+    await agent.submitMessage('third turn');
+
+    expect(reminderContentsOfCall(1)).toEqual(['REMINDER']);
+    expect(reminderContentsOfCall(2)).toEqual(['REMINDER']);
+  });
+
+  it('records each new version exactly once, keeping previous versions', async () => {
+    remindersPerTurnEnd('REMINDER V1', 'REMINDER V2');
+    streamTextMock.mockImplementation(() => fakeSuccessfulStream());
+    const agent = createAgent();
+
+    await agent.submitMessage('first turn');
+    await agent.submitMessage('second turn');
+    await agent.submitMessage('third turn');
+
+    expect(reminderContentsOfCall(1)).toEqual(['REMINDER V1']);
+    expect(reminderContentsOfCall(2)).toEqual(['REMINDER V1', 'REMINDER V2']);
   });
 });

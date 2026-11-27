@@ -1,4 +1,4 @@
-import { type ModelMessage, type ToolSet } from 'ai';
+import { type ToolSet } from 'ai';
 import type { Message } from '../types/messages';
 import { Notifier as NotifierImpl, type Notifier } from '../events/notifier';
 import { FileCache as FileCacheImpl, type FileCache } from '../file-cache';
@@ -98,6 +98,8 @@ export abstract class AgentBase extends EventEmitter<AgentEventMap> {
   protected _reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM;
   protected _model: ModelDefinition = DEFAULT_MODEL;
   protected _systemPrompt?: string;
+  /** Reminder content already persisted into the history, for change detection. */
+  private _persistedReminder?: string;
 
   protected invalidateSystemPrompt(): void {
     this._systemPrompt = undefined;
@@ -239,19 +241,34 @@ export abstract class AgentBase extends EventEmitter<AgentEventMap> {
     return this._systemPrompt ?? '';
   }
 
-  protected maybeAppendAgentStateReminder(
-    messages: ModelMessage[]
-  ): ModelMessage[] {
+  /**
+   * Persists the live session state (active skills, task list) into the
+   * conversation history — once per state change, never per step. Appending
+   * it as a per-request tail re-billed the whole block as uncached input on
+   * every step; persisted once, it rides the provider's cached prefix until
+   * the state changes again.
+   *
+   * Must only run at a turn boundary: pushing it mid-turn would place the
+   * reminder before responses the provider has already cached, breaking
+   * prefix alignment for every later request.
+   */
+  protected persistStateReminder(): void {
     const reminder = constructStateReminderMessage({
       skills: this._skills,
       taskList: this._taskList,
     });
-    if (isNil(reminder)) return messages;
-    return [...messages, { role: 'user', content: reminder }];
+    if (isNil(reminder)) {
+      this._persistedReminder = undefined;
+      return;
+    }
+    if (reminder === this._persistedReminder) return;
+    this._persistedReminder = reminder;
+    this._context.pushUser(reminder);
   }
 
   protected clearContext(): void {
     this._context.clear();
+    this._persistedReminder = undefined;
   }
 
   public get status(): BitSet<StatusFlag> {
