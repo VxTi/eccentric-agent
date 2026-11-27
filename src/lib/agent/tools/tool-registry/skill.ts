@@ -1,4 +1,4 @@
-import { isNil, isNotNil } from '@vxti/typed';
+import { isNil, isNotNil, type Nullable } from '@vxti/typed';
 import type { ModelMessage, ToolModelMessage, ToolResultPart } from 'ai';
 import * as z from 'zod';
 import { Result } from '../../../result';
@@ -53,16 +53,22 @@ export function getActivatedSkillsFromMessages(
       (part): part is ToolResultPart =>
         part.type === 'tool-result' && part.toolName === USE_SKILL_TOOL
     )
-    .map(activatedSkillOf)
+    .map(getActivatedSkillFromToolPart)
     .filter((skill): skill is SkillName => isNotNil(skill));
 }
 
-function activatedSkillOf(part: ToolResultPart): SkillName | undefined {
+const activatedSkillSchema = z.looseObject({
+  data: z.looseObject({
+    skill: z.string<SkillName>(),
+  }),
+});
+
+function getActivatedSkillFromToolPart(
+  part: ToolResultPart
+): Nullable<SkillName> {
   if (part.output.type !== 'json') return undefined;
-  const result = part.output.value as {
-    ok?: unknown;
-    data?: { skill?: unknown };
-  } | null;
-  const skill = result?.data?.skill;
-  return result?.ok === true && typeof skill === 'string' ? skill : undefined;
+
+  const result = activatedSkillSchema.safeParse(part.output.value);
+
+  return result.data?.data.skill;
 }
