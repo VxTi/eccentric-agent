@@ -12,6 +12,7 @@ import {
 import {
   detectLineEnding,
   levenshteinDistance,
+  toUnixLineEndings,
 } from '../../../../utils/string-utils';
 import { createTool } from '../../tool-definition';
 import { MessagePartType } from '../../../../types/messages';
@@ -641,10 +642,6 @@ function reindent(lines: string[], indentation: string): string[] {
 /** Non-overlapping occurrence count of `needle` in `haystack`. */
 function countOccurrences(haystack: string, needle: string): number {
   return haystack.split(needle).length - 1;
-}
-
-function toUnixLineEndings(text: string): string {
-  return text.replace(/\r\n/g, '\n');
 }
 
 function convertLineEndings(text: string, newline: string): string {

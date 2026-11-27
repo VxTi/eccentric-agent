@@ -1,7 +1,6 @@
-import { isEmptyString } from '@vxti/typed';
 import { Box, Text, useWindowSize } from 'ink';
 import { useMemo } from 'react';
-import { renderMessageContent } from '../../terminal-markdown-renderer/markdown-renderer';
+import { renderMessageLines } from '../../terminal-markdown-renderer/markdown-renderer';
 import type { MessagePart } from '../../../lib/types/messages';
 
 // Columns the parsed markdown may assume: MessageList horizontal padding (2)
@@ -18,23 +17,10 @@ interface MarkdownViewProps {
 
 export function ChatMessageContent({ content, parts, uid }: MarkdownViewProps) {
   const { columns } = useWindowSize();
-  const parsedContent = useMemo(
-    () =>
-      renderMessageContent(
-        content,
-        parts,
-        columns - PARSE_WIDTH_RESERVE
-      ).trim(),
+  const lines = useMemo(
+    () => renderMessageLines(content, parts, columns - PARSE_WIDTH_RESERVE),
     [content, parts, columns]
   );
-
-  if (isEmptyString(parsedContent)) {
-    return;
-  }
-  const allLines: string[] = parsedContent.split('\n').map(line => {
-    const trimmed = line.trim();
-    return trimmed.length === 0 ? ' ' : trimmed;
-  });
 
   // Render as a column of one <Text> per line. Each <Text> is its own row, so
   // lines are single-spaced. A trailing '\n' inside a <Text> here (especially
@@ -42,7 +28,7 @@ export function ChatMessageContent({ content, parts, uid }: MarkdownViewProps) {
   // is what made tables and multi-line content double-space.
   return (
     <Box flexDirection="column" flexShrink={1}>
-      {allLines.map((line, i) => (
+      {lines.map((line, i) => (
         <Text key={`${uid}-${i}`} wrap="wrap">
           {line}
         </Text>

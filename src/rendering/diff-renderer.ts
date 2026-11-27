@@ -8,7 +8,7 @@ import {
 } from 'cli-highlight';
 import ansiRegex from 'ansi-regex';
 import { generateSideBySideDiff, type DiffLine } from '../lib/utils/diff-utils';
-import { Position } from '../lib/utils/string-utils';
+import { Position, toUnixLineEndings } from '../lib/utils/string-utils';
 import type { DiffMessagePart } from '../lib/types/messages';
 import { githubDark } from './terminal-markdown-renderer/code-highlight-theme';
 
@@ -36,21 +36,11 @@ function diffSideLine(side: string[], lineNumber: number | undefined): string {
 
 /** Characters a two-sided row spends on everything that is not cell content. */
 const DIFF_COLUMN_OVERHEAD = 5; // '<num> <cell> | <num> <cell>'
-/** Characters a single-sided row spends on everything that is not cell content. */
-const DIFF_SINGLE_COLUMN_OVERHEAD = 1; // '<num> <cell>'
 
 /** Width budget shared by every row of one rendered diff. */
 interface DiffRowLayout {
   numberWidth: number;
   colWidth: number;
-}
-
-/** Everything a single-sided row draws: one cell taken from one side. */
-interface SingleSidedRowParams {
-  line: DiffLine;
-  side: string[];
-  lineNumber: number | undefined;
-  at: Position;
 }
 
 /** The two halves one side-by-side row aligns. */
@@ -105,10 +95,9 @@ interface DiffRendererOptions {
 }
 
 /**
- * Lays out a {@link DiffMessagePart} as an ANSI side-by-side grid: two aligned
- * columns, or a single full-width column when the change is one-sided (only
- * additions or only removals) — a permanently empty opposite column carries no
- * information.
+ * Lays out a {@link DiffMessagePart} as an ANSI side-by-side grid of two
+ * aligned columns: removals on the left, additions on the right, one half
+ * blank when a change touched only one side.
  *
  * `language` is the language of the *content*, not of the diff itself; it is
  * what the columns are highlighted as.
@@ -130,20 +119,18 @@ export class DiffRenderer {
   }
 
   public renderDiff(part: DiffMessagePart): string {
-    const { previous, current, language = DEFAULT_LANG } = part;
+    // CRLF endings never reach the grid: a carriage return inside a cell is
+    // rendered as a cursor return and garbles the row. The diff sides are the
+    // only path file content takes into the renderer.
+    const previous = toUnixLineEndings(part.previous);
+    const current = toUnixLineEndings(part.current);
+    const { language = DEFAULT_LANG } = part;
     // Rows pre-computed at emit time are honoured verbatim; an empty list
     // means the tool found no changes, so nothing is rendered.
     const rows = part.rows ?? generateSideBySideDiff(previous, current);
     if (!isNonEmptyArray(rows)) return '';
 
     const availableWidth = this.shellWidth;
-    const hasRemoved = rows.some(([left, right]) =>
-      Boolean(left.removed || right.removed)
-    );
-    const hasAdded = rows.some(([left, right]) =>
-      Boolean(left.added || right.added)
-    );
-    const singleSided = hasRemoved !== hasAdded;
 
     const numberWidth = String(
       Math.max(previous.split('\n').length, current.split('\n').length)
@@ -151,20 +138,15 @@ export class DiffRenderer {
 
     // Floor the cell width so a narrow terminal stays legible instead of
     // collapsing to nothing. The non-cell cost per row is numberWidth plus
-    // the separators: two cells joined by ' | ', or one cell after '<num> '.
+    // the separators: two cells joined by ' | '.
     const layout: DiffRowLayout = {
       numberWidth,
-      colWidth: singleSided
-        ? Math.max(
-            DIFF_MIN_COL_WIDTH,
-            availableWidth - numberWidth - DIFF_SINGLE_COLUMN_OVERHEAD
-          )
-        : Math.max(
-            DIFF_MIN_COL_WIDTH,
-            Math.floor(
-              (availableWidth - 2 * numberWidth - DIFF_COLUMN_OVERHEAD) / 2
-            )
-          ),
+      colWidth: Math.max(
+        DIFF_MIN_COL_WIDTH,
+        Math.floor(
+          (availableWidth - 2 * numberWidth - DIFF_COLUMN_OVERHEAD) / 2
+        )
+      ),
     };
 
     // Highlight each side as a single block, then index it by line number.
@@ -178,21 +160,7 @@ export class DiffRenderer {
 
     const lines = rows.map(([left, right]) => {
       if (left.collapsed || right.collapsed) {
-        return singleSided
-          ? this.collapsedSingleSidedRow(layout)
-          : this.collapsedRow(layout);
-      }
-
-      if (singleSided) {
-        const line = hasAdded ? right : left;
-        const at = hasAdded ? Position.START : Position.END;
-        const side = hasAdded ? newLines : oldLines;
-        const lineNumber = hasAdded
-          ? line.lineNumberModified
-          : line.lineNumberOriginal;
-        return this.finishDiffRow(
-          this.singleSidedDiffRow({ line, side, lineNumber, at }, layout)
-        );
+        return this.collapsedRow(layout);
       }
 
       return this.finishDiffRow(
@@ -271,21 +239,6 @@ export class DiffRenderer {
     const blank = ' '.repeat(layout.numberWidth);
     const rule = chalk.dim(DIFF_ELLISION.repeat(layout.colWidth));
     return `${blank} ${rule} | ${blank} ${rule}`;
-  }
-
-  private collapsedSingleSidedRow(layout: DiffRowLayout): string {
-    const blank = ' '.repeat(layout.numberWidth);
-    return `${blank} ${chalk.dim(DIFF_ELLISION.repeat(layout.colWidth))}`;
-  }
-
-  private singleSidedDiffRow(
-    { line, side, lineNumber, at }: SingleSidedRowParams,
-    layout: DiffRowLayout
-  ): string {
-    return [
-      this.diffNumber(lineNumber, layout.numberWidth),
-      this.diffCell(diffSideLine(side, lineNumber), line, layout.colWidth, at),
-    ].join(' ');
   }
 
   private sideBySideDiffRow(

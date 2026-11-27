@@ -1,4 +1,4 @@
-import { isNonEmptyString } from '@vxti/typed';
+import { isNonEmptyArray, isNonEmptyString } from '@vxti/typed';
 import chalk from 'chalk';
 import { marked } from 'marked';
 import { githubDark } from './code-highlight-theme';
@@ -57,38 +57,54 @@ export function parseMarkdown(input: string, width: number): string {
 }
 
 /**
- * Renders a message's structured parts below its parsed `content`. Parts are
- * the sole carrier of rendering-only data — a diff part holds the changed
- * file's two sides, so the content never stores it a second time.
+ * Renders a message into display lines, its structured parts below the parsed
+ * `content`. Parts are the sole carrier of rendering-only data — a diff part
+ * holds the changed file's two sides, so the content never stores it a second
+ * time.
+ *
+ * Markdown lines are trimmed and blank lines collapsed to a single space; diff
+ * rows come through verbatim, since their column alignment is padding-based
+ * and any trim would shear the grid's halves apart.
  */
-export function renderMessageContent(
+export function renderMessageLines(
   content: string,
   parts: MessagePart[] | undefined,
   width: number
-): string {
-  const parsed = parseMarkdown(content, width);
-  const renderedParts = renderParts(parts, width);
-  return renderedParts.length === 0
-    ? parsed
-    : `${parsed.trimEnd()}\n\n${renderedParts}`;
+): string[] {
+  const blocks = [
+    markdownLines(content, width),
+    ...(parts ?? []).map(part =>
+      part.type === MessagePartType.DIFF
+        ? diffLines(part, width)
+        : markdownLines(part.content, width)
+    ),
+  ]
+    .map(withoutBlankEdges)
+    .filter(isNonEmptyArray);
+
+  return blocks.flatMap((block, index) =>
+    index === 0 ? block : [' ', ...block]
+  );
 }
 
-function renderParts(parts: MessagePart[] | undefined, width: number): string {
-  if (parts === undefined) return '';
-
-  return parts
-    .map(part => renderPart(part, width))
-    .filter(rendered => isNonEmptyString(rendered))
-    .join('\n\n');
+function withoutBlankEdges(lines: string[]): string[] {
+  const first = lines.findIndex(line => line !== ' ');
+  if (first === -1) return [];
+  const last = lines.findLastIndex(line => line !== ' ');
+  return lines.slice(first, last + 1);
 }
 
-function renderPart(part: MessagePart, width: number): string {
-  return part.type === MessagePartType.DIFF
-    ? renderDiffPart(part, width)
-    : parseMarkdown(part.content, width);
+function markdownLines(markdown: string, width: number): string[] {
+  return parseMarkdown(markdown, width)
+    .split('\n')
+    .map(line => {
+      const trimmed = line.trim();
+      return trimmed.length === 0 ? ' ' : trimmed;
+    });
 }
 
-function renderDiffPart(part: DiffMessagePart, width: number): string {
+function diffLines(part: DiffMessagePart, width: number): string[] {
   diffRenderer.setWidth(width);
-  return diffRenderer.renderDiff(part);
+  const rendered = diffRenderer.renderDiff(part);
+  return isNonEmptyString(rendered) ? rendered.split('\n') : [];
 }

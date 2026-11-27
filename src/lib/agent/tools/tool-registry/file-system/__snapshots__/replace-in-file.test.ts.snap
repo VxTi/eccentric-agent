@@ -10,15 +10,17 @@ exports[`replace_in_file > applies an exact single-occurrence replacement 1`] = 
 `;
 
 exports[`replace_in_file > rendering > attaches the diff as a part and renders it beside the headline 1`] = `
-"Edited render-diff.txt
-
-   ——————————————————————————————————————————————————————— |    ———————————————————————————————————————————————————————
- 3   line 3                                                |  3   line 3                                               
- 4   line 4                                                |  4   line 4                                               
- 5 - line 5                                                |  5 + REPLACED                                             
- 6   line 6                                                |  6   line 6                                               
- 7   line 7                                                |  7   line 7                                               
-   ——————————————————————————————————————————————————————— |    ———————————————————————————————————————————————————————"
+[
+  "Edited render-diff.txt",
+  " ",
+  "   ——————————————————————————————————————————————————————— |    ———————————————————————————————————————————————————————",
+  " 3   line 3                                                |  3   line 3                                               ",
+  " 4   line 4                                                |  4   line 4                                               ",
+  " 5 - line 5                                                |  5 + REPLACED                                             ",
+  " 6   line 6                                                |  6   line 6                                               ",
+  " 7   line 7                                                |  7   line 7                                               ",
+  "   ——————————————————————————————————————————————————————— |    ———————————————————————————————————————————————————————",
+]
 `;
 
 exports[`replace_in_file > rendering > formats long arguments by showing only their tail 1`] = `
@@ -40,12 +42,14 @@ line 8
 `;
 
 exports[`replace_in_file > rendering > notes when the whitespace-lenient fallback was used 1`] = `
-"Edited render-whitespace.txt
- Matched ignoring per-line indentation; whole lines were replaced and re-indented.
-
-1   function f() {                                         | 1   function f() {                                        
-2 - 	return 1;                                             | 2 + 	return 2;                                            
-3   }                                                      | 3   }                                                     "
+[
+  "Edited render-whitespace.txt",
+  "Matched ignoring per-line indentation; whole lines were replaced and re-indented.",
+  " ",
+  "1   function f() {                                         | 1   function f() {                                        ",
+  "2 - 	return 1;                                             | 2 + 	return 2;                                            ",
+  "3   }                                                      | 3   }                                                     ",
+]
 `;
 
 exports[`replace_in_file > rendering > shows the old text, an ellipsis, and the new text 1`] = `

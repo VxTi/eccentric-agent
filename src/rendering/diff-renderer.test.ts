@@ -43,28 +43,36 @@ describe('DiffRenderer', () => {
       `);
     });
 
-    it('should render additions only as a single-sided diff', () => {
+    it('renders an additions-only diff as a two-column grid with additions on the right', () => {
       const rendered = renderer.renderDiff(
         part('line 1\nline 2', 'line 1\nline 2\nline 3\nline 4')
       );
-      expect(rendered).toMatchInlineSnapshot(`
-        "1   line 1                                                                      
-        2   line 2                                                                      
-        3 + line 3                                                                      
-        4 + line 4                                                                      "
-      `);
+
+      for (const row of rowsOf(rendered)) {
+        expect(row).toContain(' | ');
+      }
+
+      const addedRow = rowsOf(rendered).find(row => row.includes('+ line 3'));
+      expect(addedRow).toBeDefined();
+      const [oldHalf, newHalf] = addedRow!.split(' | ');
+      expect(newHalf).toContain('+ line 3');
+      expect(oldHalf!.trim()).toBe('');
     });
 
-    it('should render removals only as a single-sided diff', () => {
+    it('renders a removals-only diff as a two-column grid with removals on the left', () => {
       const rendered = renderer.renderDiff(
         part('line 1\nline 2\nline 3\nline 4', 'line 1\nline 2')
       );
-      expect(rendered).toMatchInlineSnapshot(`
-        "1   line 1                                                                      
-        2   line 2                                                                      
-        3 - line 3                                                                      
-        4 - line 4                                                                      "
-      `);
+
+      for (const row of rowsOf(rendered)) {
+        expect(row).toContain(' | ');
+      }
+
+      const removedRow = rowsOf(rendered).find(row => row.includes('- line 3'));
+      expect(removedRow).toBeDefined();
+      const [oldHalf, newHalf] = removedRow!.split(' | ');
+      expect(oldHalf).toContain('- line 3');
+      expect(newHalf!.trim()).toBe('');
     });
 
     it('collapses the unchanged majority of a long file', () => {
@@ -96,6 +104,15 @@ describe('DiffRenderer', () => {
 
       expect(rows).toHaveLength(1);
       expect(rows[0]).toContain('—');
+    });
+
+    it('renders CRLF content without carrying carriage returns into the grid', () => {
+      const rendered = renderer.renderDiff(
+        part('one\r\ntwo\r\nthree\r\n', 'one\r\nTWO!\r\nthree\r\n')
+      );
+
+      expect(rendered).not.toContain('\r');
+      expect(rendered).toContain('TWO!');
     });
   });
 

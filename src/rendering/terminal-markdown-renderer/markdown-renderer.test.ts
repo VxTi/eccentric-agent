@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderMessageContent } from './markdown-renderer';
+import { renderMessageLines } from './markdown-renderer';
 import { generateSideBySideDiff } from '../../lib/utils/diff-utils';
 import {
   MessagePartType,
@@ -16,40 +16,70 @@ const diffPart: DiffMessagePart = {
   rows: generateSideBySideDiff(previous, current),
 };
 
-describe('renderMessageContent with parts', () => {
-  it('appends the diff part below the parsed content', () => {
-    const rendered = renderMessageContent('Edited `file.ts`', [diffPart], 120);
+describe('renderMessageLines', () => {
+  it('renders the diff part below the parsed content', () => {
+    const lines = renderMessageLines('Edited `file.ts`', [diffPart], 120);
 
-    expect(rendered).toContain('Edited file.ts');
-    expect(rendered).toContain('2 - line 2');
-    expect(rendered).toContain('2 + changed');
+    expect(lines.join('\n')).toContain('Edited file.ts');
+    expect(lines.join('\n')).toContain('2 - line 2');
+    expect(lines.join('\n')).toContain('2 + changed');
+    expect(lines.filter(line => line === ' ')).toHaveLength(1);
   });
 
-  it('renders nothing extra without parts', () => {
-    expect(renderMessageContent('plain text', undefined, 120)).not.toContain(
-      'line 2'
-    );
+  it('renders nothing without parts', () => {
+    const lines = renderMessageLines('plain text', undefined, 120);
+
+    expect(lines.join('\n')).toContain('plain text');
+    expect(lines.join('\n')).not.toContain('line 2');
   });
 
-  it('appends nothing when the diff part has no rows', () => {
-    const rendered = renderMessageContent(
+  it('renders nothing when the diff part has no rows', () => {
+    const lines = renderMessageLines(
       'plain text',
       [{ ...diffPart, rows: [] }],
       120
     );
 
-    expect(rendered).not.toContain('line 2');
+    expect(lines.join('\n')).toContain('plain text');
+    expect(lines.join('\n')).not.toContain('line 2');
   });
 
   it('renders text parts below the parsed content', () => {
-    const rendered = renderMessageContent(
+    const lines = renderMessageLines(
       'headline',
       [{ type: MessagePartType.TEXT, content: '**plain** tail' }],
       120
     );
 
-    expect(rendered).toContain('headline');
-    expect(rendered).toContain('plain');
-    expect(rendered).toContain('tail');
+    expect(lines.join('\n')).toContain('headline');
+    expect(lines.join('\n')).toContain('plain');
+    expect(lines.join('\n')).toContain('tail');
+  });
+
+  it('trims markdown lines but keeps diff rows verbatim', () => {
+    const twelveLines = Array.from(
+      { length: 12 },
+      (_, i) => `line ${i + 1}`
+    ).join('\n');
+    const wideDiff: DiffMessagePart = {
+      ...diffPart,
+      previous: twelveLines,
+      current: twelveLines.replace('line 6', 'changed'),
+      rows: generateSideBySideDiff(
+        twelveLines,
+        twelveLines.replace('line 6', 'changed')
+      ),
+    };
+
+    const lines = renderMessageLines('headline', [wideDiff], 120);
+    const diffRows = lines.slice(lines.indexOf('headline') + 1);
+
+    // A markdown line arrives trimmed; a diff row keeps the number column's
+    // leading padding, which is what keeps the grid's halves aligned.
+    expect(lines[0]).toBe('headline');
+    const removedRow = diffRows.find(line => line.includes('- line 6'));
+    expect(removedRow).toMatch(/^ 6 - line 6/);
+    const changedRow = diffRows.find(line => line.includes('+ changed'));
+    expect(changedRow).toContain(' |  6 + changed');
   });
 });

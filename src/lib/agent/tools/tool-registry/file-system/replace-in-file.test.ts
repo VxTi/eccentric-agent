@@ -6,7 +6,7 @@ import { type Result, type SuccessResult } from '../../../../result';
 import { store, setCwd } from '../../../../state';
 import { NotifierChannel } from '../../../../events/notifier';
 import type { ToolChannelParams } from '../../tool-definition';
-import { renderMessageContent } from '../../../../../rendering/terminal-markdown-renderer/markdown-renderer';
+import { renderMessageLines } from '../../../../../rendering/terminal-markdown-renderer/markdown-renderer';
 import {
   MessagePartType,
   type DiffMessagePart,
@@ -709,7 +709,7 @@ describe('replace_in_file', () => {
       );
       expect(diffPart?.type).toBe(MessagePartType.DIFF);
       expect(diffPart?.rows?.length).toBeGreaterThan(0);
-      expect(renderMessageContent(report, parts, 120)).toMatchSnapshot();
+      expect(renderMessageLines(report, parts, 120)).toMatchSnapshot();
     });
 
     it('notes when the whitespace-lenient fallback was used', async () => {
@@ -745,7 +745,7 @@ describe('replace_in_file', () => {
         channel,
         result.data.context!
       );
-      expect(renderMessageContent(report, parts, 120)).toMatchSnapshot();
+      expect(renderMessageLines(report, parts, 120)).toMatchSnapshot();
     });
   });
 });
