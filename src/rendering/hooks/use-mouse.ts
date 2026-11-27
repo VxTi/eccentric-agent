@@ -1,8 +1,8 @@
+import type { MouseEvent } from '../../lib/mouse-input';
 import { type DependencyList, useEffect } from 'react';
-import { type MouseListener } from '../context/mouse-context';
 import { useMouseContext } from './use-mouse-context';
 
-export type { MouseListener };
+export type MouseListener = (event: MouseEvent) => void;
 
 /**
  * Subscribes the given listener to global mouse events for the lifetime of the component.

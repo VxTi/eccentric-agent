@@ -1,9 +1,8 @@
+import type { WheelDirection, WheelEvent } from '../../lib/mouse-input';
 import { type DependencyList, useEffect } from 'react';
-import type { WheelDirection } from '../../lib/mouse-input';
-import type { WheelListener } from '../context/mouse-context';
 import { useMouseContext } from './use-mouse-context';
 
-export type { WheelListener };
+export type WheelListener = (event: WheelEvent) => void;
 
 const SCROLL_STEP = 1;
 

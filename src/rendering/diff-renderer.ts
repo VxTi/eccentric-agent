@@ -13,7 +13,6 @@ import type { DiffMessagePart } from '../lib/types/messages';
 import { githubDark } from './terminal-markdown-renderer/code-highlight-theme';
 
 const DEFAULT_LANG = 'plaintext';
-const DEFAULT_SHELL_WIDTH = 80;
 const DIFF_MIN_COL_WIDTH = 10;
 
 const ANSI_REGEXP = ansiRegex();
@@ -95,28 +94,27 @@ interface DiffRendererOptions {
  */
 export class DiffRenderer {
   private readonly codeHighlighting: HighlightOptions | undefined;
-  private shellWidth: number;
   /** Whole-side highlight results, reused across re-parses (terminal resizes,
    *  component remounts). Bounded: the newest entries matter most. */
   private readonly highlightCache = new Map<string, string[]>();
 
-  public constructor(options: DiffRendererOptions = {}, width?: number) {
+  public constructor(options: DiffRendererOptions = {}) {
     this.codeHighlighting = options.codeHighlighting;
-    this.shellWidth = width ?? DEFAULT_SHELL_WIDTH;
   }
 
-  public setWidth(newWidth: number): void {
-    this.shellWidth = newWidth;
-  }
-
-  public renderDiff(part: DiffMessagePart): string {
+  /**
+   * `width` is the column count the grid may occupy, taken per call: the
+   * renderer holds no layout state, so one component's diff cannot be laid out
+   * against another's width.
+   */
+  public renderDiff(part: DiffMessagePart, width: number): string {
     const { language = DEFAULT_LANG, lineCounts } = part;
     // Rows always come pre-computed from the emitting tool; an empty list
     // means no changes, so nothing is rendered.
     const rows = part.rows;
     if (!isNonEmptyArray(rows)) return '';
 
-    const availableWidth = this.shellWidth;
+    const availableWidth = width;
 
     const numberWidth = String(
       Math.max(lineCounts.previous, lineCounts.current)

@@ -1,8 +1,11 @@
+import type { DiffMessagePart } from '../../../lib/types/messages';
 import { isNotNil } from '@vxti/typed';
 import { Box, Text, type DOMElement, measureElement } from 'ink';
 import { useMemo, useRef, useState } from 'react';
-import type { DiffMessagePart } from '../../../lib/types/messages';
 import { useScrollOffset } from '../../context/scroll-offset-context';
+// Direct imports, not the `hooks` barrel: the barrel also pulls in
+// `use-agent` → `agent-context` → `lib/agent`, which is circular with
+// `lib/state` and breaks when this component is the test's entry point.
 import { useMouse } from '../../hooks/use-mouse';
 import { isWithinBounds } from '../../hooks/use-pointer-focus';
 import { diffLines } from '../../terminal-markdown-renderer/markdown-renderer';
@@ -34,26 +37,39 @@ export function CollapsibleDiff({ part, width }: CollapsibleDiffProps) {
   const boundsRef = useRef<DOMElement>(null);
   const scrollOffset = useScrollOffset();
 
-  useMouse(event => {
-    if (event.kind !== 'down' || event.button !== LEFT_MOUSE_BUTTON) return;
-    if (!boundsRef.current) return;
+  const [hovering, setHovering] = useState(false);
 
-    const bounds = measureElement(boundsRef.current);
-    // `measureElement` reports layout coordinates, which exclude the scroll
-    // container's contentOffsetY; mouse events are viewport coordinates.
-    const clicked = isWithinBounds(
-      event.x,
-      event.y + scrollOffset.current,
-      bounds
-    );
-    if (clicked) setIsExpanded(expanded => !expanded);
-  });
+  const { visible, hiddenCount } = useMemo(() => {
+    const visible = diffLines(part, width);
+    if (isExpanded) return { visible, hiddenCount: 0 };
 
-  const lines = useMemo(() => diffLines(part, width), [part, width]);
-  const { visible, hiddenCount } = isExpanded
-    ? { visible: lines, hiddenCount: 0 }
-    : collapseDiffLines(lines, COLLAPSED_DIFF_MAX_LINES);
+    return collapseDiffLines(visible, COLLAPSED_DIFF_MAX_LINES);
+  }, [isExpanded, part, width]);
   const footer = diffFooter(isExpanded, hiddenCount);
+
+  useMouse(
+    event => {
+      if (!boundsRef.current) return;
+      const bounds = measureElement(boundsRef.current);
+      // `measureElement` reports layout coordinates, which exclude the scroll
+      // container's contentOffsetY; mouse events are viewport coordinates.
+      const over = isWithinBounds(
+        event.x,
+        event.y + scrollOffset.current,
+        bounds
+      );
+
+      if (event.kind === 'move' && hovering !== over && isNotNil(footer)) {
+        setHovering(over);
+        return;
+      }
+
+      if (event.kind !== 'down' || event.button !== LEFT_MOUSE_BUTTON) return;
+
+      if (over) setIsExpanded(expanded => !expanded);
+    },
+    [hovering, setHovering, setIsExpanded, footer]
+  );
 
   return (
     <Box ref={boundsRef} flexDirection="column" flexShrink={1}>
@@ -62,7 +78,7 @@ export function CollapsibleDiff({ part, width }: CollapsibleDiffProps) {
           {line}
         </Text>
       ))}
-      {isNotNil(footer) && <Text dimColor>{footer}</Text>}
+      {isNotNil(footer) && <Text dimColor={hovering}>{footer}</Text>}
     </Box>
   );
 }

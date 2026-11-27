@@ -1,6 +1,6 @@
 import { isNonEmptyArray, isNonEmptyString } from '@vxti/typed';
 import chalk from 'chalk';
-import { marked } from 'marked';
+import { marked, type MarkedOptions } from 'marked';
 import { githubDark } from './code-highlight-theme';
 import { HEADINGS, TerminalRenderer } from './terminal-markdown-renderer';
 import { DiffRenderer } from '../diff-renderer';
@@ -47,12 +47,17 @@ const diffRenderer = new DiffRenderer({
  * width). Callers must pass the width their container actually gives them.
  */
 export function parseMarkdown(input: string, width: number): string {
-  terminalRenderer.setWidth(width);
-  return marked.parse(input, {
+  // The width is handed to the renderer through the parse options, so it scopes
+  // to this parse alone: marked assigns the merged options of the current parse
+  // to the renderer it invokes. Nothing is mutated on the shared renderer, and
+  // a parse started later at another width cannot see this one's.
+  const options: MarkedOptions & { width: number; async: false } = {
     gfm: true,
     renderer: terminalRenderer,
     async: false,
-  });
+    width,
+  };
+  return marked.parse(input, options);
 }
 
 export interface LinesBlock {
@@ -143,7 +148,6 @@ function markdownLines(markdown: string, width: number): string[] {
 }
 
 export function diffLines(part: DiffMessagePart, width: number): string[] {
-  diffRenderer.setWidth(width);
-  const rendered = diffRenderer.renderDiff(part);
+  const rendered = diffRenderer.renderDiff(part, width);
   return isNonEmptyString(rendered) ? rendered.split('\n') : [];
 }

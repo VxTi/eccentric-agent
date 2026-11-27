@@ -31,13 +31,14 @@ describe('DiffRenderer', () => {
     rendered.split('\n').filter(line => line.trim().length > 0);
 
   beforeEach(() => {
-    renderer = new DiffRenderer({}, WIDTH);
+    renderer = new DiffRenderer({});
   });
 
   describe('renderDiff', () => {
     it('should render a side-by-side diff correctly', () => {
       const rendered = renderer.renderDiff(
-        part('line 1\nline 2\nline 3', 'line 1\nline A\nline 3\nline 4')
+        part('line 1\nline 2\nline 3', 'line 1\nline A\nline 3\nline 4'),
+        WIDTH
       );
       expect(rendered).toMatchInlineSnapshot(`
         "1   line 1                             | 1   line 1                            
@@ -49,7 +50,8 @@ describe('DiffRenderer', () => {
 
     it('renders an additions-only diff as a two-column grid with additions on the right', () => {
       const rendered = renderer.renderDiff(
-        part('line 1\nline 2', 'line 1\nline 2\nline 3\nline 4')
+        part('line 1\nline 2', 'line 1\nline 2\nline 3\nline 4'),
+        WIDTH
       );
 
       for (const row of rowsOf(rendered)) {
@@ -65,7 +67,8 @@ describe('DiffRenderer', () => {
 
     it('renders a removals-only diff as a two-column grid with removals on the left', () => {
       const rendered = renderer.renderDiff(
-        part('line 1\nline 2\nline 3\nline 4', 'line 1\nline 2')
+        part('line 1\nline 2\nline 3\nline 4', 'line 1\nline 2'),
+        WIDTH
       );
 
       for (const row of rowsOf(rendered)) {
@@ -85,7 +88,7 @@ describe('DiffRenderer', () => {
       const currentContent = oldContent.replace('line 100', 'line ONE HUNDRED');
 
       const rows = rowsOf(
-        renderer.renderDiff(part(oldContent, currentContent))
+        renderer.renderDiff(part(oldContent, currentContent), WIDTH)
       );
 
       expect(rows).toHaveLength(7);
@@ -103,7 +106,7 @@ describe('DiffRenderer', () => {
       ];
 
       const rows = rowsOf(
-        renderer.renderDiff(part('old\n', 'new\n', collapsedRows))
+        renderer.renderDiff(part('old\n', 'new\n', collapsedRows), WIDTH)
       );
 
       expect(rows).toHaveLength(1);
@@ -117,7 +120,8 @@ describe('DiffRenderer', () => {
         part(
           toUnixLineEndings('one\r\ntwo\r\nthree\r\n'),
           toUnixLineEndings('one\r\nTWO!\r\nthree\r\n')
-        )
+        ),
+        WIDTH
       );
 
       expect(rendered).not.toContain('\r');
@@ -156,10 +160,9 @@ describe('DiffRenderer', () => {
       current: string,
       language?: string
     ): string =>
-      new DiffRenderer(
-        { codeHighlighting: { theme: buildGithubDarkTheme() } },
-        WIDTH
-      ).renderDiff(part(previous, current, undefined, language));
+      new DiffRenderer({
+        codeHighlighting: { theme: buildGithubDarkTheme() },
+      }).renderDiff(part(previous, current, undefined, language), WIDTH);
 
     it('paints changed rows red and green', () => {
       const rows = rowsOf(render('shared\nold line\n', 'shared\nnew line\n'));

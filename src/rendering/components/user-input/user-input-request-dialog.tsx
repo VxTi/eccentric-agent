@@ -16,6 +16,16 @@ import {
 import { useAgent, useInputArea } from '../../hooks';
 import { parseMarkdown } from '../../terminal-markdown-renderer/markdown-renderer';
 
+/**
+ * Columns the parsed description may not use: the dialog renders it inside a
+ * `borderStyle="round"` box, whose left and right border spend 2 of the
+ * terminal's columns. Same semantic as `PARSE_WIDTH_RESERVE` in
+ * chat-message-content.tsx — the width handed to `parseMarkdown` is the width
+ * the rendered blocks may actually occupy — so the horizontal rules and tables
+ * a description produces fit inside the box instead of overflowing it.
+ */
+const PARSE_WIDTH_BORDER_RESERVE = 2;
+
 interface Props {
   request: UserInputRequest;
 }
@@ -140,7 +150,7 @@ export function UserInputRequestDialog({
   const mdDescription = useMemo(() => {
     if (!isNonEmptyString(description)) return;
 
-    const md = parseMarkdown(description, columns);
+    const md = parseMarkdown(description, columns - PARSE_WIDTH_BORDER_RESERVE);
 
     return md.split('\n').slice(0, 5).join('\n');
   }, [description, columns]);

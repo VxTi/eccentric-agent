@@ -2,6 +2,18 @@ import { type ChalkInstance } from 'chalk';
 import { type HighlightOptions } from 'cli-highlight';
 import { type TableOptions } from 'cli-table3';
 
+declare module 'marked' {
+  interface MarkedOptions<_ParserOutput = string, _RendererOutput = string> {
+    /**
+     * Column count the parsed blocks may occupy, carried per parse. marked
+     * hands the merged options of the current parse to the renderer as
+     * `this.options` (see `Parser`'s constructor), so the width travels with
+     * the parse and leaves nothing behind on the renderer for the next one.
+     */
+    width?: number | undefined;
+  }
+}
+
 export declare namespace TerminalMarked {
   type StringTransformFn = (input: string) => string;
 

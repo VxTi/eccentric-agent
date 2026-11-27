@@ -20,6 +20,9 @@ const DEFAULT_INDENTATION = 2;
 const DEFAULT_LANG = 'plaintext';
 const DEFAULT_SHELL_WIDTH = 80;
 
+/** Fenced-code highlight results kept per `TerminalRenderer` instance. */
+const MAX_HIGHLIGHT_CACHE_ENTRIES = 16;
+
 const ANSI_REGEXP = ansiRegex();
 
 // HARD_RETURN holds a character sequence used to indicate text has a
@@ -53,7 +56,16 @@ export const HEADINGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const;
 
 export class TerminalRenderer extends Renderer {
   private readonly config: TerminalMarked.RendererOptions;
-  private shellWidth: number;
+  /** Width of the terminal at construction, for parses that request none. */
+  private readonly defaultWidth: number;
+  /** Highlighted fenced-code blocks, reused across re-parses (terminal
+   *  resizes, component remounts). Bounded: the newest entries matter most. */
+  private readonly highlightCache = new Map<string, string>();
+  /** Nesting depth of the list being rendered: 1 for a top-level list, 2 for a
+   *  list nested inside an item, and so on. Zero outside any list. Only alive
+   *  while a `list()` call is on the stack, so it reads back as the depth of the
+   *  list currently being rendered. */
+  private listDepth = 0;
 
   public constructor(
     options: TerminalMarked.RendererOptions,
@@ -65,7 +77,7 @@ export class TerminalRenderer extends Renderer {
     // the derived column width becomes NaN and every diff cell collapses to the
     // truncation mark.
     const { columns } = process.stdout;
-    this.shellWidth =
+    this.defaultWidth =
       isNotNil(columns) && columns > 0 ? columns : DEFAULT_SHELL_WIDTH;
   }
 
@@ -134,17 +146,62 @@ export class TerminalRenderer extends Renderer {
       }
     }
 
-    text += this.parser.parse(tokens).trim();
+    // A list nested in this item is rendered by the recursive `list()` the parse
+    // below reaches, so its bullets arrive as extra lines of *this* item's
+    // content. Fold the block padding down to a single break — a child must sit
+    // directly under its parent, never a blank line away — and then indent every
+    // line but the item's own: the bullet prefixes the first line only, so the
+    // indentation is what keeps continuation text and nested bullets attached to
+    // the item they belong to.
+    text += this.indentContinuation(
+      this.parser
+        .parse(tokens)
+        .replace(/\n{2,}/g, '\n')
+        .trim()
+    );
 
     return this.config.listitem?.(text) ?? text;
   }
 
   public override list({ items }: Tokens.List): string {
-    const transformed = items
-      .map(item => this.listitem(item).trim())
-      .join('\n');
+    // A nested list is rendered from inside `listitem()`'s recursive parse, so
+    // the depth spans exactly the item mapping — and is released even when a
+    // render throws, never leaking into the next parse.
+    const isNested = this.listDepth > 0;
+    this.listDepth += 1;
 
-    return this.makeSection(this.config.list?.(transformed) ?? transformed, 1);
+    let transformed: string;
+    try {
+      transformed = items.map(item => this.listitem(item).trim()).join('\n');
+    } finally {
+      this.listDepth -= 1;
+    }
+
+    const content = this.config.list?.(transformed) ?? transformed;
+
+    // A top-level list keeps the section edges that separate it from the
+    // surrounding blocks; a nested one is embedded in its parent item's content,
+    // where those edges would surface as blank lines between parent and children
+    // — a single break is all it takes to start the children on their own line.
+    return isNested ? `\n${content}` : this.makeSection(content, 1);
+  }
+
+  /**
+   * Indents every line of a list item's content but the first, so continuation
+   * lines and nested items align under the bullet text instead of drifting back
+   * to the margin. Blank lines are left bare: padding them would turn them into
+   * indentation-only lines, which the line-based output reads as content.
+   */
+  private indentContinuation(text: string): string {
+    if (!text.includes('\n')) return text;
+
+    const pad = ' '.repeat(this.config.indentation ?? DEFAULT_INDENTATION);
+    const [first, ...rest] = text.split('\n');
+
+    return [
+      first,
+      ...rest.map(line => (isEmptyString(line.trim()) ? line : pad + line)),
+    ].join('\n');
   }
 
   public override blockquote({ tokens, text }: Tokens.Blockquote): string {
@@ -297,12 +354,17 @@ export class TerminalRenderer extends Renderer {
 
   /* ------------------------------------------------------------------ */
 
+  /**
+   * The width of the parse currently being rendered: marked's `Parser` assigns
+   * the merged options of that parse to `this.options`, so the width travels
+   * with the parse instead of living on this (shared) renderer instance. A
+   * parse that requests none falls back to the terminal width.
+   */
   private get width(): number {
-    return this.shellWidth;
-  }
-
-  public setWidth(newWidth: number): void {
-    this.shellWidth = newWidth;
+    const { width } = this.options;
+    return isNotNil(width) && Number.isFinite(width) && width > 0
+      ? width
+      : this.defaultWidth;
   }
 
   private get isFormattingEnabled(): boolean {
@@ -315,12 +377,31 @@ export class TerminalRenderer extends Renderer {
       code,
       this.config.reflowText ?? false
     );
+
+    // Re-parses (terminal resize, remount) hand back the exact same code, so
+    // the highlight — the most expensive step of code-block rendering — runs
+    // once per block. Language is part of the key: the same source highlighted
+    // as two languages must not collide.
+    const key = `${language}\u0000${reflowed}`;
+    const cached = this.highlightCache.get(key);
+    if (isNotNil(cached)) return cached;
+
     try {
-      return highlightCli(reflowed, {
+      const highlighted = highlightCli(reflowed, {
         language,
         ...this.config.codeHighlighting,
       });
+
+      if (this.highlightCache.size >= MAX_HIGHLIGHT_CACHE_ENTRIES) {
+        const oldest = this.highlightCache.keys().next().value;
+        if (isNotNil(oldest)) this.highlightCache.delete(oldest);
+      }
+      this.highlightCache.set(key, highlighted);
+
+      return highlighted;
     } catch {
+      // The fallback is cheap and content-derived, so it is not cached: a
+      // transient highlighter failure must not pin its fallback output.
       return this.config.code?.(reflowed) ?? reflowed;
     }
   }

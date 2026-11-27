@@ -12,9 +12,6 @@ import {
 } from '../../lib/mouse-input';
 import { PubSub } from '../../lib/events/pub-sub';
 
-export type MouseListener = (event: MouseEvent) => void;
-export type WheelListener = (event: WheelEvent) => void;
-
 export interface MouseContextInstance {
   mouse: PubSub<MouseEvent>;
   wheel: PubSub<WheelEvent>;
