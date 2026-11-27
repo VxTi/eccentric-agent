@@ -1,0 +1,40 @@
+FINDING 9: the resize/re-calculation path has zero test coverage
+=================================================================
+Priority: medium (everything above ships unverified at width boundaries)
+Risk: low — tests only. Do this AFTER findings 5/7/8 to test the end state.
+
+Problem
+-------
+Every test that renders markdown or diffs uses width 120
+(markdown-renderer.test.ts, replace-in-file.test.ts snapshots). No test:
+- renders the same input at two different widths and asserts the output
+  actually changes where it must (hr line length equals width; diff
+  colWidth shrink; table columns fit),
+- asserts output is UNCHANGED where it must be (paragraph text, list
+  bullets — the width-independent parts),
+- exercises the narrow-terminal degenerate cases added by finding 2's
+  refactor (width too small for min column width -> intrinsic fallback),
+- covers the user-input-request-dialog truncation (slice(0, 5)).
+
+What to do
+----------
+Add a "resize" describe block to markdown-renderer.test.ts:
+1. hr: parseMarkdown('---', w) for w in [40, 80, 120] -> the dashes line is
+   exactly w chars (ANSI-stripped).
+2. Stability: paragraph/list/blockquote output identical across widths
+   (guards against accidental width coupling).
+3. Tables at [120, 60, 40]: every rendered line's visible width (strip ANSI
+   via ansi-regex, already imported in terminal-markdown-renderer.ts) is
+   <= w; at the degenerate floor, intrinsic-width fallback kicks in.
+4. Diff: diffLines at two widths -> column count math follows
+   DiffRenderer's layout formula; narrow width respects DIFF_MIN_COL_WIDTH.
+5. If finding 8 is done first: also assert that calling parseMarkdown for
+   component A does not disturb a subsequent parse for component B with a
+   different width (the regression finding 8 exists to guarantee).
+
+Constraints
+-----------
+- Do not snapshot the resize outputs (they'd churn); assert properties.
+- Reuse the existing ANSI-strip approach from the tests added with
+  finding 2 rather than adding a new utility.
+- Keep width constants explicit in tests; no magic reuse of 120 everywhere.

@@ -195,9 +195,20 @@ export class TerminalRenderer extends Renderer {
     // directly. Each body row must be an array of cell strings; pushing a plain
     // string (or an object) makes cli-table3 render a vertical table, which is
     // what produced the stray "text" first column and one cell per line.
+    // Columns are laid out within the shell width so the grid survives narrow
+    // terminals: cli-table3 truncates overflow at a fixed column width
+    // ANSI-aware (see utils.truncateWidthWithAnsi), instead of letting Ink's
+    // hard wrap cut mid-cell.
+    const tableOptions = this.config.tableOptions;
+    const colWidths =
+      tableOptions?.colWidths === undefined
+        ? computeColumnWidths(this.width, header.length)
+        : undefined;
+
     const table = new Table({
       head: header.map(cell => this.renderTableCell(cell)),
-      ...(this.config.tableOptions ?? {}),
+      ...tableOptions,
+      ...(colWidths === undefined ? {} : { colWidths }),
     });
 
     for (const row of rows) {
@@ -425,4 +436,29 @@ export class TerminalRenderer extends Renderer {
     const newlines = '\n'.repeat(size);
     return `${newlines}${text}${newlines}`;
   }
+}
+
+const MIN_TABLE_COLUMN_WIDTH = 3;
+
+/**
+ * Distributes the shell width evenly across `columnCount` columns, subtracting
+ * the (columnCount + 1) border characters that flank and separate them.
+ * Returns `undefined` when the width is too small to give every column a
+ * usable width; the table then falls back to its intrinsic width.
+ */
+function computeColumnWidths(
+  width: number,
+  columnCount: number
+): number[] | undefined {
+  if (columnCount < 1) return undefined;
+
+  const available = width - (columnCount + 1);
+  if (available < columnCount * MIN_TABLE_COLUMN_WIDTH) return undefined;
+
+  const base = Math.floor(available / columnCount);
+  const remainder = available - base * columnCount;
+  return Array.from(
+    { length: columnCount },
+    (_, index) => base + (index < remainder ? 1 : 0)
+  );
 }

@@ -1,6 +1,7 @@
 import { Box, type DOMElement, useBoxMetrics } from 'ink';
 import { type RefObject, useEffect, useRef, useState } from 'react';
 import { ScrollAcceleration, usePointerFocus, useScroll } from '../hooks';
+import { ScrollOffsetProvider } from '../context/scroll-offset-context';
 import { MessageList } from './messages/message-list';
 import { WelcomingText } from './welcome-text';
 
@@ -10,6 +11,7 @@ export function ScrollList({
   containerRef: RefObject<DOMElement | null>;
 }) {
   const contentRef = useRef<DOMElement>(null);
+  const scrollOffsetRef = useRef(0);
 
   const containerMetrics = useBoxMetrics(containerRef);
   const contentMetrics = useBoxMetrics(contentRef);
@@ -51,16 +53,22 @@ export function ScrollList({
     );
   }, [maxScroll]);
 
+  useEffect(() => {
+    scrollOffsetRef.current = scrollTop;
+  }, [scrollTop]);
+
   return (
-    <Box
-      ref={contentRef}
-      contentOffsetY={scrollTop}
-      flexDirection="column"
-      alignItems="flex-start"
-      flexShrink={0}
-    >
-      <WelcomingText />
-      <MessageList />
-    </Box>
+    <ScrollOffsetProvider offset={scrollOffsetRef}>
+      <Box
+        ref={contentRef}
+        contentOffsetY={scrollTop}
+        flexDirection="column"
+        alignItems="flex-start"
+        flexShrink={0}
+      >
+        <WelcomingText />
+        <MessageList />
+      </Box>
+    </ScrollOffsetProvider>
   );
 }

@@ -1,0 +1,40 @@
+FINDING 7: markdown code blocks re-highlight on every resize
+============================================================
+Priority: medium-high (performance on resize, long chats)
+Risk: low — purely additive caching, no output change.
+
+Problem
+-------
+On a terminal resize, useWindowSize() changes width, which invalidates the
+useMemo in ChatMessageContent (deps include width), so EVERY historical
+message re-parses, and every fenced code block re-runs cli-highlight
+(TerminalRenderer.highlightCode, terminal-markdown-renderer.ts ~line 301).
+There is no caching on the markdown side.
+
+DiffRenderer already solved the identical problem: it keeps a bounded
+`highlightCache` keyed by content (diff-renderer.ts ~line 101), with FIFO
+eviction at MAX_HIGHLIGHT_CACHE_ENTRIES (~line 323). Highlighting is
+width-independent in both cases, so the cache stays valid across resizes.
+
+What to do
+----------
+Mirror the DiffRenderer pattern in TerminalRenderer:
+- Add `private readonly highlightCache = new Map<string, string>()` keyed by
+  `${language}\0${code}` (include language — same code in two languages
+  must not collide).
+- Read through it in highlightCode() (only on the success path; the catch
+  fallback must not be cached).
+- Same bounded eviction: on insert, if size >= MAX, delete oldest key
+  (Map preserves insertion order).
+- Consider extracting the tiny bounded-map logic into one shared helper used
+  by both DiffRenderer and TerminalRenderer instead of duplicating it
+  (DRY) — only if it stays small; do not invent a framework.
+
+Constraints
+-----------
+- Cache values are ANSI-styled strings; do not key on width.
+- Do not cache when chalk.level === 0 (isFormattingEnabled false returns
+  plain code anyway — happens before highlight, fine).
+- Tests: assert a second render of identical code does not re-highlight
+  (e.g. spy on cli-highlight, or expose cache size for the test) and that
+  eviction keeps the map bounded.

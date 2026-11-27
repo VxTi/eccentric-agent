@@ -29,7 +29,6 @@ export const markdownFormattingOptions = {
   del: chalk.dim.gray.strikethrough,
   link: chalk.cyan,
   href: chalk.blue.underline,
-  maxWidth: 120,
   reflowText: false,
   unescape: true,
   indentation: 2,
@@ -56,13 +55,69 @@ export function parseMarkdown(input: string, width: number): string {
   });
 }
 
+export interface LinesBlock {
+  kind: 'lines';
+  lines: string[];
+}
+
+export interface DiffBlock {
+  kind: 'diff';
+  part: DiffMessagePart;
+}
+
+export type MessageBlock = LinesBlock | DiffBlock;
+
+/**
+ * Splits a message into renderable blocks: parsed markdown (content and text
+ * parts) as line blocks, diff parts kept whole so the UI can render them
+ * interactively. Blocks are trimmed of blank edges and empty ones dropped;
+ * callers are responsible for the spacing *between* blocks.
+ */
+export function renderMessageBlocks(
+  content: string,
+  parts: MessagePart[] | undefined,
+  width: number
+): MessageBlock[] {
+  const blocks: MessageBlock[] = [
+    { kind: 'lines', lines: markdownLines(content, width) },
+    ...(parts ?? []).map(
+      (part): MessageBlock =>
+        part.type === MessagePartType.DIFF
+          ? { kind: 'diff', part }
+          : { kind: 'lines', lines: markdownLines(part.content, width) }
+    ),
+  ];
+  return blocks.map(withoutBlankEdges).filter(isNonEmptyBlock);
+}
+
+function withoutBlankEdges(block: MessageBlock): MessageBlock {
+  if (block.kind === 'diff') return block;
+
+  const lines = trimBlankEdges(block.lines);
+  return { kind: 'lines', lines };
+}
+
+function trimBlankEdges(lines: string[]): string[] {
+  const first = lines.findIndex(line => line !== ' ');
+  if (first === -1) return [];
+  const last = lines.findLastIndex(line => line !== ' ');
+  return lines.slice(first, last + 1);
+}
+
+function isNonEmptyBlock(block: MessageBlock): boolean {
+  return block.kind === 'diff'
+    ? isNonEmptyArray(block.part.rows)
+    : block.lines.length > 0;
+}
+
 /**
  * Renders a message into display lines, its structured parts below the parsed
  * `content`. Parts are the sole carrier of rendering-only data — a diff part
  * holds the changed file's two sides, so the content never stores it a second
  * time.
  *
- * Markdown lines are trimmed and blank lines collapsed to a single space; diff
+ * Markdown lines are trailing-trimmed (the renderer's leading indentation is
+ * kept) and blank lines collapsed to a single space; diff
  * rows come through verbatim, since their column alignment is padding-based
  * and any trim would shear the grid's halves apart.
  */
@@ -71,39 +126,23 @@ export function renderMessageLines(
   parts: MessagePart[] | undefined,
   width: number
 ): string[] {
-  const blocks = [
-    markdownLines(content, width),
-    ...(parts ?? []).map(part =>
-      part.type === MessagePartType.DIFF
-        ? diffLines(part, width)
-        : markdownLines(part.content, width)
-    ),
-  ]
-    .map(withoutBlankEdges)
-    .filter(isNonEmptyArray);
-
-  return blocks.flatMap((block, index) =>
-    index === 0 ? block : [' ', ...block]
-  );
-}
-
-function withoutBlankEdges(lines: string[]): string[] {
-  const first = lines.findIndex(line => line !== ' ');
-  if (first === -1) return [];
-  const last = lines.findLastIndex(line => line !== ' ');
-  return lines.slice(first, last + 1);
+  return renderMessageBlocks(content, parts, width)
+    .map(block =>
+      block.kind === 'diff' ? diffLines(block.part, width) : block.lines
+    )
+    .flatMap((lines, index) => (index === 0 ? lines : [' ', ...lines]));
 }
 
 function markdownLines(markdown: string, width: number): string[] {
   return parseMarkdown(markdown, width)
     .split('\n')
     .map(line => {
-      const trimmed = line.trim();
+      const trimmed = line.trimEnd();
       return trimmed.length === 0 ? ' ' : trimmed;
     });
 }
 
-function diffLines(part: DiffMessagePart, width: number): string[] {
+export function diffLines(part: DiffMessagePart, width: number): string[] {
   diffRenderer.setWidth(width);
   const rendered = diffRenderer.renderDiff(part);
   return isNonEmptyString(rendered) ? rendered.split('\n') : [];

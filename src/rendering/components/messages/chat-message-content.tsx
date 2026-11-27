@@ -1,7 +1,8 @@
 import { Box, Text, useWindowSize } from 'ink';
-import { useMemo } from 'react';
-import { renderMessageLines } from '../../terminal-markdown-renderer/markdown-renderer';
+import { Fragment, useMemo } from 'react';
+import { renderMessageBlocks } from '../../terminal-markdown-renderer/markdown-renderer';
 import type { MessagePart } from '../../../lib/types/messages';
+import { CollapsibleDiff } from './collapsible-diff';
 
 // Columns the parsed markdown may assume: MessageList horizontal padding (2)
 // plus the marker column every message row reserves for its bullet/prefix (2).
@@ -17,9 +18,10 @@ interface MarkdownViewProps {
 
 export function ChatMessageContent({ content, parts, uid }: MarkdownViewProps) {
   const { columns } = useWindowSize();
-  const lines = useMemo(
-    () => renderMessageLines(content, parts, columns - PARSE_WIDTH_RESERVE),
-    [content, parts, columns]
+  const width = columns - PARSE_WIDTH_RESERVE;
+  const blocks = useMemo(
+    () => renderMessageBlocks(content, parts, width),
+    [content, parts, width]
   );
 
   // Render as a column of one <Text> per line. Each <Text> is its own row, so
@@ -28,10 +30,19 @@ export function ChatMessageContent({ content, parts, uid }: MarkdownViewProps) {
   // is what made tables and multi-line content double-space.
   return (
     <Box flexDirection="column" flexShrink={1}>
-      {lines.map((line, i) => (
-        <Text key={`${uid}-${i}`} wrap="wrap">
-          {line}
-        </Text>
+      {blocks.map((block, index) => (
+        <Fragment key={`${uid}-${index}`}>
+          {index > 0 && <Text> </Text>}
+          {block.kind === 'diff' ? (
+            <CollapsibleDiff part={block.part} width={width} />
+          ) : (
+            block.lines.map((line, lineIndex) => (
+              <Text key={`${uid}-${index}-${lineIndex}`} wrap="wrap">
+                {line}
+              </Text>
+            ))
+          )}
+        </Fragment>
       ))}
     </Box>
   );

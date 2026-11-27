@@ -44,7 +44,7 @@ line 8
 exports[`replace_in_file > rendering > notes when the whitespace-lenient fallback was used 1`] = `
 [
   "Edited render-whitespace.txt",
-  "Matched ignoring per-line indentation; whole lines were replaced and re-indented.",
+  " Matched ignoring per-line indentation; whole lines were replaced and re-indented.",
   " ",
   "1   function f() {                                         | 1   function f() {                                        ",
   "2 - 	return 1;                                             | 2 + 	return 2;                                            ",

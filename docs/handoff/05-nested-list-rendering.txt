@@ -1,0 +1,41 @@
+FINDING 5: nested lists lose structure twice
+============================================
+Priority: medium (visual correctness, no resize dependency)
+Risk: low-medium — renderer output shape changes, snapshots WILL change.
+
+Problem
+-------
+Two layers conspire to flatten nested markdown lists:
+
+1. src/rendering/terminal-markdown-renderer/terminal-markdown-renderer.ts,
+   `list()` (~line 142): items are rendered via `this.listitem(item)` and
+   joined with '\n' WITHOUT indenting nested content. A nested list lives
+   inside its parent item's tokens, so `listitem()` -> `this.parser.parse()`
+   renders it as extra lines inside the parent's text block.
+
+2. src/rendering/terminal-markdown-renderer/markdown-renderer.ts,
+   `markdownFormattingOptions.listitem`:
+   `item => `${chalk.cyan('• ') + item}\n`` — the bullet is prefixed to the
+   ENTIRE (possibly multi-line) item string. Result: one bullet at the top,
+   continuation lines with no bullet, no indentation.
+
+   `markdownLines()` (now trimEnd-only, see finding 4) preserves whatever
+   leading whitespace exists, but the renderer produces none for nesting.
+
+What to do
+----------
+- In `TerminalRenderer.list()`, indent nested multi-line item content by
+  config.indentation (or a list-depth-aware amount) before joining.
+- Track list depth (e.g. a counter around the recursive parser.parse call
+  inside listitem) so nested lists get their own bullet + indent.
+- Keep the `• ` prefix emission in sync: with depth tracking, the prefix
+  belongs per list-item, not per top-level block.
+
+Constraints
+-----------
+- Do not change the flat-list output (current snapshots must survive for
+  non-nested lists, modulo intentional whitespace from finding 4).
+- Update/extend tests in markdown-renderer.test.ts: nested list at depth 2+
+  renders bullet per item with increasing indent.
+- Review every snapshot diff; nested-list snapshot changes are expected and
+  must be eyeballed, not blindly accepted.

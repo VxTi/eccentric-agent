@@ -40,7 +40,7 @@ export interface Bounds {
   height: number;
 }
 
-function isWithinBounds(x: number, y: number, bounds: Bounds): boolean {
+export function isWithinBounds(x: number, y: number, bounds: Bounds): boolean {
   return (
     x >= bounds.x &&
     x < bounds.x + bounds.width &&
