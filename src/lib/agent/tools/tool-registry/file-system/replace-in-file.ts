@@ -1,20 +1,13 @@
-import {
-  isEmptyArray,
-  isEmptyString,
-  isNil,
-  isNonEmptyArray,
-  isNotNil,
-  type NonEmptyArray,
-} from '@vxti/typed';
+import { isEmptyString, isNil, isNotNil, isNonEmptyArray } from '@vxti/typed';
 import { readFile, writeFile } from 'fs/promises';
 import path from 'node:path';
 import * as z from 'zod';
 import { Result } from '../../../../result';
 import { store } from '../../../../state';
 import { formatDiffMd } from '../../../../utils/diff-utils';
-import { existsAsync } from '../../../../utils/fs';
 import { detectLineEnding, LINE_BREAK } from '../../../../utils/string-utils';
 import { createTool } from '../../tool-definition';
+import { locateRange, trimDuplicatedSeams } from './replace-in-file-range';
 
 const inputSchema = z.object({
   filePath: z
@@ -87,7 +80,8 @@ const outputSchema = z.object({
 
 const MAX_SHOWN_LINES = 5;
 const TRAILING_LINE_BREAK = /\r?\n$/;
-const READ_FILE_PREFIX = /^\s*\d+\t/;
+/** Errnos that mean the path holds no file, whichever call reported them. */
+const MISSING_FILE_ERRNOS: ReadonlySet<string> = new Set(['ENOENT', 'ENOTDIR']);
 
 export const replaceInFile = createTool({
   internalName: 'replace_in_file',
@@ -195,11 +189,15 @@ async function handleReplaceInFile({
   } = store.getState();
   const absolutePath = path.resolve(cwd, filePath);
 
-  if (!(await existsAsync(absolutePath))) {
-    return Result.Error(`No file exists at \`${absolutePath}\`.`);
+  // No preflight existence check: the read is the check, so a file removed in
+  // between the two calls can never be edited as though it were still there.
+  let original: string;
+  try {
+    original = await readFile(absolutePath, 'utf-8');
+  } catch (cause) {
+    return Result.Error(describeIoFailure('read', absolutePath, cause));
   }
 
-  const original = await readFile(absolutePath, 'utf-8');
   const newline = detectLineEnding(original);
   const hadTrailingNewline = TRAILING_LINE_BREAK.test(original);
   const lines = original.split(LINE_BREAK);
@@ -230,7 +228,11 @@ async function handleReplaceInFile({
   if (hadTrailingNewline && isNonEmptyArray(lines)) {
     updated += newline;
   }
-  await writeFile(absolutePath, updated, 'utf-8');
+  try {
+    await writeFile(absolutePath, updated, 'utf-8');
+  } catch (cause) {
+    return Result.Error(describeIoFailure('write to', absolutePath, cause));
+  }
   await fileCache.update(absolutePath);
 
   return Result.Ok(
@@ -250,525 +252,58 @@ async function handleReplaceInFile({
   );
 }
 
+/**
+ * The lines `replacement` carries. A trailing `\n` separates lines rather than
+ * starting one, so a lone `\n` — a separator with nothing in front of it —
+ * holds no content and deletes the range instead of writing a blank line.
+ */
 function splitReplacement(replacement: string): string[] {
-  if (isEmptyString(replacement)) return [];
+  if (isEmptyString(replacement) || replacement === '\n') return [];
 
   const lines = replacement.split(LINE_BREAK);
   if (lines.length > 1 && lines.at(-1) === '') lines.pop();
   return lines;
 }
 
-/** The endpoints and span of one edit, as the caller described them. */
-interface RangeQuery {
-  hintLine: number;
-  leadingAnchor: string;
-  trailingAnchor: string | undefined;
-  count: number;
-}
-
-/** How strongly a file line agrees with an anchor, strongest evidence first. */
-type AnchorStrength = 'exact' | 'whitespace' | 'stale-prefix';
-
-const ANCHOR_STRENGTH_RANK: Record<AnchorStrength, number> = {
-  exact: 0,
-  whitespace: 1,
-  'stale-prefix': 2,
-};
-
-/** An anchor reduced to the forms a single file line can agree with it. */
-interface AnchorEvidence {
-  /** The anchor's first line, minus a `read_file` prefix when it was current. */
-  anchor: string;
-  /** `anchor` without its surrounding whitespace. */
-  trimmed: string;
-  /** `anchor` minus a copied `read_file` `<n>\t` prefix, when it carried one. */
-  withoutPrefix: string | null;
-}
-
-/** A line that agrees with `leadingAnchor`, scored by how near the hint it sits. */
-interface LeadingMatch {
-  startLine: number;
-  strength: AnchorStrength;
-  distance: number;
-}
-
-/** A range the endpoints corroborate, scored like its leading match. */
-interface RangeCandidate extends LeadingMatch {
-  endLine: number;
-  countAdjustment: 0 | 1 | -1;
-}
-
-/** One span of lines the trailing anchor corroborates at a start line. */
-interface SpanOption {
-  endLine: number;
-  countAdjustment: 0 | 1 | -1;
-}
-
-/** Where an edit will land, plus any `count` correction the endpoints forced. */
-interface LocatedRange {
-  startLine: number;
-  countAdjustment: 0 | 1 | -1;
-}
-
 /**
- * Resolves the first line of the range from its endpoints.
- *
- * The hinted line wins when it matches — first against the anchor exactly as
- * sent, before any `read_file` prefix is stripped — otherwise the nearest exact
- * match, then the nearest whitespace-insensitive match, so that edits planned
- * from a read made before earlier edits still land on the intended line.
- *
- * A trailing anchor, when supplied, is independent evidence about where the
- * range ends rather than a second name for its start. Relocation therefore only
- * offers ranges whose end line agrees with it, which is what keeps a nearer copy
- * of a repeated leading line from being mistaken for the intended start. A
- * claimed end that disagrees gets one bounded chance: when the anchor matches
- * exactly one line either side of it, `count` is corrected by that much and the
- * correction is reported; agreement on both sides leaves the span undecidable
- * and is reported. An edit whose endpoints agree nowhere is reported rather
- * than written.
- *
- * Without a trailing anchor nothing is filtered up front: the nearest leading
- * match is chosen first, and only then is its span checked against the file
- * length — the pre-`trailingAnchor` behavior, unchanged.
+ * Frames a filesystem failure so the model can act on it: the file concerned is
+ * named absolutely and the underlying detail is kept, so an unexpected
+ * `EACCES` or `EISDIR` is never reported as a missing file, and a non-`Error`
+ * throw is surfaced rather than reduced to a generic one.
  */
-function locateRange(lines: string[], query: RangeQuery): Result<LocatedRange> {
-  const leading = toEvidence(
-    normalizeAnchor(query.leadingAnchor, query.hintLine)
-  );
-  const trailing = resolveTrailingAnchor(query);
-  const endOffset = query.count - 1;
-
-  // A blank leading anchor describes no content, so the only line it can confirm
-  // is the hinted one; relocating it would guess the range instead of match it.
-  const blankLeading = isEmptyString(leading.trimmed);
-  const stalePrefix = uniqueStalePrefix(lines, leading);
-
-  const leadingMatches: LeadingMatch[] = [];
-  const candidates: RangeCandidate[] = [];
-  const pastEnd: number[] = [];
-
-  lines.forEach((line, index) => {
-    const startLine = index + 1;
-    const isHinted = startLine === query.hintLine;
-
-    // The anchor as the caller sent it outranks every normalized form, so a
-    // line that legitimately opens with digits and a tab is never mistaken for
-    // a copied `read_file` prefix and relocated to the line holding the
-    // stripped content — the pre-normalization behavior, unchanged.
-    const strength =
-      isHinted && line === query.leadingAnchor
-        ? 'exact'
-        : blankLeading
-          ? isHinted && isEmptyString(line.trim())
-            ? 'exact'
-            : null
-          : leadingStrength(line, leading, stalePrefix);
-    if (isNil(strength)) return;
-
-    const match: LeadingMatch = {
-      startLine,
-      strength,
-      distance: Math.abs(startLine - query.hintLine),
-    };
-    leadingMatches.push(match);
-
-    // Without a trailing anchor the original behavior applies: every leading
-    // match is a candidate, the nearest one is chosen first, and only then is
-    // the chosen range checked against the file length — so a farther match
-    // that fits is never edited in place of a nearer one that overruns.
-    if (isNil(trailing)) {
-      candidates.push({
-        ...match,
-        endLine: startLine + endOffset,
-        countAdjustment: 0,
-      });
-      return;
-    }
-
-    const spans = spanOptions(startLine, query.count, lines, trailing);
-    if (isNonEmptyArray(spans)) {
-      spans.forEach(span =>
-        candidates.push({
-          ...match,
-          endLine: span.endLine,
-          countAdjustment: span.countAdjustment,
-        })
-      );
-      return;
-    }
-
-    if (startLine + endOffset > lines.length) pastEnd.push(startLine);
-  });
-
-  if (isNonEmptyArray(candidates)) {
-    const chosen = selectCandidate(candidates, query, trailing);
-    if (!chosen.ok) return chosen;
-
-    // The file-length check runs after the nearest match is chosen, exactly as
-    // it did before `trailingAnchor` existed.
-    if (isNil(trailing) && chosen.data.endLine > lines.length)
-      return Result.Error(
-        describeOverrun(lines, [chosen.data.startLine], query)
-      );
-
-    return Result.Ok({
-      startLine: chosen.data.startLine,
-      countAdjustment: chosen.data.countAdjustment,
-    });
-  }
-  if (isEmptyArray(leadingMatches)) {
-    return Result.Error(
-      blankLeading
-        ? describeBlankAnchor(lines, query)
-        : describeMissingLeadingAnchor(lines, query)
-    );
-  }
-  if (pastEnd.length === leadingMatches.length) {
-    return Result.Error(describeOverrun(lines, pastEnd, query));
-  }
-
-  // A leading match fits the file, so only the trailing endpoint can have ruled
-  // every candidate range out.
-  return Result.Error(describeDisagreement(lines, leadingMatches, query));
-}
-
-/**
- * Chooses the range the endpoints point at, or reports why they cannot decide.
- * An exactly corroborated span beats any inferred one, then the hinted line,
- * then the strongest agreement with `leadingAnchor`, then the closest one.
- */
-function selectCandidate(
-  candidates: NonEmptyArray<RangeCandidate>,
-  query: RangeQuery,
-  trailing: AnchorEvidence | null
-): Result<RangeCandidate> {
-  candidates.sort(compareCandidates);
-  const best = candidates[0];
-
-  const equallyGood = candidates.filter(
-    candidate => compareCandidates(candidate, best) === 0
-  );
-  if (equallyGood.length > 1)
-    return Result.Error(describeAmbiguity(equallyGood, query, trailing));
-
-  return Result.Ok(best);
-}
-
-/**
- * The spans `count` could describe at `startLine`: the claimed one when its end
- * agrees with the trailing anchor, otherwise — the bounded repair for a
- * miscount — a span one line shorter or longer whose end agrees. Agreement on
- * both sides yields both, leaving the span undecidable for `selectCandidate`.
- */
-function spanOptions(
-  startLine: number,
-  count: number,
-  lines: string[],
-  trailing: AnchorEvidence
-): SpanOption[] {
-  const claimedEnd = startLine + count - 1;
-  if (
-    claimedEnd <= lines.length &&
-    endpointAgrees(lines[claimedEnd - 1], trailing)
-  ) {
-    return [{ endLine: claimedEnd, countAdjustment: 0 }];
-  }
-
-  const options: SpanOption[] = [];
-  for (const adjustment of [-1, 1] as const) {
-    const adjustedCount = count + adjustment;
-    if (adjustedCount < 1) continue;
-
-    const endLine = startLine + adjustedCount - 1;
-    if (endLine > lines.length) continue;
-    if (!endpointAgrees(lines[endLine - 1], trailing)) continue;
-    options.push({ endLine, countAdjustment: adjustment });
-  }
-  return options;
-}
-
-/**
- * Preferred order for two ranges the endpoints agree on: an exactly
- * corroborated span beats one inferred from an off-by-one trailing anchor, the
- * hinted line beats any relocation, then the strongest agreement, then the
- * closest one.
- */
-function compareCandidates(a: RangeCandidate, b: RangeCandidate): number {
-  const byCorroboration =
-    Math.abs(a.countAdjustment) - Math.abs(b.countAdjustment);
-  if (byCorroboration !== 0) return byCorroboration;
-
-  return compareLeadingMatches(a, b);
-}
-
-function compareLeadingMatches(a: LeadingMatch, b: LeadingMatch): number {
-  const byHint = (a.distance === 0 ? 0 : 1) - (b.distance === 0 ? 0 : 1);
-  if (byHint !== 0) return byHint;
-
-  const byStrength =
-    ANCHOR_STRENGTH_RANK[a.strength] - ANCHOR_STRENGTH_RANK[b.strength];
-  if (byStrength !== 0) return byStrength;
-
-  return a.distance - b.distance;
-}
-
-/** How strongly `line` agrees with the anchor naming the start of the range. */
-function leadingStrength(
-  line: string,
-  anchor: AnchorEvidence,
-  stalePrefix: string | null
-): AnchorStrength | null {
-  if (line === anchor.anchor) return 'exact';
-  if (line.trim() === anchor.trimmed) return 'whitespace';
-  if (isNotNil(stalePrefix) && line === stalePrefix) return 'stale-prefix';
-  return null;
-}
-
-/**
- * Whether `line` corroborates the anchor naming the end of the range.
- *
- * The same agreements the leading anchor accepts: exact, ignoring surrounding
- * whitespace, and — for a pasted `read_file` prefix — the content underneath it.
- * Here they judge one known line rather than choose between candidates, so a
- * stripped prefix needs no uniqueness guard of its own.
- */
-function endpointAgrees(
-  line: string | undefined,
-  anchor: AnchorEvidence
-): boolean {
-  if (isNil(line)) return false;
-
-  const forms = isNotNil(anchor.withoutPrefix)
-    ? [anchor.anchor, anchor.withoutPrefix]
-    : [anchor.anchor];
-
-  return forms.some(form => line === form || line.trim() === form.trim());
-}
-
-/**
- * Models often paste several lines, or the `<n>\t` prefix `read_file` prints,
- * as an anchor; neither can ever equal a single file line. The prefix is only
- * stripped when it names the line the anchor is expected to sit on, so a stale
- * copy survives for `toEvidence` to repair as a last resort. Stripping happens
- * only after an exact match against the anchor as sent has had its chance at
- * the hinted line, so content that legitimately opens with digits and a tab is
- * never rewritten onto an unrelated line.
- */
-function normalizeAnchor(anchor: string, lineNumber: number): string {
-  const [firstLine = ''] = anchor.split(LINE_BREAK);
-  const readFilePrefix = `${lineNumber}\t`;
-  const unpadded = firstLine.trimStart();
-
-  return unpadded.startsWith(readFilePrefix)
-    ? unpadded.slice(readFilePrefix.length)
-    : firstLine;
-}
-
-function toEvidence(anchor: string): AnchorEvidence {
-  const withoutPrefix = anchor.replace(READ_FILE_PREFIX, '');
-
-  return {
-    anchor,
-    trimmed: anchor.trim(),
-    withoutPrefix:
-      withoutPrefix === anchor || isEmptyString(withoutPrefix)
-        ? null
-        : withoutPrefix,
-  };
-}
-
-/**
- * Last-resort repair for an anchor copied from an older `read_file` whose
- * `<n>\t` prefix no longer matches the hinted line number. Only a form that is
- * exact and unique in the whole file qualifies, so content that legitimately
- * opens with digits and a tab can never be rewritten onto an unrelated line.
- */
-function uniqueStalePrefix(
-  lines: string[],
-  anchor: AnchorEvidence
-): string | null {
-  const target = anchor.withoutPrefix;
-  if (isNil(target)) return null;
-
-  return lines.filter(line => line === target).length === 1 ? target : null;
-}
-
-/**
- * The trailing anchor as endpoint evidence, or null when there is nothing to
- * check: an omitted anchor, or a blank one, says nothing about where the range
- * ends. Its copied `read_file` prefix is stripped against the line the range is
- * claimed to end on, so a pasted `<n>\t` is ignored the same way the leading
- * anchor ignores it.
- */
-function resolveTrailingAnchor(query: RangeQuery): AnchorEvidence | null {
-  if (isNil(query.trailingAnchor)) return null;
-
-  const anchor = normalizeAnchor(
-    query.trailingAnchor,
-    query.hintLine + query.count - 1
-  );
-  return isEmptyString(anchor.trim()) ? null : toEvidence(anchor);
-}
-
-function describeOverrun(
-  lines: string[],
-  pastEnd: number[],
-  query: RangeQuery
+function describeIoFailure(
+  action: 'read' | 'write to',
+  absolutePath: string,
+  cause: unknown
 ): string {
-  const nearest = pastEnd.reduce((best, line) =>
-    Math.abs(line - query.hintLine) < Math.abs(best - query.hintLine)
-      ? line
-      : best
-  );
+  const code = errnoOf(cause);
+  const headline =
+    isNotNil(code) && MISSING_FILE_ERRNOS.has(code)
+      ? `No file exists at \`${absolutePath}\``
+      : `Could not ${action} \`${absolutePath}\``;
 
-  return (
-    `Range starting at line ${nearest} with \`count\` ${query.count} exceeds file` +
-    ` length (${lines.length} line(s)).`
-  );
+  return `${headline} (${detailOf(cause)}).`;
 }
 
-function describeBlankAnchor(lines: string[], query: RangeQuery): string {
-  const hinted = lines[query.hintLine - 1];
-  const reason = isNil(hinted)
-    ? `line ${query.hintLine} is out of range: the file has only ${lines.length} line(s)`
-    : `line ${query.hintLine} does not match the blank \`leadingAnchor\``;
+/** The errno a filesystem call failed with, when it carried one. */
+function errnoOf(cause: unknown): string | undefined {
+  if (!(cause instanceof Error)) return undefined;
 
-  return (
-    `A blank \`leadingAnchor\` cannot be relocated (${reason}). Re-read the file and` +
-    ' anchor on a non-blank line.'
-  );
-}
-
-function describeMissingLeadingAnchor(
-  lines: string[],
-  query: RangeQuery
-): string {
-  const hinted = lines[query.hintLine - 1];
-  const found = isNil(hinted)
-    ? `the file has only ${lines.length} line(s)`
-    : `line ${query.hintLine} is \`${hinted}\``;
-
-  return (
-    `No line matches \`leadingAnchor\` (${found}). The file may have changed; re-read` +
-    ' it and retry.'
-  );
-}
-
-function describeAmbiguity(
-  candidates: RangeCandidate[],
-  query: RangeQuery,
-  trailing: AnchorEvidence | null
-): string {
-  const startLines = [...new Set(candidates.map(c => c.startLine))];
-  const matched = startLines.join(', ');
-
-  return startLines.length === 1
-    ? `\`trailingAnchor\` agrees one line either side of the range \`count\` ${query.count} closes on at line ${matched}, so the range length is ambiguous. Re-read the file and fix \`count\`.`
-    : `\`leadingAnchor\` is ambiguous: lines ${matched} match and are equally near line ${query.hintLine}${
-        isNotNil(trailing)
-          ? ', and `trailingAnchor` agrees at every one of them'
-          : ''
-      }. Re-read the file and anchor on a line that is unique in the file.`;
-}
-
-function describeDisagreement(
-  lines: string[],
-  leadingMatches: LeadingMatch[],
-  query: RangeQuery
-): string {
-  const startLine =
-    [...leadingMatches].sort(compareLeadingMatches)[0]?.startLine ??
-    query.hintLine;
-  const endLine = startLine + query.count - 1;
-
-  return (
-    `The endpoints of this range disagree: \`leadingAnchor\` matches at line` +
-    ` ${startLine}, but the line \`count\` ${query.count} ends that range on — line` +
-    ` ${endLine}, which is \`${lines[endLine - 1] ?? ''}\` — does not agree with` +
-    ' `trailingAnchor`, not even one line either side of it, and no other range' +
-    ' whose first line matches `leadingAnchor` has endpoints that agree. Re-read' +
-    ' the file and fix the anchors or `count`.'
-  );
+  const { code } = cause as { code?: unknown };
+  return typeof code === 'string' ? code : undefined;
 }
 
 /**
- * Drops leading/trailing replacement lines that repeat the file lines just
- * outside the replaced range, as happens when a model sends a diff-style hunk
- * with context. Only seams containing a letter or digit count: a lone `}` or
- * blank line matching its neighbour is as likely intentional as accidental.
- * Nothing is trimmed if that would empty the replacement, since that would
- * silently turn the edit into a deletion.
+ * What actually went wrong, minus the errno token: `ENOENT: no such file or
+ * directory, open '/x'` reads back as `no such file or directory, open '/x'`,
+ * keeping the detail without echoing back the code it names.
  */
-function trimDuplicatedSeams(
-  lines: string[],
-  startLine: number,
-  endLine: number,
-  replacementLines: string[]
-): {
-  replacementLines: string[];
-  duplicatesRemoved: number;
-  duplicatedLines: string[];
-} {
-  const linesAbove = lines.slice(0, startLine - 1);
-  const linesBelow = lines.slice(endLine);
+function detailOf(cause: unknown): string {
+  if (!(cause instanceof Error)) return String(cause);
 
-  const leading = findLongestSeam(
-    replacementLines.length,
-    linesAbove.length,
-    k => linesEqual(replacementLines.slice(0, k), linesAbove.slice(-k))
-  );
-  const trailing = findLongestSeam(
-    replacementLines.length,
-    linesBelow.length,
-    k => linesEqual(replacementLines.slice(-k), linesBelow.slice(0, k))
-  );
+  const code = errnoOf(cause);
+  const prefix = isNil(code) ? '' : `${code}: `;
+  if (!cause.message.startsWith(prefix)) return cause.message;
 
-  const leadingTrim = isSignificantSeam(replacementLines.slice(0, leading))
-    ? leading
-    : 0;
-  const trailingTrim = isSignificantSeam(
-    replacementLines.slice(replacementLines.length - trailing)
-  )
-    ? trailing
-    : 0;
-
-  if (leadingTrim + trailingTrim >= replacementLines.length) {
-    return { replacementLines, duplicatesRemoved: 0, duplicatedLines: [] };
-  }
-
-  return {
-    replacementLines: replacementLines.slice(
-      leadingTrim,
-      replacementLines.length - trailingTrim
-    ),
-    duplicatesRemoved: leadingTrim + trailingTrim,
-    duplicatedLines: [
-      ...replacementLines.slice(0, leadingTrim),
-      ...replacementLines.slice(replacementLines.length - trailingTrim),
-    ],
-  };
-}
-
-function isSignificantSeam(seam: string[]): boolean {
-  return seam.some(line => /[\p{L}\p{N}]/u.test(line));
-}
-
-function findLongestSeam(
-  replacementLength: number,
-  contextLength: number,
-  matchesAt: (seamLength: number) => boolean
-): number {
-  for (
-    let seamLength = Math.min(replacementLength, contextLength);
-    seamLength > 0;
-    seamLength--
-  ) {
-    if (matchesAt(seamLength)) return seamLength;
-  }
-  return 0;
-}
-
-function linesEqual(a: string[], b: string[]): boolean {
-  return a.length === b.length && a.every((line, i) => line === b[i]);
+  return cause.message.slice(prefix.length);
 }

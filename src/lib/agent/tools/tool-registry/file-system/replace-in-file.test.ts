@@ -145,6 +145,30 @@ describe('replace_in_file', () => {
     ]);
   });
 
+  it('treats a lone trailing newline as an empty replacement and deletes the range', async () => {
+    // `'\n'` is a single trailing separator with no content before it, so the
+    // documented splitting semantics make it an empty replacement: the range is
+    // deleted, not overwritten with a blank line.
+    const filePath = await prepareFixture();
+
+    const result = expectOk(
+      await replaceInFile.handle(
+        {
+          filePath,
+          range: { lineNumber: 5, leadingAnchor: 'line 5', count: 1 },
+          replacement: '\n',
+        },
+        channel,
+        signal
+      )
+    );
+
+    expect(result.data.linesInserted).toBe(0);
+    expect(await fs.readFile(filePath, 'utf-8')).toBe(
+      'line 1\nline 2\nline 3\nline 4\nline 6\nline 7\nline 8\nline 9\nline 10\n'
+    );
+  });
+
   it('drops leading replacement lines duplicating the line above the range', async () => {
     const filePath = await prepareFixture();
 
@@ -958,6 +982,35 @@ describe('replace_in_file', () => {
       expect(await fs.readFile(filePath, 'utf-8')).toBe(before);
     });
 
+    it('mentions the overrun evidence when the endpoints disagree and another leading match overflows', async () => {
+      const filePath = await prepareLines('x();', 'a();', 'x();', 'b();');
+      const before = await fs.readFile(filePath, 'utf-8');
+
+      // The nearest `x();` (line 1) fits the file but no span of it closes on
+      // `zz();`; the farther `x();` (line 3) cannot even fit `count` 3 in a
+      // 4-line file. The disagreement report has to carry that overrun evidence
+      // too, not just the endpoint mismatch of the nearest match.
+      const result = await replaceInFile.handle(
+        {
+          filePath,
+          range: {
+            lineNumber: 1,
+            leadingAnchor: 'x();',
+            trailingAnchor: 'zz();',
+            count: 3,
+          },
+          replacement: 'NEW',
+        },
+        channel,
+        signal
+      );
+
+      const error = expectError(result);
+      expect(error).toContain('disagree');
+      expect(error).toContain('exceeds file length');
+      expect(await fs.readFile(filePath, 'utf-8')).toBe(before);
+    });
+
     describe('count off-by-one tolerance', () => {
       it('grows the range when the trailing anchor sits one line past the claimed end', async () => {
         const filePath = await prepareLines('x();', 'a();', 'b();', 'c();');
@@ -1096,6 +1149,27 @@ describe('replace_in_file', () => {
         expect(await readLines(filePath)).toEqual(['NEW', '']);
       });
     });
+  });
+
+  it('reports a missing file with a friendly, path-bearing error', async () => {
+    // There is no preflight existence check to lean on: the read itself is what
+    // fails, and the tool must still surface a human-readable message that
+    // names the file instead of leaking a raw filesystem error.
+    const filePath = path.join(tmpDir, 'does-not-exist.txt');
+
+    const result = await replaceInFile.handle(
+      {
+        filePath,
+        range: { lineNumber: 1, leadingAnchor: 'anything', count: 1 },
+        replacement: 'NEW',
+      },
+      channel,
+      signal
+    );
+
+    const error = expectError(result);
+    expect(error).toContain(filePath);
+    expect(error).not.toContain('ENOENT');
   });
 
   describe('rendering', () => {
