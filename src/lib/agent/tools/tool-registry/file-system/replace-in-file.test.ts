@@ -6,7 +6,11 @@ import { type Result, type SuccessResult } from '../../../../result';
 import { store, setCwd } from '../../../../state';
 import { NotifierChannel } from '../../../../events/notifier';
 import type { ToolChannelParams } from '../../tool-definition';
-import { parseMarkdown } from '../../../../../rendering/terminal-markdown-renderer/markdown-renderer';
+import { renderMessageContent } from '../../../../../rendering/terminal-markdown-renderer/markdown-renderer';
+import {
+  MessagePartType,
+  type DiffMessagePart,
+} from '../../../../types/messages';
 import { readFile } from './read-file';
 import { replaceInFile } from './replace-in-file';
 
@@ -673,7 +677,7 @@ describe('replace_in_file', () => {
       ).toMatchSnapshot();
     });
 
-    it('attaches the diff as payload and renders it beside the headline', async () => {
+    it('attaches the diff as a part and renders it beside the headline', async () => {
       const filePath = await prepareNamedFixture('render-diff.txt');
 
       const result = expectOk(
@@ -695,14 +699,17 @@ describe('replace_in_file', () => {
       );
       expect(report).toBe('Edited `render-diff.txt`');
 
-      const payload = replaceInFile.outputToPayload!(
+      const parts = replaceInFile.outputToParts!(
         result.data.data,
         channel,
         result.data.context!
       );
-      expect(payload?.kind).toBe('diff');
-      expect(payload?.rows.length).toBeGreaterThan(0);
-      expect(parseMarkdown(report, 120, payload)).toMatchSnapshot();
+      const diffPart = parts?.find(
+        (part): part is DiffMessagePart => part.type === MessagePartType.DIFF
+      );
+      expect(diffPart?.type).toBe(MessagePartType.DIFF);
+      expect(diffPart?.rows?.length).toBeGreaterThan(0);
+      expect(renderMessageContent(report, parts, 120)).toMatchSnapshot();
     });
 
     it('notes when the whitespace-lenient fallback was used', async () => {
@@ -733,12 +740,12 @@ describe('replace_in_file', () => {
       );
       expect(report).not.toContain('```');
 
-      const payload = replaceInFile.outputToPayload!(
+      const parts = replaceInFile.outputToParts!(
         result.data.data,
         channel,
         result.data.context!
       );
-      expect(parseMarkdown(report, 120, payload)).toMatchSnapshot();
+      expect(renderMessageContent(report, parts, 120)).toMatchSnapshot();
     });
   });
 });

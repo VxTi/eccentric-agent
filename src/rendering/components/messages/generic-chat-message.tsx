@@ -16,7 +16,7 @@ export function GenericChatMessage({ message }: BaseProps<GenericMessage>) {
       )}
       <ChatMessageContent
         content={message.content}
-        data={message.data}
+        parts={message.parts}
         uid={message.id}
       />
     </Box>

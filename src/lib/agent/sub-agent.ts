@@ -245,11 +245,11 @@ export class SubAgent {
 
         this.channel.notify({
           content: tool.outputToString(data, this.channel, context),
-          data: tool.outputToPayload?.(data, this.channel, context),
+          parts: tool.outputToParts?.(data, this.channel, context),
         });
 
         // Context stays out of the model window: it exists only to feed
-        // `outputToString`/`outputToPayload`, as in `tools/core.ts`.
+        // `outputToString`/`outputToParts`, as in `tools/core.ts`.
         return data;
       },
     });

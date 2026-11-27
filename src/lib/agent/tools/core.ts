@@ -169,7 +169,7 @@ function makeTool(
           content: `${basicHighlightFormatting('→')} ${tool
             .outputToString(output, channel, context)
             .trim()}`,
-          data: tool.outputToPayload?.(output, channel, context),
+          parts: tool.outputToParts?.(output, channel, context),
         });
       } else {
         channel.notify({

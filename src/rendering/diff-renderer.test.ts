@@ -1,28 +1,40 @@
-import { TerminalRenderer } from './terminal-markdown-renderer';
-import { buildGithubDarkTheme } from './code-highlight-theme';
-import type { SideBySideDiff } from '../../lib/utils/diff-utils';
+import { DiffRenderer } from './diff-renderer';
+import { buildGithubDarkTheme } from './terminal-markdown-renderer/code-highlight-theme';
+import { MessagePartType, type DiffMessagePart } from '../lib/types/messages';
+import type { SideBySideDiff } from '../lib/utils/diff-utils';
 import chalk, { type ChalkInstance } from 'chalk';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-describe('TerminalRenderer', () => {
-  let renderer: TerminalRenderer;
+const WIDTH = 80;
+
+const part = (
+  previous: string,
+  current: string,
+  rows?: SideBySideDiff[],
+  language?: string
+): DiffMessagePart => ({
+  type: MessagePartType.DIFF,
+  previous,
+  current,
+  rows,
+  language,
+});
+
+describe('DiffRenderer', () => {
+  let renderer: DiffRenderer;
 
   const rowsOf = (rendered: string): string[] =>
     rendered.split('\n').filter(line => line.trim().length > 0);
 
   beforeEach(() => {
-    renderer = new TerminalRenderer({});
+    renderer = new DiffRenderer({}, WIDTH);
   });
 
   describe('renderDiff', () => {
     it('should render a side-by-side diff correctly', () => {
-      const oldContent = 'line 1\nline 2\nline 3';
-      const newContent = 'line 1\nline A\nline 3\nline 4';
-
-      const rendered = renderer.renderDiff({
-        oldStr: oldContent,
-        newStr: newContent,
-      });
+      const rendered = renderer.renderDiff(
+        part('line 1\nline 2\nline 3', 'line 1\nline A\nline 3\nline 4')
+      );
       expect(rendered).toMatchInlineSnapshot(`
         "1   line 1                             | 1   line 1                            
         2 - line 2                             | 2 + line A                            
@@ -32,13 +44,9 @@ describe('TerminalRenderer', () => {
     });
 
     it('should render additions only as a single-sided diff', () => {
-      const oldContent = 'line 1\nline 2';
-      const newContent = 'line 1\nline 2\nline 3\nline 4';
-
-      const rendered = renderer.renderDiff({
-        oldStr: oldContent,
-        newStr: newContent,
-      });
+      const rendered = renderer.renderDiff(
+        part('line 1\nline 2', 'line 1\nline 2\nline 3\nline 4')
+      );
       expect(rendered).toMatchInlineSnapshot(`
         "1   line 1                                                                      
         2   line 2                                                                      
@@ -48,13 +56,9 @@ describe('TerminalRenderer', () => {
     });
 
     it('should render removals only as a single-sided diff', () => {
-      const oldContent = 'line 1\nline 2\nline 3\nline 4';
-      const newContent = 'line 1\nline 2';
-
-      const rendered = renderer.renderDiff({
-        oldStr: oldContent,
-        newStr: newContent,
-      });
+      const rendered = renderer.renderDiff(
+        part('line 1\nline 2\nline 3\nline 4', 'line 1\nline 2')
+      );
       expect(rendered).toMatchInlineSnapshot(`
         "1   line 1                                                                      
         2   line 2                                                                      
@@ -68,10 +72,9 @@ describe('TerminalRenderer', () => {
       const oldContent = `${previous.join('\n')}\n`;
       const currentContent = oldContent.replace('line 100', 'line ONE HUNDRED');
 
-      const rows = renderer
-        .renderDiff({ oldStr: oldContent, newStr: currentContent })
-        .split('\n')
-        .filter(line => line.trim().length > 0);
+      const rows = rowsOf(
+        renderer.renderDiff(part(oldContent, currentContent))
+      );
 
       expect(rows).toHaveLength(7);
       expect(rows.join('\n')).toContain('line ONE HUNDRED');
@@ -88,11 +91,7 @@ describe('TerminalRenderer', () => {
       ];
 
       const rows = rowsOf(
-        renderer.renderDiff({
-          oldStr: 'old\n',
-          newStr: 'new\n',
-          precomputedRows: collapsedRows,
-        })
+        renderer.renderDiff(part('old\n', 'new\n', collapsedRows))
       );
 
       expect(rows).toHaveLength(1);
@@ -126,10 +125,15 @@ describe('TerminalRenderer', () => {
     const openingOf = (style: ChalkInstance): string =>
       style('\u0001').split('\u0001')[0] ?? '';
 
-    const render = (oldStr: string, newStr: string, lang?: string): string =>
-      new TerminalRenderer({
-        codeHighlighting: { theme: buildGithubDarkTheme() },
-      }).renderDiff({ oldStr, newStr, lang });
+    const render = (
+      previous: string,
+      current: string,
+      language?: string
+    ): string =>
+      new DiffRenderer(
+        { codeHighlighting: { theme: buildGithubDarkTheme() } },
+        WIDTH
+      ).renderDiff(part(previous, current, undefined, language));
 
     it('paints changed rows red and green', () => {
       const rows = rowsOf(render('shared\nold line\n', 'shared\nnew line\n'));

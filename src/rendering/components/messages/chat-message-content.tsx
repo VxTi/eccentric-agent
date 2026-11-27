@@ -1,8 +1,8 @@
 import { isEmptyString } from '@vxti/typed';
 import { Box, Text, useWindowSize } from 'ink';
 import { useMemo } from 'react';
-import { parseMarkdown } from '../../terminal-markdown-renderer/markdown-renderer';
-import type { ToolMessageData } from '../../../lib/agent/tools/tool-payload';
+import { renderMessageContent } from '../../terminal-markdown-renderer/markdown-renderer';
+import type { MessagePart } from '../../../lib/types/messages';
 
 // Columns the parsed markdown may assume: MessageList horizontal padding (2)
 // plus the marker column every message row reserves for its bullet/prefix (2).
@@ -12,15 +12,20 @@ const PARSE_WIDTH_RESERVE = 4;
 
 interface MarkdownViewProps {
   content: string;
-  data?: ToolMessageData;
+  parts?: MessagePart[];
   uid: string;
 }
 
-export function ChatMessageContent({ content, data, uid }: MarkdownViewProps) {
+export function ChatMessageContent({ content, parts, uid }: MarkdownViewProps) {
   const { columns } = useWindowSize();
   const parsedContent = useMemo(
-    () => parseMarkdown(content, columns - PARSE_WIDTH_RESERVE, data).trim(),
-    [content, columns, data]
+    () =>
+      renderMessageContent(
+        content,
+        parts,
+        columns - PARSE_WIDTH_RESERVE
+      ).trim(),
+    [content, parts, columns]
   );
 
   if (isEmptyString(parsedContent)) {

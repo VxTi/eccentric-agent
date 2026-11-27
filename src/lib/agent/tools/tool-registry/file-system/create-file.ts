@@ -9,6 +9,7 @@ import {
 import { mkdir, writeFile } from 'fs/promises';
 import { existsAsync } from '../../../../utils/fs';
 import { createTool } from '../../tool-definition';
+import { MessagePartType } from '../../../../types/messages';
 
 const inputSchema = z.object({
   path: z.string().describe('The absolute path of the file to create'),
@@ -60,14 +61,16 @@ export const createFile = createTool({
     return `Wrote to \`${filePath}\``;
   },
 
-  outputToPayload(_, __, { filePath, newContent }) {
-    return {
-      kind: 'diff',
-      previous: '',
-      current: newContent,
-      rows: generateSideBySideDiff('', newContent),
-      language: diffLanguageForFile(filePath),
-    };
+  outputToParts(_, __, { filePath, newContent }) {
+    return [
+      {
+        type: MessagePartType.DIFF,
+        previous: '',
+        current: newContent,
+        rows: generateSideBySideDiff('', newContent),
+        language: diffLanguageForFile(filePath),
+      },
+    ];
   },
 });
 

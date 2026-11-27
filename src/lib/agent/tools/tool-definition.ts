@@ -1,7 +1,7 @@
 import type { NonEmptyArray } from '@vxti/typed';
 import type * as z from 'zod';
 import type { Result } from '../../result';
-import type { GenericMessage } from '../../types/messages';
+import type { GenericMessage, MessagePart } from '../../types/messages';
 import type { NotifierChannel } from '../../events/notifier';
 import type {
   ApprovalOption,
@@ -10,9 +10,6 @@ import type {
 } from '../../types/types';
 import { isBoolean, isNumber, isObject, isString } from 'lodash-es';
 import chalk from 'chalk';
-import type { ToolMessageData } from './tool-payload';
-
-export type { ToolMessageData } from './tool-payload';
 
 export const enum ToolSelectionOption {
   ALLOW = 'allow',
@@ -98,17 +95,17 @@ export interface IToolDefinition<
   ): string;
 
   /**
-   * Builds the structured data attached to the tool's completion message for
-   * the UI, from `context`. Diff payloads are the sole carrier of the diff:
-   * `outputToString` must not embed the changed content. Nothing returned here
-   * reaches the model context.
+   * Builds the structured rendering parts attached to the tool's completion
+   * message, from `context`. Parts are the sole carrier of rendering-only
+   * data such as diffs: `outputToString` must not embed the changed content.
+   * Nothing returned here reaches the model context.
    * @returns `undefined` if not provided upon tool creation
    */
-  outputToPayload?(
+  outputToParts?(
     output: TOut,
     channel: NotifierChannel<ToolChannelParams>,
     context: NoInfer<TContext>
-  ): ToolMessageData | undefined;
+  ): MessagePart[] | undefined;
 }
 
 type ToolProps<

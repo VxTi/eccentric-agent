@@ -9,7 +9,7 @@ exports[`replace_in_file > applies an exact single-occurrence replacement 1`] = 
 }
 `;
 
-exports[`replace_in_file > rendering > attaches the diff as payload and renders it beside the headline 1`] = `
+exports[`replace_in_file > rendering > attaches the diff as a part and renders it beside the headline 1`] = `
 "Edited render-diff.txt
 
    ——————————————————————————————————————————————————————— |    ———————————————————————————————————————————————————————

@@ -14,6 +14,7 @@ import {
   levenshteinDistance,
 } from '../../../../utils/string-utils';
 import { createTool } from '../../tool-definition';
+import { MessagePartType } from '../../../../types/messages';
 
 const inputSchema = z.object({
   filePath: z
@@ -127,14 +128,16 @@ export const replaceInFile = createTool({
     return `Edited \`${fileName}\`${noteBlock}`;
   },
 
-  outputToPayload({ filePath }, __, { previous, current }) {
-    return {
-      kind: 'diff',
-      previous,
-      current,
-      rows: generateSideBySideDiff(previous, current),
-      language: diffLanguageForFile(filePath),
-    };
+  outputToParts({ filePath }, __, { previous, current }) {
+    return [
+      {
+        type: MessagePartType.DIFF,
+        previous,
+        current,
+        rows: generateSideBySideDiff(previous, current),
+        language: diffLanguageForFile(filePath),
+      },
+    ];
   },
 });
 

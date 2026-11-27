@@ -1,7 +1,7 @@
 import type { TaskComplexity } from '../agent/inference';
 import type { ToolIdentifier } from '../agent/tools';
-import type { ToolMessageData } from '../agent/tools/tool-payload';
 import type { MakeOptional } from './types';
+import type { SideBySideDiff } from '../utils/diff-utils';
 
 export enum MessageType {
   USER = 'user',
@@ -30,6 +30,29 @@ export interface AssistantMessage extends IMessage {
   metadata?: object;
 }
 
+export enum MessagePartType {
+  TEXT = 'text',
+  DIFF = 'diff',
+}
+
+export interface TextMessagePart {
+  type: MessagePartType.TEXT;
+  content: string;
+}
+
+export interface DiffMessagePart {
+  type: MessagePartType.DIFF;
+  /** The file content before and after the edit; the sole copy the UI holds. */
+  previous: string;
+  current: string;
+  /** Side-by-side rows pre-computed from `previous`/`current` at emit time;
+   *  derived by the renderer when absent. An empty list renders nothing. */
+  rows?: SideBySideDiff[];
+  language?: string;
+}
+
+export type MessagePart = TextMessagePart | DiffMessagePart;
+
 export interface GenericMessage extends IMessage, ILoadable {
   type: MessageType.GENERIC;
   failure?: boolean;
@@ -40,9 +63,9 @@ export interface GenericMessage extends IMessage, ILoadable {
   /** Present on messages that aggregate (collapse) consecutive completed tool
    *  calls into a single line. */
   collapsed?: CollapsedToolCalls;
-  /** Structured rendering data for the UI, pre-computed by the tool at emit
-   *  time. Absent when the tool defines no `outputToPayload`. */
-  data?: ToolMessageData;
+  /** Structured rendering parts for the UI, pre-computed at emit time and
+   *  rendered below the parsed `content`. Absent for plain-text messages. */
+  parts?: MessagePart[];
 }
 
 export interface ThoughtMessage extends IMessage, ILoadable {

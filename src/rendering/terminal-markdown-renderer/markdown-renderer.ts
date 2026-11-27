@@ -1,9 +1,15 @@
+import { isNonEmptyString } from '@vxti/typed';
 import chalk from 'chalk';
 import { marked } from 'marked';
 import { githubDark } from './code-highlight-theme';
 import { HEADINGS, TerminalRenderer } from './terminal-markdown-renderer';
+import { DiffRenderer } from '../diff-renderer';
+import {
+  MessagePartType,
+  type DiffMessagePart,
+  type MessagePart,
+} from '../../lib/types/messages';
 import type { TerminalMarked } from './types';
-import type { ToolMessageData } from '../../lib/agent/tools/tool-payload';
 
 export const basicHighlightFormatting = chalk.rgb(165, 214, 255);
 
@@ -32,44 +38,57 @@ export const markdownFormattingOptions = {
 
 export const terminalRenderer = new TerminalRenderer(markdownFormattingOptions);
 
+const diffRenderer = new DiffRenderer({
+  codeHighlighting: { theme: githubDark },
+});
+
 /**
  * `width` is the column count the rendered blocks may occupy (diff grids are
  * laid out against it, paragraphs are wrapped by Ink at the real layout
  * width). Callers must pass the width their container actually gives them.
- *
- * `data` carries the diff a tool pre-computed at emit time, rendered as a grid
- * below the parsed content. The diff travels only as data: the message content
- * never embeds the changed file, so it is not stored twice.
  */
-export function parseMarkdown(
-  input: string,
-  width: number,
-  data?: ToolMessageData
-): string {
+export function parseMarkdown(input: string, width: number): string {
   terminalRenderer.setWidth(width);
-  const parsed = marked.parse(input, {
+  return marked.parse(input, {
     gfm: true,
     renderer: terminalRenderer,
     async: false,
   });
-
-  const diff = renderMessageDiff(data, width);
-  return diff === undefined ? parsed : `${parsed.trimEnd()}\n\n${diff}`;
 }
 
-function renderMessageDiff(
-  data: ToolMessageData | undefined,
+/**
+ * Renders a message's structured parts below its parsed `content`. Parts are
+ * the sole carrier of rendering-only data — a diff part holds the changed
+ * file's two sides, so the content never stores it a second time.
+ */
+export function renderMessageContent(
+  content: string,
+  parts: MessagePart[] | undefined,
   width: number
-): string | undefined {
-  if (data?.kind !== 'diff') return undefined;
+): string {
+  const parsed = parseMarkdown(content, width);
+  const renderedParts = renderParts(parts, width);
+  return renderedParts.length === 0
+    ? parsed
+    : `${parsed.trimEnd()}\n\n${renderedParts}`;
+}
 
-  const rendered = terminalRenderer.renderDiff({
-    oldStr: data.previous,
-    newStr: data.current,
-    lang: data.language,
-    availableWidth: width,
-    precomputedRows: data.rows,
-  });
+function renderParts(parts: MessagePart[] | undefined, width: number): string {
+  if (parts === undefined) return '';
 
-  return rendered.length > 0 ? rendered : undefined;
+  return parts
+    .map(part => renderPart(part, width))
+    .filter(rendered => isNonEmptyString(rendered))
+    .join('\n\n');
+}
+
+function renderPart(part: MessagePart, width: number): string {
+  return part.type === MessagePartType.DIFF
+    ? renderDiffPart(part, width)
+    : parseMarkdown(part.content, width);
+}
+
+function renderDiffPart(part: DiffMessagePart, width: number): string {
+  diffRenderer.setWidth(width);
+  return diffRenderer.renderDiff(part);
 }
