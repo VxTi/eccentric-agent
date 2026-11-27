@@ -41,7 +41,11 @@ export const createFile = createTool({
     ' file, prefer `replace_in_file` instead.',
   inputSchema,
   outputSchema,
-  requiresApproval: () => true,
+  requiresApproval: ({ overwrite }) => {
+    // Doesn't require approval if auto-approval is enabled
+    // and it's not trying to overwrite an existing file
+    return !store.getState().agent.autoApprove && !overwrite;
+  },
 
   formatArguments: ({ path: filePath }) => `Creating a file at \`${filePath}\``,
 
