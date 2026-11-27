@@ -59,3 +59,13 @@ export class TaskList {
     this.taskList = [];
   }
 }
+
+/** Progress summary returned with task-list tool results, nudging the model to finish. */
+export function describeTaskProgress(tasks: readonly Task[]): string {
+  const remaining = tasks.filter(t => t.status !== TaskStatus.COMPLETED).length;
+  if (remaining === 0) return `All ${tasks.length} tasks completed.`;
+  return (
+    `${remaining} of ${tasks.length} tasks remaining. You MUST keep working autonomously until every task is completed:` +
+    ' mark a task "in_progress" before starting it and "completed" when done.'
+  );
+}

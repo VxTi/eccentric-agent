@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { Result } from '../../../../result';
 import { store } from '../../../../state';
-import { type Task, TaskStatus } from '../../../../tasks';
+import { describeTaskProgress, type Task, TaskStatus } from '../../../../tasks';
 import { createTool } from '../../tool-definition';
 
 const statusNameMapping: Record<TaskStatus, string> = {
@@ -34,6 +34,7 @@ const inputSchema = z.object({
 
 const outputSchema = z.object({
   tasks: z.array(TaskStatusSchema),
+  progress: z.string(),
 });
 
 export const updateTaskList = createTool({
@@ -61,7 +62,7 @@ export const updateTaskList = createTool({
 
     const tasks: Task[] = taskList.updateTasks(updates);
 
-    return Result.Ok({ tasks });
+    return Result.Ok({ tasks, progress: describeTaskProgress(tasks) });
   },
 
   inputToString({ updates }) {

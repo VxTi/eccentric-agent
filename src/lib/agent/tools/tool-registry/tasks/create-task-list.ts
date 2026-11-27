@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { Result } from '../../../../result';
 import { store } from '../../../../state';
-import { type Task, TaskStatus } from '../../../../tasks';
+import { describeTaskProgress, type Task, TaskStatus } from '../../../../tasks';
 import { createTool } from '../../tool-definition';
 
 const CreateTaskSchema = z.object({
@@ -13,6 +13,12 @@ const CreateTaskSchema = z.object({
   description: z
     .string()
     .describe('A concise description of what completing the task entails.'),
+  status: z
+    .enum(TaskStatus)
+    .optional()
+    .describe(
+      "The initial status of the task. Can be set if it is the first task that's being worked on"
+    ),
 });
 
 const TaskSchema = z.object({
@@ -32,6 +38,7 @@ const inputSchema = z.object({
 
 const outputSchema = z.object({
   tasks: z.array(TaskSchema),
+  progress: z.string(),
 });
 
 export const createTaskList = createTool({
@@ -56,12 +63,15 @@ export const createTaskList = createTool({
     const newList: Task[] = tasks.map(task => ({
       id: task.id,
       description: task.description,
-      status: TaskStatus.PENDING,
+      status: task.status ?? TaskStatus.PENDING,
     }));
 
     taskList.set(newList);
 
-    return Result.Ok({ tasks: newList });
+    return Result.Ok({
+      tasks: newList,
+      progress: describeTaskProgress(newList),
+    });
   },
 
   inputToString({ tasks }) {
