@@ -49,6 +49,7 @@ export const enum AgentEvents {
   AUTO_MODE_CHANGE = 'auto-mode-change',
   SKILL_LOADED = 'skill-loaded',
   SKILL_ACTIVATED = 'skill-activated',
+  SKILL_DEACTIVATED = 'skill-deactivated',
   MCPS_LOADED = 'mcps-loaded',
 }
 
@@ -59,6 +60,7 @@ interface AgentEventMap {
   [AgentEvents.AUTO_MODE_CHANGE]: [boolean];
   [AgentEvents.SKILL_LOADED]: [AgentSkill];
   [AgentEvents.SKILL_ACTIVATED]: [AgentSkill];
+  [AgentEvents.SKILL_DEACTIVATED]: [AgentSkill];
   [AgentEvents.MCPS_LOADED]: [];
 }
 
@@ -72,8 +74,12 @@ export interface StatefulAgentSkill extends AgentSkill {
   active?: boolean;
 }
 
+export function isAlwaysIncluded(skill: AgentSkill): boolean {
+  return skill.inclusion === SkillInclusion.ALWAYS;
+}
+
 export function isActiveSkill(skill: StatefulAgentSkill): boolean {
-  return skill.active ?? skill.inclusion === SkillInclusion.ALWAYS;
+  return skill.active ?? isAlwaysIncluded(skill);
 }
 
 export type StatefulSkillMap = Map<SkillName, StatefulAgentSkill>;
@@ -92,6 +98,11 @@ export abstract class AgentBase extends EventEmitter<AgentEventMap> {
   protected _reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM;
   protected _model: ModelDefinition = DEFAULT_MODEL;
   protected _systemPrompt?: string;
+
+  protected invalidateSystemPrompt(): void {
+    this._systemPrompt = undefined;
+  }
+
   protected _status: BitSet<StatusFlag> = new BitSet<StatusFlag>(
     StatusFlag.NONE
   );
@@ -141,7 +152,7 @@ export abstract class AgentBase extends EventEmitter<AgentEventMap> {
     return Array.from(this._mcpServers);
   }
 
-  public findSkill(name: string): Nullable<AgentSkill> {
+  public findSkill(name: string): Nullable<StatefulAgentSkill> {
     return this._skills.get(name);
   }
 
@@ -154,11 +165,31 @@ export abstract class AgentBase extends EventEmitter<AgentEventMap> {
       ...skill,
       active: skill.inclusion === SkillInclusion.ALWAYS,
     });
+    this.invalidateSystemPrompt();
     this.emit(AgentEvents.SKILL_LOADED, skill);
   }
 
-  public activateSkill(skill: AgentSkill): void {
-    this._skills.set(skill.name, { ...skill, active: true });
+  public activateSkill(name: SkillName): void {
+    this.setSkillActiveState(name, true);
+    this.emit(AgentEvents.SKILL_ACTIVATED, this.getSkill(name));
+  }
+
+  public deactivateSkill(name: SkillName): void {
+    this.setSkillActiveState(name, false);
+    this.emit(AgentEvents.SKILL_DEACTIVATED, this.getSkill(name));
+  }
+
+  private setSkillActiveState(name: SkillName, active: boolean): void {
+    const skill = this.getSkill(name);
+    this._skills.set(name, { ...skill, active });
+  }
+
+  private getSkill(name: SkillName): AgentSkill {
+    const skill = this._skills.get(name);
+    if (isNil(skill)) {
+      throw new Error(`Skill \`${name}\` not found`);
+    }
+    return skill;
   }
 
   public async loadSkills(): Promise<boolean> {

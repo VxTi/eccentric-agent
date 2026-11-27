@@ -25,7 +25,7 @@ export const useSkill = createTool({
       return Result.Error(`Skill \`${skill}\` not found`, { skill });
     }
 
-    agent.activateSkill(skillItem);
+    agent.activateSkill(skillItem.name);
 
     return Result.Ok({}, { skill });
   },

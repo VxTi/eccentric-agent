@@ -377,12 +377,8 @@ export class Agent extends AgentBase {
     if (remaining > 0) this.emit(AgentEvents.MESSAGE_QUEUE_SIZE_CHANGE, 0);
   }
 
-  private requestSystemPromptUpdate(): void {
-    this._systemPrompt = undefined;
-  }
-
   public setGitIgnored(ignored: Set<string>): void {
     this._gitIgnore = ignored;
-    this.requestSystemPromptUpdate();
+    this.invalidateSystemPrompt();
   }
 }

@@ -1,4 +1,9 @@
-import { isActiveSkill, type StatefulSkillMap } from './agent-base';
+import {
+  isActiveSkill,
+  isAlwaysIncluded,
+  type StatefulAgentSkill,
+  type StatefulSkillMap,
+} from './agent-base';
 import type { MCP } from './mcp/mcp';
 import { type TaskList, TaskStatus } from '../tasks';
 import {
@@ -80,6 +85,7 @@ export async function constructSystemPrompt({
     `- The current date is ${new Date().toLocaleDateString()}.\n`,
     OPERATING_GUIDE,
     constructSkillsSystemPromptFragment(skills),
+    constructAlwaysIncludedSkillsFragment(skills),
     `The following MCP servers are available:\n${mcpServerNames}\nUse 'list_mcp_tools' to discover tools (no 'toolName' → name+description list; with a specific 'toolName' → that tool's full input/output schema). Always fetch the schema for a specific tool before invoking it via 'call_mcp_tool'.`,
   ]).join('\n\n');
 }
@@ -130,30 +136,55 @@ async function describeMcpServers(mcpServers: Set<MCP>): Promise<string> {
 function constructActiveSkillsReminderFragment(
   skills: StatefulSkillMap
 ): string | undefined {
-  const active = Array.from(skills.values().filter(isActiveSkill));
-  if (isEmptyArray(active)) return undefined;
+  const activatedSkills = skills
+    .values()
+    // Always-included skills are embedded in the system prompt; the reminder
+    // carries only skills activated during the session.
+    .filter(skill => isActiveSkill(skill) && !isAlwaysIncluded(skill))
+    .toArray();
+  if (isEmptyArray(activatedSkills)) return undefined;
 
-  return active.map(sk => sk.content).join('\n\n---');
+  return renderSkillBodies(activatedSkills);
+}
+
+function constructAlwaysIncludedSkillsFragment(
+  skills: StatefulSkillMap
+): string | undefined {
+  const alwaysIncludedSkills = skills
+    .values()
+    .filter(isAlwaysIncluded)
+    .toArray();
+  if (isEmptyArray(alwaysIncludedSkills)) return undefined;
+
+  return renderSkillBodies(alwaysIncludedSkills);
 }
 
 function constructSkillsSystemPromptFragment(
   skills: StatefulSkillMap
 ): string | undefined {
-  const inactiveSkills = skills
+  const onDemandSkills = skills
     .values()
-    // Exclude always-included skills, as these are already included in the agent's system prompt
-    .filter(skill => !isActiveSkill(skill))
+    // Lists every on-demand skill regardless of activation state: the
+    // catalog must stay stable for prompt caching, while activation is
+    // reported per-request by the state reminder.
+    .filter(skill => !isAlwaysIncluded(skill))
     .toArray();
-  if (isEmptyArray(inactiveSkills)) return undefined;
+  if (isEmptyArray(onDemandSkills)) return undefined;
 
-  const skillsSummary = inactiveSkills
+  const skillsSummary = onDemandSkills
     .map(skill => `- Name: ${skill.name}.\nDescription:\n${skill.description}`)
     .join('\n---\n');
   return [
-    'You have access to the following skills, which are described by `name` and `description`. Use the \`use_skill\`' +
+    'You have access to the following skills, which are described by `name` and `description`. Use the \\`use_skill\\`' +
       ' tool to invoke them if the current context relates to the description, or when the user asks to use it:',
     skillsSummary,
   ].join('\n\n');
+}
+
+function renderSkillBodies(skills: StatefulAgentSkill[]): string {
+  return skills
+    .map(skill => `# ${skill.name}\n\n${skill.content}`)
+    .join('\n\n---\n\n');
 }
 
 function constructTaskListReminderFragment(

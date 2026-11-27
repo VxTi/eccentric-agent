@@ -1,4 +1,5 @@
 import { isNil } from '@vxti/typed';
+import { isActiveSkill } from './agent/agent-base';
 import { ReasoningEffort } from './agent/agent';
 import { MODEL_CATALOG } from './agent/inference';
 import { SkillInclusion } from './agent/skills/model';
@@ -139,11 +140,19 @@ export function processCommand(command: string) {
         });
         return;
       }
+      if (isActiveSkill(skill)) {
+        agent.deactivateSkill(skill.name);
+        emitMessage({
+          type: MessageType.ASSISTANT,
+          content: `Deactivated skill \`${command}\``,
+        });
+        return;
+      }
       emitMessage({
         type: MessageType.ASSISTANT,
         content: `Using skill \`${command}\``,
       });
-      agent.activateSkill(skill);
+      agent.activateSkill(skill.name);
     }
   }
 }
