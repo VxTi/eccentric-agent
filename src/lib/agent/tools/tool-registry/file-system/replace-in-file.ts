@@ -87,7 +87,9 @@ export const replaceInFile = createTool({
   inputSchema,
   outputSchema,
 
-  requiresApproval: () => true,
+  requiresApproval: () => {
+    return !store.getState().agent.autoApprove;
+  },
 
   handle: handleReplaceInFile,
 
