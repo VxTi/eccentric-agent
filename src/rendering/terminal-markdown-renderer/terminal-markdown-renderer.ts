@@ -7,7 +7,7 @@ import {
   isNotNil,
   toNonEmptyString,
 } from '@vxti/typed';
-import chalk from 'chalk';
+import chalk, { type ChalkInstance } from 'chalk';
 import Table from 'cli-table3';
 import { type MarkedOptions, Renderer, type Tokens } from 'marked';
 import { highlight as highlightCli } from 'cli-highlight';
@@ -20,6 +20,7 @@ import {
   type DiffLine,
 } from '../../lib/utils/diff-utils';
 import { Position } from '../../lib/utils/string-utils';
+import { githubDark } from './code-highlight-theme';
 import type { TerminalMarked } from './types';
 
 const DEFAULT_INDENTATION = 2;
@@ -96,8 +97,37 @@ const DIFF_NEUTRAL_MARKER = '  ';
 const DIFF_TRUNCATION_MARK = '...';
 const DIFF_ELLISION = '—';
 
-const DIFF_REMOVED_BG = chalk.bgRed;
-const DIFF_ADDED_BG = chalk.bgRgb(30, 150, 34);
+/** One changed diff row's colour pair: its background and its plain text. */
+interface DiffTint {
+  background: ChalkInstance;
+  text: ChalkInstance;
+}
+
+// Chalk downsamples colours to its current support level, so the styles must
+// be built at render time, not once at module load.
+const diffRemovedTint = (): DiffTint => ({
+  background: chalk.bgRgb(55, 28, 33),
+  text: chalk.rgb(248, 81, 73),
+});
+
+const diffAddedTint = (): DiffTint => ({
+  background: chalk.bgRgb(24, 50, 37),
+  text: chalk.rgb(63, 185, 80),
+});
+
+const DIFF_PROBE = '\u0001';
+
+const UNSTYLED = (text: string): string => text;
+
+/**
+ * The escape sequence `style` opens with, extracted by probing it — it is not
+ * a constant across chalk support levels. Empty when `style` is a no-op.
+ */
+function openingOf(style: (text: string) => string): string {
+  const probe = style(DIFF_PROBE);
+  const cut = probe.indexOf(DIFF_PROBE);
+  return cut === -1 ? '' : probe.slice(0, cut);
+}
 
 // HARD_RETURN holds a character sequence used to indicate text has a
 // hard (no-reflowing) line break.  Previously \r and \r\n were turned
@@ -353,17 +383,44 @@ export class TerminalRenderer extends Renderer {
       : line.added
         ? DIFF_ADDED_MARKER
         : DIFF_NEUTRAL_MARKER;
+    const tint = line.removed
+      ? diffRemovedTint()
+      : line.added
+        ? diffAddedTint()
+        : undefined;
 
     // Clip after highlighting: the escape sequences are zero-width, so this is
     // the only order that both preserves colour and fills the column.
+    const content = marker + this.clipAnsi(source, width - marker.length, at);
     const cell = this.padRight(
-      marker + this.clipAnsi(source, width - marker.length, at),
+      tint ? this.tint(tint, content) : content,
       width
     );
 
-    if (line.removed) return DIFF_REMOVED_BG(cell);
-    if (line.added) return DIFF_ADDED_BG(cell);
+    if (tint) return tint.background(cell);
     return cell;
+  }
+
+  /**
+   * Recolours the parts of a changed row the code theme leaves plain, so the
+   * row reads red/green while token colours (strings, keywords, …) survive.
+   * Text the theme produced no escapes for at all takes the tint whole.
+   */
+  private tint(tint: DiffTint, text: string): string {
+    if (!this.isFormattingEnabled) return text;
+    const plainOpening = this.plainTextOpening();
+    if (plainOpening !== '' && text.includes(plainOpening)) {
+      return text.split(plainOpening).join(openingOf(tint.text));
+    }
+    if (!text.includes(ESC)) return tint.text(text);
+    return text;
+  }
+
+  /** The style the configured code theme paints un-tokenized text with. */
+  private plainTextOpening(): string {
+    const theme = this.config.codeHighlighting?.theme;
+    const defaultStyle = theme?.default ?? githubDark.default ?? UNSTYLED;
+    return openingOf(defaultStyle);
   }
 
   private collapsedRow(layout: DiffRowLayout): string {

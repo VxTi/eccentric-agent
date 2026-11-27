@@ -5,7 +5,10 @@ import path from 'node:path';
 import * as z from 'zod';
 import { Result } from '../../../../result';
 import { store } from '../../../../state';
-import { formatDiffMd } from '../../../../utils/diff-utils';
+import {
+  diffLanguageForFile,
+  formatDiffMd,
+} from '../../../../utils/diff-utils';
 import {
   detectLineEnding,
   levenshteinDistance,
@@ -113,7 +116,11 @@ export const replaceInFile = createTool({
       matchKindNote(matchKind, similarity),
     ].filter(isNotNil);
     const noteBlock = notes.map(note => `\n\n${note}`).join('');
-    return `Edited \`${fileName}\`\n\n${formatDiffMd(previous, current)}${noteBlock}`;
+    return `Edited \`${fileName}\`\n\n${formatDiffMd(
+      previous,
+      current,
+      diffLanguageForFile(filePath)
+    )}${noteBlock}`;
   },
 });
 

@@ -2,7 +2,10 @@ import * as z from 'zod';
 import path from 'node:path';
 import { Result } from '../../../../result';
 import { store } from '../../../../state';
-import { formatDiffMd } from '../../../../utils/diff-utils';
+import {
+  diffLanguageForFile,
+  formatDiffMd,
+} from '../../../../utils/diff-utils';
 import { mkdir, writeFile } from 'fs/promises';
 import { existsAsync } from '../../../../utils/fs';
 import { createTool } from '../../tool-definition';
@@ -54,7 +57,11 @@ export const createFile = createTool({
   inputToString: ({ path: filePath }) => `Writing file \`${filePath}\``,
 
   outputToString(_, __, { newContent, filePath }) {
-    return `Wrote to \`${filePath}\`\n\n${formatDiffMd('', newContent)}`;
+    return `Wrote to \`${filePath}\`\n\n${formatDiffMd(
+      '',
+      newContent,
+      diffLanguageForFile(filePath)
+    )}`;
   },
 });
 

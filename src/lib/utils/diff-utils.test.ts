@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { type Tokens, lexer } from 'marked';
 import {
+  diffLanguageForFile,
   formatDiffMd,
   generateSideBySideDiff,
   splitDiffSides,
@@ -77,6 +78,28 @@ describe('formatDiffMd', () => {
     expect(
       formatDiffMd('line 1\nline 2\n', 'line 1\nchanged\n')
     ).toMatchSnapshot();
+  });
+
+  it('tags the fence with the content language', () => {
+    expect(
+      formatDiffMd('line 1\n', 'line 1\nchanged\n', 'ts').startsWith(
+        '```diff:ts\n'
+      )
+    ).toBe(true);
+  });
+});
+
+describe('diffLanguageForFile', () => {
+  it('resolves a supported file extension to its language', () => {
+    expect(diffLanguageForFile('src/app.ts')).toBe('ts');
+    expect(diffLanguageForFile('README.md')).toBe('md');
+    expect(diffLanguageForFile('config.yml')).toBe('yml');
+  });
+
+  it('returns undefined for dotfiles, extension-less paths and unknown extensions', () => {
+    expect(diffLanguageForFile('.gitignore')).toBeUndefined();
+    expect(diffLanguageForFile('Makefile')).toBeUndefined();
+    expect(diffLanguageForFile('notes.weirdext')).toBeUndefined();
   });
 });
 

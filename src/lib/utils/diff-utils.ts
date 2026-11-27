@@ -1,5 +1,7 @@
-import { hasArrayLength, isNotNil } from '@vxti/typed';
+import { hasArrayLength, isNonEmptyString, isNotNil } from '@vxti/typed';
+import { supportsLanguage } from 'cli-highlight';
 import { diffTrimmedLines } from 'diff';
+import { extname } from 'node:path';
 import {
   DIFF_LANG,
   DIFF_SEPARATOR,
@@ -175,6 +177,11 @@ function collapseUnchangedRegions(
  * Serialises a diff for `TerminalRenderer.code`: both sides inside a fenced
  * `diff` block, divided by {@link DIFF_SEPARATOR}.
  *
+ * `language` is the language the *content* is written in, not of the diff
+ * itself; it is what the renderer highlights the columns as, so pass
+ * {@link diffLanguageForFile} of the file the diff belongs to whenever it is
+ * known.
+ *
  * The fence grows past every backtick run that opens a line of either side. A
  * fixed three-backtick fence is closed by the payload itself as soon as the
  * file is Markdown (or otherwise holds a delimiter at the start of a line),
@@ -182,13 +189,31 @@ function collapseUnchangedRegions(
  * reach {@link generateSideBySideDiff}, so nothing is collapsed and a one-line
  * edit prints the entire file. That is the bug this guards against.
  */
-export function formatDiffMd(previous: string, current: string): string {
+export function formatDiffMd(
+  previous: string,
+  current: string,
+  language?: string
+): string {
   const longestRun = [
     ...`${previous}\n${current}`.matchAll(LINE_INITIAL_BACKTICKS),
   ].reduce((longest, [run]) => Math.max(longest, run.length), 0);
   const fence = '`'.repeat(Math.max(MIN_DIFF_FENCE_LENGTH, longestRun + 1));
+  const langTag = isNonEmptyString(language)
+    ? `${DIFF_LANG}:${language}`
+    : DIFF_LANG;
 
-  return `${fence}${DIFF_LANG}\n${previous}\n${DIFF_SEPARATOR}\n${current}\n${fence}\n`;
+  return `${fence}${langTag}\n${previous}\n${DIFF_SEPARATOR}\n${current}\n${fence}\n`;
+}
+
+/**
+ * The highlighter language for `filePath`'s extension, or undefined when the
+ * path has no extension or one highlight.js does not know.
+ */
+export function diffLanguageForFile(filePath: string): string | undefined {
+  const extension = extname(filePath).slice(1);
+  return isNonEmptyString(extension) && supportsLanguage(extension)
+    ? extension
+    : undefined;
 }
 
 /**
