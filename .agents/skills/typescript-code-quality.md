@@ -207,7 +207,7 @@ function callLibrary(input: string): LibraryResponse {
 
 **Write small, focused functions that do one thing well:**
 
-- Function names must use verbs to describe the action
+- Function names must use verbs to describe the action, e.g., `getSomething`, `setSomething`, `extractSomething`.
 - Minimize parameters - ideally no more than two
 - Avoid boolean parameters - they invite conditional logic
 - Keep functions small: ideally no more than 8 meaningful lines of code
