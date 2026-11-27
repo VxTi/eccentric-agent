@@ -15,6 +15,8 @@ import ansiEscapes from 'ansi-escapes';
 import supportsHyperlinks from 'supports-hyperlinks';
 import ansiRegex from 'ansi-regex';
 import {
+  DIFF_LANG,
+  DIFF_SEPARATOR,
   generateSideBySideDiff,
   splitDiffSides,
   type DiffLine,
@@ -35,8 +37,7 @@ const ANSI_RESET = `${ESC}[0m`;
 // Captures SGR sequences so `split` retains them as alternate array entries.
 const ANSI_FRAGMENT_RE = new RegExp(`(${ESC}\\[[0-9;]*m)`);
 
-export const DIFF_LANG = 'diff';
-export const DIFF_SEPARATOR = '---DIFF_SEPARATOR---';
+export { DIFF_LANG, DIFF_SEPARATOR };
 
 /** Whole-side highlight results kept per `TerminalRenderer` instance. */
 const MAX_HIGHLIGHT_CACHE_ENTRIES = 16;

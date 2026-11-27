@@ -106,6 +106,22 @@ describe('TerminalRenderer', () => {
       expect(rows.join('\n')).not.toContain('# Title');
       expect(rows.join('\n')).not.toContain('line 200');
     });
+    it('renders a diff whose content contains the separator marker as a diff', () => {
+      const oldContent = [
+        'line 1',
+        '---DIFF_SEPARATOR---',
+        ...Array.from({ length: 200 }, (_, i) => `line ${i + 1}`),
+      ].join('\n');
+      const currentContent = oldContent.replace('line 100', 'line ONE HUNDRED');
+
+      // An unescaped marker inside the payload made `splitDiffSides` bail, and
+      // the renderer fell back to printing both whole files as plain code.
+      const rows = rowsOf(render(formatDiffMd(oldContent, currentContent)));
+
+      expect(rows).toHaveLength(7);
+      expect(rows.join('\n')).toContain('line ONE HUNDRED');
+      expect(rows.join('\n')).not.toContain('line 200');
+    });
   });
 
   describe('diff colours', () => {

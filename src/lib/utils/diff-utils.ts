@@ -2,10 +2,12 @@ import { hasArrayLength, isNonEmptyString, isNotNil } from '@vxti/typed';
 import { supportsLanguage } from 'cli-highlight';
 import { diffTrimmedLines } from 'diff';
 import { extname } from 'node:path';
-import {
-  DIFF_LANG,
-  DIFF_SEPARATOR,
-} from '../../rendering/terminal-markdown-renderer/terminal-markdown-renderer';
+
+// Owned here, not in the renderer: diff-utils builds module-level values from
+// them, and importing them back from the renderer would be a cycle that leaves
+// them undefined mid-initialisation depending on which module loads first.
+export const DIFF_LANG = 'diff';
+export const DIFF_SEPARATOR = '---DIFF_SEPARATOR---';
 
 export interface DiffLine {
   value: string;
@@ -26,6 +28,46 @@ const LINE_INITIAL_BACKTICKS = /^ {0,3}(`+)/gm;
 /** The breaks `formatDiffMd` spends on keeping the marker on its own line. */
 const LEADING_BREAK = /^\r?\n/;
 const TRAILING_BREAK = /\r?\n$/;
+
+const BACKSLASH = '\\';
+const ESCAPED_BACKSLASH = '\\\\';
+const ESCAPED_DIFF_SEPARATOR = `\\${DIFF_SEPARATOR}`;
+const DIFF_SIDE_ESCAPE_RE = new RegExp(
+  `${ESCAPED_BACKSLASH}|${DIFF_SEPARATOR}`,
+  'g'
+);
+// Regex sources: `\\` matches one backslash, `\\\\` matches two, so the first
+// alternative takes a doubled backslash whole and the second an escaped marker.
+const DIFF_SIDE_UNESCAPE_RE = new RegExp(
+  `${ESCAPED_BACKSLASH}${ESCAPED_BACKSLASH}|${ESCAPED_BACKSLASH}${DIFF_SEPARATOR}`,
+  'g'
+);
+// Escaped markers still contain the bare marker as a substring, so the
+// envelope split must skip occurrences the escape backslash protects.
+const DIFF_SEPARATOR_SPLIT_RE = new RegExp(
+  `(?<!${BACKSLASH}${BACKSLASH})${DIFF_SEPARATOR}`
+);
+
+/**
+ * Makes a side safe to embed around {@link DIFF_SEPARATOR}.
+ *
+ * A file that itself contains the marker would otherwise produce a payload the
+ * marker splits into three or more parts, and the renderer would fall back to
+ * printing both whole sides. Backslashes are escaped first so the rewriting is
+ * injective: content that already holds the escaped forms round-trips exactly.
+ */
+function escapeDiffSide(side: string): string {
+  return side.replace(DIFF_SIDE_ESCAPE_RE, matched =>
+    matched === BACKSLASH ? ESCAPED_BACKSLASH : ESCAPED_DIFF_SEPARATOR
+  );
+}
+
+/** Reverses {@link escapeDiffSide} in a single left-to-right pass. */
+function unescapeDiffSide(side: string): string {
+  return side.replace(DIFF_SIDE_UNESCAPE_RE, matched =>
+    matched === ESCAPED_BACKSLASH ? BACKSLASH : DIFF_SEPARATOR
+  );
+}
 
 /**
  * Splits one change part into the lines it covers.
@@ -194,15 +236,17 @@ export function formatDiffMd(
   current: string,
   language?: string
 ): string {
+  const escapedPrevious = escapeDiffSide(previous);
+  const escapedCurrent = escapeDiffSide(current);
   const longestRun = [
-    ...`${previous}\n${current}`.matchAll(LINE_INITIAL_BACKTICKS),
+    ...`${escapedPrevious}\n${escapedCurrent}`.matchAll(LINE_INITIAL_BACKTICKS),
   ].reduce((longest, [run]) => Math.max(longest, run.length), 0);
   const fence = '`'.repeat(Math.max(MIN_DIFF_FENCE_LENGTH, longestRun + 1));
   const langTag = isNonEmptyString(language)
     ? `${DIFF_LANG}:${language}`
     : DIFF_LANG;
 
-  return `${fence}${langTag}\n${previous}\n${DIFF_SEPARATOR}\n${current}\n${fence}\n`;
+  return `${fence}${langTag}\n${escapedPrevious}\n${DIFF_SEPARATOR}\n${escapedCurrent}\n${fence}\n`;
 }
 
 /**
@@ -225,11 +269,11 @@ export function diffLanguageForFile(filePath: string): string | undefined {
  * and shift every line number printed beside it by one.
  */
 export function splitDiffSides(text: string): [string, string] | null {
-  const sides = text.split(DIFF_SEPARATOR);
+  const sides = text.split(DIFF_SEPARATOR_SPLIT_RE);
   if (!hasArrayLength(sides, 2)) return null;
 
   return [
-    sides[0].replace(TRAILING_BREAK, ''),
-    sides[1].replace(LEADING_BREAK, ''),
+    unescapeDiffSide(sides[0].replace(TRAILING_BREAK, '')),
+    unescapeDiffSide(sides[1].replace(LEADING_BREAK, '')),
   ];
 }

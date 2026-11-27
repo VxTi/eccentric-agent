@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type Tokens, lexer } from 'marked';
+import { DIFF_SEPARATOR } from '../../rendering/terminal-markdown-renderer/terminal-markdown-renderer';
 import {
   diffLanguageForFile,
   formatDiffMd,
@@ -44,6 +45,30 @@ describe('formatDiffMd', () => {
   it('gives back both sides when neither ends in a line break', () => {
     const previous = 'line 1\nline 2';
     const current = 'line 1\nchanged';
+
+    const [restoredPrevious, restoredCurrent] = splitSides(
+      diffBlock(previous, current)
+    );
+
+    expect(restoredPrevious).toBe(previous);
+    expect(restoredCurrent).toBe(current);
+  });
+
+  it('round-trips a side that itself contains the separator marker', () => {
+    const previous = `line 1\n${DIFF_SEPARATOR}\nline 2\n`;
+    const current = `line 1\n${DIFF_SEPARATOR} changed\n`;
+
+    const [restoredPrevious, restoredCurrent] = splitSides(
+      diffBlock(previous, current)
+    );
+
+    expect(restoredPrevious).toBe(previous);
+    expect(restoredCurrent).toBe(current);
+  });
+
+  it('round-trips backslashes next to the marker and each other', () => {
+    const previous = 'path C:\\dir\n\\\\---DIFF_SEPARATOR---\nregex \\d+\n';
+    const current = 'path C:\\dir\n\\\\---DIFF_SEPARATOR---\nregex \\w+\n';
 
     const [restoredPrevious, restoredCurrent] = splitSides(
       diffBlock(previous, current)
