@@ -1,12 +1,14 @@
 import { TerminalRenderer } from './terminal-markdown-renderer';
-import { marked } from 'marked';
-import { formatDiffMd } from '../../lib/utils/diff-utils';
 import { buildGithubDarkTheme } from './code-highlight-theme';
+import type { SideBySideDiff } from '../../lib/utils/diff-utils';
 import chalk, { type ChalkInstance } from 'chalk';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 describe('TerminalRenderer', () => {
   let renderer: TerminalRenderer;
+
+  const rowsOf = (rendered: string): string[] =>
+    rendered.split('\n').filter(line => line.trim().length > 0);
 
   beforeEach(() => {
     renderer = new TerminalRenderer({});
@@ -60,25 +62,16 @@ describe('TerminalRenderer', () => {
         4 - line 4                                                                      "
       `);
     });
-  });
-
-  describe('diff blocks', () => {
-    const render = (markdown: string): string =>
-      marked.parse(markdown, {
-        gfm: true,
-        renderer,
-        async: false,
-      });
-
-    const rowsOf = (rendered: string): string[] =>
-      rendered.split('\n').filter(line => line.trim().length > 0);
 
     it('collapses the unchanged majority of a long file', () => {
       const previous = Array.from({ length: 200 }, (_, i) => `line ${i + 1}`);
       const oldContent = `${previous.join('\n')}\n`;
       const currentContent = oldContent.replace('line 100', 'line ONE HUNDRED');
 
-      const rows = rowsOf(render(formatDiffMd(oldContent, currentContent)));
+      const rows = renderer
+        .renderDiff({ oldStr: oldContent, newStr: currentContent })
+        .split('\n')
+        .filter(line => line.trim().length > 0);
 
       expect(rows).toHaveLength(7);
       expect(rows.join('\n')).toContain('line ONE HUNDRED');
@@ -86,41 +79,24 @@ describe('TerminalRenderer', () => {
       expect(rows.join('\n')).not.toContain('line 200');
     });
 
-    it('collapses a long file that opens lines with its own code fences', () => {
-      const oldContent = [
-        '# Title',
-        '',
-        '```ts',
-        'const a = 1;',
-        '```',
-        ...Array.from({ length: 200 }, (_, i) => `line ${i + 1}`),
-      ].join('\n');
-      const currentContent = oldContent.replace('const a = 1;', 'const a = 2;');
+    it('uses the pre-computed rows instead of re-deriving them', () => {
+      const collapsedRows: SideBySideDiff[] = [
+        [
+          { value: '', collapsed: true },
+          { value: '', collapsed: true },
+        ],
+      ];
 
-      // The payload's own fences used to close the diff block early, which made
-      // marked fall back to plain text and print both whole files.
-      const rows = rowsOf(render(formatDiffMd(oldContent, currentContent)));
+      const rows = rowsOf(
+        renderer.renderDiff({
+          oldStr: 'old\n',
+          newStr: 'new\n',
+          precomputedRows: collapsedRows,
+        })
+      );
 
-      expect(rows).toHaveLength(7);
-      expect(rows.join('\n')).toContain('const a = 2;');
-      expect(rows.join('\n')).not.toContain('# Title');
-      expect(rows.join('\n')).not.toContain('line 200');
-    });
-    it('renders a diff whose content contains the separator marker as a diff', () => {
-      const oldContent = [
-        'line 1',
-        '---DIFF_SEPARATOR---',
-        ...Array.from({ length: 200 }, (_, i) => `line ${i + 1}`),
-      ].join('\n');
-      const currentContent = oldContent.replace('line 100', 'line ONE HUNDRED');
-
-      // An unescaped marker inside the payload made `splitDiffSides` bail, and
-      // the renderer fell back to printing both whole files as plain code.
-      const rows = rowsOf(render(formatDiffMd(oldContent, currentContent)));
-
-      expect(rows).toHaveLength(7);
-      expect(rows.join('\n')).toContain('line ONE HUNDRED');
-      expect(rows.join('\n')).not.toContain('line 200');
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toContain('—');
     });
   });
 
@@ -150,22 +126,13 @@ describe('TerminalRenderer', () => {
     const openingOf = (style: ChalkInstance): string =>
       style('\u0001').split('\u0001')[0] ?? '';
 
-    const render = (markdown: string): string =>
-      marked.parse(markdown, {
-        gfm: true,
-        renderer: new TerminalRenderer({
-          codeHighlighting: { theme: buildGithubDarkTheme() },
-        }),
-        async: false,
-      });
+    const render = (oldStr: string, newStr: string, lang?: string): string =>
+      new TerminalRenderer({
+        codeHighlighting: { theme: buildGithubDarkTheme() },
+      }).renderDiff({ oldStr, newStr, lang });
 
-    const rowsOf = (rendered: string): string[] =>
-      rendered.split('\n').filter(line => line.trim().length > 0);
-
-    it('paints changed rows red and green on a bare diff fence', () => {
-      const rows = rowsOf(
-        render(formatDiffMd('shared\nold line\n', 'shared\nnew line\n'))
-      );
+    it('paints changed rows red and green', () => {
+      const rows = rowsOf(render('shared\nold line\n', 'shared\nnew line\n'));
       const changedRow = rows.find(row => row.includes('+ new line'));
 
       expect(changedRow).toContain(openingOf(removedBackground));
@@ -174,21 +141,17 @@ describe('TerminalRenderer', () => {
       expect(changedRow).toContain(openingOf(addedText));
     });
 
-    it('leaves unchanged rows unpainted on a bare diff fence', () => {
-      const rows = rowsOf(
-        render(formatDiffMd('shared\nold line\n', 'shared\nnew line\n'))
-      );
+    it('leaves unchanged rows unpainted', () => {
+      const rows = rowsOf(render('shared\nold line\n', 'shared\nnew line\n'));
       const sharedRow = rows.find(row => row.includes('shared'));
 
       expect(sharedRow).not.toContain(openingOf(removedBackground));
       expect(sharedRow).not.toContain(openingOf(addedBackground));
     });
 
-    it('keeps syntax colours and recolours plain text on a diff:ts fence', () => {
+    it('keeps syntax colours and recolours plain text for ts content', () => {
       const rows = rowsOf(
-        render(
-          formatDiffMd('shared\nconst a = 1;\n', 'shared\nconst a = 2;\n', 'ts')
-        )
+        render('shared\nconst a = 1;\n', 'shared\nconst a = 2;\n', 'ts')
       );
       const changedRow = rows.find(row => row.includes('+ '));
 

@@ -8,9 +8,11 @@ import type {
   MakeOptional,
   MaybePromise,
 } from '../../types/types';
-import type { SideBySideDiff } from '../../utils/diff-utils';
 import { isBoolean, isNumber, isObject, isString } from 'lodash-es';
 import chalk from 'chalk';
+import type { ToolMessageData } from './tool-payload';
+
+export type { ToolMessageData } from './tool-payload';
 
 export const enum ToolSelectionOption {
   ALLOW = 'allow',
@@ -24,46 +26,18 @@ export const DEFAULT_APPROVAL_OPTIONS: ApprovalOption[] = [
   { option: ToolSelectionOption.DENY, text: 'Deny' },
 ];
 
-/**
- * Structured rendering data a tool may attach to its completion message, so
- * the UI can skip re-deriving it from the flattened `content` string on every
- * parse. Payloads never reach the model: they are built from `Result.metadata`,
- * which `core.ts` strips before the tool result enters the context window.
- */
-export type ToolMessageData = DiffMessageData;
-
-export interface DiffMessageData {
-  kind: 'diff';
-  /** The exact strings `outputToString` embedded in the message content, so
-   *  the renderer can confirm a diff block belongs to this payload. */
-  previous: string;
-  current: string;
-  /** Side-by-side rows pre-computed from `previous`/`current` at emit time. */
-  rows: SideBySideDiff[];
-  language?: string;
-}
-
-export type ToolCallResult<
-  TData,
-  TContext,
-  TToolCallData extends ToolMessageData | undefined,
-> = Result<
-  { data: TData; messageMeta?: TToolCallData; context?: TContext },
+export type ToolCallResult<TData, TContext> = Result<
+  { data: TData; context?: TContext },
   string
 >;
 
 export type ToolChannelParams = Omit<GenericMessage, 'id' | 'type'>;
 
-export type SomeTool = IToolDefinition<
-  unknown,
-  object,
-  ToolMessageData | undefined
->;
+export type SomeTool = IToolDefinition<unknown, object>;
 
 export interface IToolDefinition<
   TIn = unknown,
   TOut extends object = object,
-  TMessageMeta extends ToolMessageData | undefined = undefined,
   TApprovalOption extends string = string,
   TInternalName extends string = string,
   TContext extends object = object,
@@ -110,7 +84,7 @@ export interface IToolDefinition<
     input: TIn,
     channel: NotifierChannel<ToolChannelParams>,
     signal: AbortSignal
-  ): MaybePromise<ToolCallResult<TOut, TContext, TMessageMeta>>;
+  ): MaybePromise<ToolCallResult<TOut, TContext>>;
 
   inputToString(
     input: TIn,
@@ -125,7 +99,9 @@ export interface IToolDefinition<
 
   /**
    * Builds the structured data attached to the tool's completion message for
-   * the UI. Built from `metadata`, which never reaches the model context.
+   * the UI, from `context`. Diff payloads are the sole carrier of the diff:
+   * `outputToString` must not embed the changed content. Nothing returned here
+   * reaches the model context.
    * @returns `undefined` if not provided upon tool creation
    */
   outputToPayload?(
@@ -138,46 +114,23 @@ export interface IToolDefinition<
 type ToolProps<
   TIn extends object = object,
   TOut extends object = object,
-  TMessageMeta extends ToolMessageData | undefined = undefined,
   TApprovalOption extends string = string,
   TInternalName extends string = string,
   TContext extends object = object,
 > = MakeOptional<
-  IToolDefinition<
-    TIn,
-    TOut,
-    TMessageMeta,
-    TApprovalOption,
-    TInternalName,
-    TContext
-  >,
+  IToolDefinition<TIn, TOut, TApprovalOption, TInternalName, TContext>,
   'approvalOptions' | 'requiresApproval' | 'onOptionSelect' | 'formatArguments'
 > & {};
 
 export function createTool<
   TIn extends object = object,
   TOut extends object = object,
-  TMessageMeta extends ToolMessageData | undefined = undefined,
   TApprovalOption extends string = string,
   TInternalName extends string = string,
   TContext extends object = object,
 >(
-  props: ToolProps<
-    TIn,
-    TOut,
-    TMessageMeta,
-    TApprovalOption,
-    TInternalName,
-    TContext
-  >
-): IToolDefinition<
-  TIn,
-  TOut,
-  TMessageMeta,
-  TApprovalOption,
-  TInternalName,
-  TContext
-> {
+  props: ToolProps<TIn, TOut, TApprovalOption, TInternalName, TContext>
+): IToolDefinition<TIn, TOut, TApprovalOption, TInternalName, TContext> {
   return {
     ...props,
     formatArguments: props.formatArguments ?? defaultArgFormatter,

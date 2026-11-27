@@ -4,7 +4,7 @@ import { Result } from '../../../../result';
 import { store } from '../../../../state';
 import {
   diffLanguageForFile,
-  formatDiffMd,
+  generateSideBySideDiff,
 } from '../../../../utils/diff-utils';
 import { mkdir, writeFile } from 'fs/promises';
 import { existsAsync } from '../../../../utils/fs';
@@ -56,12 +56,18 @@ export const createFile = createTool({
 
   inputToString: ({ path: filePath }) => `Writing file \`${filePath}\``,
 
-  outputToString(_, __, { newContent, filePath }) {
-    return `Wrote to \`${filePath}\`\n\n${formatDiffMd(
-      '',
-      newContent,
-      diffLanguageForFile(filePath)
-    )}`;
+  outputToString(_, __, { filePath }) {
+    return `Wrote to \`${filePath}\``;
+  },
+
+  outputToPayload(_, __, { filePath, newContent }) {
+    return {
+      kind: 'diff',
+      previous: '',
+      current: newContent,
+      rows: generateSideBySideDiff('', newContent),
+      language: diffLanguageForFile(filePath),
+    };
   },
 });
 

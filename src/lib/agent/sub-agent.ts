@@ -248,7 +248,9 @@ export class SubAgent {
           data: tool.outputToPayload?.(data, this.channel, context),
         });
 
-        return output.data;
+        // Context stays out of the model window: it exists only to feed
+        // `outputToString`/`outputToPayload`, as in `tools/core.ts`.
+        return data;
       },
     });
   }

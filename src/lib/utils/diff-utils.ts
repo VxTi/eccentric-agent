@@ -1,13 +1,7 @@
-import { hasArrayLength, isNonEmptyString, isNotNil } from '@vxti/typed';
+import { isNonEmptyString, isNotNil } from '@vxti/typed';
 import { supportsLanguage } from 'cli-highlight';
 import { diffTrimmedLines } from 'diff';
 import { extname } from 'node:path';
-
-// Owned here, not in the renderer: diff-utils builds module-level values from
-// them, and importing them back from the renderer would be a cycle that leaves
-// them undefined mid-initialisation depending on which module loads first.
-export const DIFF_LANG = 'diff';
-export const DIFF_SEPARATOR = '---DIFF_SEPARATOR---';
 
 export interface DiffLine {
   value: string;
@@ -20,72 +14,6 @@ export interface DiffLine {
 export type SideBySideDiff = [DiffLine, DiffLine];
 
 const DEFAULT_CONTEXT_LINES = 2;
-
-/** Shortest fence `formatDiffMd` will emit, and the CommonMark minimum. */
-const MIN_DIFF_FENCE_LENGTH = 3;
-/** A backtick run that opens a line can close a fenced block. */
-const LINE_INITIAL_BACKTICKS = /^ {0,3}(`+)/gm;
-/** The breaks `formatDiffMd` spends on keeping the marker on its own line. */
-const LEADING_BREAK = /^\r?\n/;
-const TRAILING_BREAK = /\r?\n$/;
-
-const BACKSLASH = '\\';
-const ESCAPED_BACKSLASH = '\\\\';
-const ESCAPED_DIFF_SEPARATOR = `\\${DIFF_SEPARATOR}`;
-const DIFF_SIDE_ESCAPE_RE = new RegExp(
-  `${ESCAPED_BACKSLASH}|${DIFF_SEPARATOR}`,
-  'g'
-);
-// Regex sources: `\\` matches one backslash, `\\\\` matches two, so the first
-// alternative takes a doubled backslash whole and the second an escaped marker.
-const DIFF_SIDE_UNESCAPE_RE = new RegExp(
-  `${ESCAPED_BACKSLASH}${ESCAPED_BACKSLASH}|${ESCAPED_BACKSLASH}${DIFF_SEPARATOR}`,
-  'g'
-);
-// Escaped markers still contain the bare marker as a substring, so the
-// envelope split must skip occurrences the escape backslash protects.
-const DIFF_SEPARATOR_SPLIT_RE = new RegExp(
-  `(?<!${BACKSLASH}${BACKSLASH})${DIFF_SEPARATOR}`
-);
-
-/**
- * Makes a side safe to embed around {@link DIFF_SEPARATOR}.
- *
- * A file that itself contains the marker would otherwise produce a payload the
- * marker splits into three or more parts, and the renderer would fall back to
- * printing both whole sides. Backslashes are escaped first so the rewriting is
- * injective: content that already holds the escaped forms round-trips exactly.
- */
-function escapeDiffSide(side: string): string {
-  return side.replace(DIFF_SIDE_ESCAPE_RE, matched =>
-    matched === BACKSLASH ? ESCAPED_BACKSLASH : ESCAPED_DIFF_SEPARATOR
-  );
-}
-
-/** Reverses {@link escapeDiffSide} in a single left-to-right pass. */
-function unescapeDiffSide(side: string): string {
-  return side.replace(DIFF_SIDE_UNESCAPE_RE, matched =>
-    matched === ESCAPED_BACKSLASH ? BACKSLASH : DIFF_SEPARATOR
-  );
-}
-
-/**
- * Splits one change part into the lines it covers.
- *
- * Apart from the final part, every part of a line diff carries its own trailing
- * newline, so a plain `split` reports one empty element past the last real line.
- * Treating that as a line would emit a blank row per part and advance both line
- * counters once too often.
- */
-function splitPartLines(value: string): string[] {
-  const lines = value.split('\n');
-
-  if (lines.length > 1 && lines[lines.length - 1] === '') {
-    lines.pop();
-  }
-
-  return lines;
-}
 
 export function generateSideBySideDiff(
   original: string,
@@ -172,6 +100,24 @@ export function generateSideBySideDiff(
   return collapseUnchangedRegions(diffs, contextLines);
 }
 
+/**
+ * Splits one change part into the lines it covers.
+ *
+ * Apart from the final part, every part of a line diff carries its own trailing
+ * newline, so a plain `split` reports one empty element past the last real line.
+ * Treating that as a line would emit a blank row per part and advance both line
+ * counters once too often.
+ */
+function splitPartLines(value: string): string[] {
+  const lines = value.split('\n');
+
+  if (lines.length > 1 && lines[lines.length - 1] === '') {
+    lines.pop();
+  }
+
+  return lines;
+}
+
 function collapseUnchangedRegions(
   rows: SideBySideDiff[],
   contextLines: number
@@ -216,40 +162,6 @@ function collapseUnchangedRegions(
 }
 
 /**
- * Serialises a diff for `TerminalRenderer.code`: both sides inside a fenced
- * `diff` block, divided by {@link DIFF_SEPARATOR}.
- *
- * `language` is the language the *content* is written in, not of the diff
- * itself; it is what the renderer highlights the columns as, so pass
- * {@link diffLanguageForFile} of the file the diff belongs to whenever it is
- * known.
- *
- * The fence grows past every backtick run that opens a line of either side. A
- * fixed three-backtick fence is closed by the payload itself as soon as the
- * file is Markdown (or otherwise holds a delimiter at the start of a line),
- * and marked then lexes the remainder as ordinary text: the two sides never
- * reach {@link generateSideBySideDiff}, so nothing is collapsed and a one-line
- * edit prints the entire file. That is the bug this guards against.
- */
-export function formatDiffMd(
-  previous: string,
-  current: string,
-  language?: string
-): string {
-  const escapedPrevious = escapeDiffSide(previous);
-  const escapedCurrent = escapeDiffSide(current);
-  const longestRun = [
-    ...`${escapedPrevious}\n${escapedCurrent}`.matchAll(LINE_INITIAL_BACKTICKS),
-  ].reduce((longest, [run]) => Math.max(longest, run.length), 0);
-  const fence = '`'.repeat(Math.max(MIN_DIFF_FENCE_LENGTH, longestRun + 1));
-  const langTag = isNonEmptyString(language)
-    ? `${DIFF_LANG}:${language}`
-    : DIFF_LANG;
-
-  return `${fence}${langTag}\n${escapedPrevious}\n${DIFF_SEPARATOR}\n${escapedCurrent}\n${fence}\n`;
-}
-
-/**
  * The highlighter language for `filePath`'s extension, or undefined when the
  * path has no extension or one highlight.js does not know.
  */
@@ -258,22 +170,4 @@ export function diffLanguageForFile(filePath: string): string | undefined {
   return isNonEmptyString(extension) && supportsLanguage(extension)
     ? extension
     : undefined;
-}
-
-/**
- * Recovers the two sides from a {@link formatDiffMd} payload, returning null
- * whenever the text is not a two-sided diff.
- *
- * The breaks that keep the marker alone on its line belong to the envelope, not
- * to either side: left in place they add a blank row at the top of the new side
- * and shift every line number printed beside it by one.
- */
-export function splitDiffSides(text: string): [string, string] | null {
-  const sides = text.split(DIFF_SEPARATOR_SPLIT_RE);
-  if (!hasArrayLength(sides, 2)) return null;
-
-  return [
-    unescapeDiffSide(sides[0].replace(TRAILING_BREAK, '')),
-    unescapeDiffSide(sides[1].replace(LEADING_BREAK, '')),
-  ];
 }

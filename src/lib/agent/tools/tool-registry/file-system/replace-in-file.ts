@@ -7,7 +7,6 @@ import { Result } from '../../../../result';
 import { store } from '../../../../state';
 import {
   diffLanguageForFile,
-  formatDiffMd,
   generateSideBySideDiff,
 } from '../../../../utils/diff-utils';
 import {
@@ -118,22 +117,14 @@ export const replaceInFile = createTool({
     return `Editing \`${path.basename(filePath)}\``;
   },
 
-  outputToString(
-    { filePath, matchKind, occurrences, similarity },
-    _,
-    { previous, current }
-  ) {
+  outputToString({ filePath, matchKind, occurrences, similarity }) {
     const fileName = path.basename(filePath);
     const notes = [
       occurrences > 1 ? `Replaced ${occurrences} occurrences.` : undefined,
       matchKindNote(matchKind, similarity),
     ].filter(isNotNil);
     const noteBlock = notes.map(note => `\n\n${note}`).join('');
-    return `Edited \`${fileName}\`\n\n${formatDiffMd(
-      previous,
-      current,
-      diffLanguageForFile(filePath)
-    )}${noteBlock}`;
+    return `Edited \`${fileName}\`${noteBlock}`;
   },
 
   outputToPayload({ filePath }, __, { previous, current }) {

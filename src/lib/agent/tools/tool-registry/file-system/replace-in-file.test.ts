@@ -673,7 +673,7 @@ describe('replace_in_file', () => {
       ).toMatchSnapshot();
     });
 
-    it('renders the diff through the markdown renderer', async () => {
+    it('attaches the diff as payload and renders it beside the headline', async () => {
       const filePath = await prepareNamedFixture('render-diff.txt');
 
       const result = expectOk(
@@ -693,8 +693,16 @@ describe('replace_in_file', () => {
         channel,
         result.data.context!
       );
-      expect(report).toContain('Edited `render-diff.txt`');
-      expect(parseMarkdown(report, 120)).toMatchSnapshot();
+      expect(report).toBe('Edited `render-diff.txt`');
+
+      const payload = replaceInFile.outputToPayload!(
+        result.data.data,
+        channel,
+        result.data.context!
+      );
+      expect(payload?.kind).toBe('diff');
+      expect(payload?.rows.length).toBeGreaterThan(0);
+      expect(parseMarkdown(report, 120, payload)).toMatchSnapshot();
     });
 
     it('notes when the whitespace-lenient fallback was used', async () => {
@@ -723,7 +731,14 @@ describe('replace_in_file', () => {
       expect(report).toContain(
         'Matched ignoring per-line indentation; whole lines were replaced and re-indented.'
       );
-      expect(parseMarkdown(report, 120)).toMatchSnapshot();
+      expect(report).not.toContain('```');
+
+      const payload = replaceInFile.outputToPayload!(
+        result.data.data,
+        channel,
+        result.data.context!
+      );
+      expect(parseMarkdown(report, 120, payload)).toMatchSnapshot();
     });
   });
 });

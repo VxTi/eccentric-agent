@@ -15,17 +15,13 @@ import ansiEscapes from 'ansi-escapes';
 import supportsHyperlinks from 'supports-hyperlinks';
 import ansiRegex from 'ansi-regex';
 import {
-  DIFF_LANG,
-  DIFF_SEPARATOR,
   generateSideBySideDiff,
-  splitDiffSides,
   type DiffLine,
   type SideBySideDiff,
 } from '../../lib/utils/diff-utils';
 import { Position } from '../../lib/utils/string-utils';
 import { githubDark } from './code-highlight-theme';
 import type { TerminalMarked } from './types';
-import type { ToolMessageData } from '../../lib/agent/tools/tool-payload';
 
 const DEFAULT_INDENTATION = 2;
 const DEFAULT_LANG = 'plaintext';
@@ -37,28 +33,8 @@ const ANSI_RESET = `${ESC}[0m`;
 // Captures SGR sequences so `split` retains them as alternate array entries.
 const ANSI_FRAGMENT_RE = new RegExp(`(${ESC}\\[[0-9;]*m)`);
 
-export { DIFF_LANG, DIFF_SEPARATOR };
-
 /** Whole-side highlight results kept per `TerminalRenderer` instance. */
 const MAX_HIGHLIGHT_CACHE_ENTRIES = 16;
-
-const DIFF_LANG_PREFIX = `${DIFF_LANG}:`;
-
-/**
- * The language a fenced block's *content* is written in.
- *
- * ` ```diff ` carries no information about the language being diffed, so it
- * resolves to plain text. ` ```diff:typescript ` states it explicitly, which is
- * the only way to highlight both columns as real code. Returns null when the
- * block is not a diff at all.
- */
-function parseDiffLanguage(lang: string | undefined): string | null {
-  if (lang === DIFF_LANG) return DEFAULT_LANG;
-  if (isNonEmptyString(lang) && lang.startsWith(DIFF_LANG_PREFIX)) {
-    return lang.slice(DIFF_LANG_PREFIX.length);
-  }
-  return null;
-}
 
 /**
  * The highlighted text for one line of a diff side, addressed by the 1-based
@@ -175,7 +151,6 @@ interface RenderDiffProps {
 export class TerminalRenderer extends Renderer {
   private readonly config: TerminalMarked.RendererOptions;
   private shellWidth: number;
-  private diffData: ToolMessageData | undefined;
   /** Whole-side highlight results, reused across re-parses (terminal resizes,
    *  component remounts). Bounded: the newest entries matter most. */
   private readonly highlightCache = new Map<string, string[]>();
@@ -198,40 +173,8 @@ export class TerminalRenderer extends Renderer {
     return input.replace(ANSI_REGEXP, '').length;
   }
 
-  /**
-   * Attach pre-computed rendering data (diff rows) the message's tool built at
-   * emit time. Re-set by every `parseMarkdown` call.
-   */
-  public setDiffData(data: ToolMessageData | undefined): void {
-    this.diffData = data;
-  }
-
   public override code({ text, lang }: Tokens.Code) {
-    const contentLang = parseDiffLanguage(lang);
-    let renderedContent: string;
-
-    if (isNotNil(contentLang)) {
-      // `splitDiffSides` strips the envelope breaks the diff format puts around
-      // the marker; without them the new side gains a phantom leading row and
-      // every line number printed beside it shifts by one.
-      const sides = splitDiffSides(text);
-      const payloadRows = isNotNil(sides)
-        ? this.payloadRowsFor(sides)
-        : undefined;
-
-      renderedContent = isNotNil(sides)
-        ? this.renderDiff({
-            oldStr: sides[0],
-            newStr: sides[1],
-            lang: contentLang,
-            availableWidth:
-              this.width - (this.config.indentation ?? DEFAULT_INDENTATION),
-            precomputedRows: payloadRows,
-          })
-        : this.highlightCode(text, contentLang);
-    } else {
-      renderedContent = this.highlightCode(text, lang ?? DEFAULT_LANG);
-    }
+    const renderedContent = this.highlightCode(text, lang ?? DEFAULT_LANG);
 
     const finalContent = this.config.reflowText
       ? this.reflowText(renderedContent)
@@ -565,18 +508,6 @@ export class TerminalRenderer extends Renderer {
     }
     this.highlightCache.set(key, lines);
     return lines;
-  }
-
-  /** The payload's rows when it was built from exactly `sides`' content. */
-  private payloadRowsFor([previous, current]: [string, string]):
-    | SideBySideDiff[]
-    | undefined {
-    const { diffData } = this;
-    if (diffData?.kind !== 'diff') return undefined;
-    if (diffData.previous !== previous || diffData.current !== current) {
-      return undefined;
-    }
-    return diffData.rows;
   }
 
   /**

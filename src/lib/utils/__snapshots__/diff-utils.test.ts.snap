@@ -1,18 +1,5 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`formatDiffMd > matches its documented envelope shape 1`] = `
-"\`\`\`diff
-line 1
-line 2
-
----DIFF_SEPARATOR---
-line 1
-changed
-
-\`\`\`
-"
-`;
-
 exports[`generateSideBySideDiff > collapses an unchanged head even when the change starts the file 1`] = `
 [
   [
@@ -434,16 +421,5 @@ exports[`generateSideBySideDiff > pairs a replacement onto shared rows 1`] = `
       "value": "c",
     },
   ],
-]
-`;
-
-exports[`splitDiffSides > strips exactly the envelope breaks and nothing else 1`] = `
-[
-  "a
-b
-",
-  "a
-c
-",
 ]
 `;

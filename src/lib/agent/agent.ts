@@ -326,6 +326,15 @@ export class Agent extends AgentBase {
             });
             break;
           }
+          /*case 'reasoning-delta': {
+            this.emit(AgentEvents.MESSAGE_DELTA, {
+              type: MessageType.REASONING,
+              id: reasoning!.id,
+              loading: false,
+              content: `Thinking...\n${part.text}`,
+            });
+            break;
+          }*/
           case 'reasoning-end':
             finishReasoning();
             break;

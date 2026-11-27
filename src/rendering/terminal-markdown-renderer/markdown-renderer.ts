@@ -37,9 +37,9 @@ export const terminalRenderer = new TerminalRenderer(markdownFormattingOptions);
  * laid out against it, paragraphs are wrapped by Ink at the real layout
  * width). Callers must pass the width their container actually gives them.
  *
- * `data` carries pre-computed rendering data (e.g. diff rows) the message's
- * tool attached at emit time, letting the renderer skip re-deriving it from
- * the parsed text.
+ * `data` carries the diff a tool pre-computed at emit time, rendered as a grid
+ * below the parsed content. The diff travels only as data: the message content
+ * never embeds the changed file, so it is not stored twice.
  */
 export function parseMarkdown(
   input: string,
@@ -47,10 +47,29 @@ export function parseMarkdown(
   data?: ToolMessageData
 ): string {
   terminalRenderer.setWidth(width);
-  terminalRenderer.setDiffData(data);
-  return marked.parse(input, {
+  const parsed = marked.parse(input, {
     gfm: true,
     renderer: terminalRenderer,
     async: false,
   });
+
+  const diff = renderMessageDiff(data, width);
+  return diff === undefined ? parsed : `${parsed.trimEnd()}\n\n${diff}`;
+}
+
+function renderMessageDiff(
+  data: ToolMessageData | undefined,
+  width: number
+): string | undefined {
+  if (data?.kind !== 'diff') return undefined;
+
+  const rendered = terminalRenderer.renderDiff({
+    oldStr: data.previous,
+    newStr: data.current,
+    lang: data.language,
+    availableWidth: width,
+    precomputedRows: data.rows,
+  });
+
+  return rendered.length > 0 ? rendered : undefined;
 }

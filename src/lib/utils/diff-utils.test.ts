@@ -1,118 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { type Tokens, lexer } from 'marked';
-import { DIFF_SEPARATOR } from '../../rendering/terminal-markdown-renderer/terminal-markdown-renderer';
-import {
-  diffLanguageForFile,
-  formatDiffMd,
-  generateSideBySideDiff,
-  splitDiffSides,
-} from './diff-utils';
-
-/** The payload of the single fenced block `formatDiffMd` is meant to emit. */
-function diffBlock(previous: string, current: string): string {
-  const tokens = lexer(formatDiffMd(previous, current));
-  expect(tokens.map(token => token.type)).toEqual(['code']);
-  const [code] = tokens as Tokens.Code[];
-  return code!.text;
-}
-
-function splitSides(text: string): [string, string] {
-  const sides = splitDiffSides(text);
-  expect(sides).not.toBeNull();
-  return sides as [string, string];
-}
+import { diffLanguageForFile, generateSideBySideDiff } from './diff-utils';
 
 function numberedFile(length: number): string {
   return `${Array.from({ length }, (_, i) => `line ${i + 1}`).join('\n')}\n`;
 }
-
-describe('formatDiffMd', () => {
-  it('gives back both sides exactly when they are split apart again', () => {
-    const previous = 'line 1\nline 2\n';
-    const current = 'line 1\nchanged\n';
-
-    // The breaks that keep the marker alone on its line belong to the envelope:
-    // handing them to the diff would add a blank row and shift every line number
-    // printed beside it.
-    const [restoredPrevious, restoredCurrent] = splitSides(
-      diffBlock(previous, current)
-    );
-
-    expect(restoredPrevious).toBe(previous);
-    expect(restoredCurrent).toBe(current);
-  });
-
-  it('gives back both sides when neither ends in a line break', () => {
-    const previous = 'line 1\nline 2';
-    const current = 'line 1\nchanged';
-
-    const [restoredPrevious, restoredCurrent] = splitSides(
-      diffBlock(previous, current)
-    );
-
-    expect(restoredPrevious).toBe(previous);
-    expect(restoredCurrent).toBe(current);
-  });
-
-  it('round-trips a side that itself contains the separator marker', () => {
-    const previous = `line 1\n${DIFF_SEPARATOR}\nline 2\n`;
-    const current = `line 1\n${DIFF_SEPARATOR} changed\n`;
-
-    const [restoredPrevious, restoredCurrent] = splitSides(
-      diffBlock(previous, current)
-    );
-
-    expect(restoredPrevious).toBe(previous);
-    expect(restoredCurrent).toBe(current);
-  });
-
-  it('round-trips backslashes next to the marker and each other', () => {
-    const previous = 'path C:\\dir\n\\\\---DIFF_SEPARATOR---\nregex \\d+\n';
-    const current = 'path C:\\dir\n\\\\---DIFF_SEPARATOR---\nregex \\w+\n';
-
-    const [restoredPrevious, restoredCurrent] = splitSides(
-      diffBlock(previous, current)
-    );
-
-    expect(restoredPrevious).toBe(previous);
-    expect(restoredCurrent).toBe(current);
-  });
-
-  it('keeps the payload inside one code block when a side is Markdown', () => {
-    const previous = '# Title\n\n```ts\nconst a = 1;\n```\n\nprose\n';
-    const current = previous.replace('const a = 1;', 'const a = 2;');
-
-    // A fixed three-backtick fence is closed by the payload itself here, and
-    // marked then lexes the remainder of the file as ordinary text: the sides
-    // never reach the diff generator, so a one-line edit prints everything.
-    expect(lexer(formatDiffMd(previous, current)).length).toBe(1);
-    const restoredCurrent = splitSides(diffBlock(previous, current))[1];
-    expect(restoredCurrent).toBe(current);
-  });
-
-  it('grows the fence past the longest backtick run either side opens a line with', () => {
-    expect(formatDiffMd('plain\n', 'plain\n').startsWith('```diff\n')).toBe(
-      true
-    );
-    expect(formatDiffMd('```\n', 'x\n````\n').startsWith('`````diff\n')).toBe(
-      true
-    );
-  });
-
-  it('matches its documented envelope shape', () => {
-    expect(
-      formatDiffMd('line 1\nline 2\n', 'line 1\nchanged\n')
-    ).toMatchSnapshot();
-  });
-
-  it('tags the fence with the content language', () => {
-    expect(
-      formatDiffMd('line 1\n', 'line 1\nchanged\n', 'ts').startsWith(
-        '```diff:ts\n'
-      )
-    ).toBe(true);
-  });
-});
 
 describe('diffLanguageForFile', () => {
   it('resolves a supported file extension to its language', () => {
@@ -125,16 +16,6 @@ describe('diffLanguageForFile', () => {
     expect(diffLanguageForFile('.gitignore')).toBeUndefined();
     expect(diffLanguageForFile('Makefile')).toBeUndefined();
     expect(diffLanguageForFile('notes.weirdext')).toBeUndefined();
-  });
-});
-
-describe('splitDiffSides', () => {
-  it('returns null for text that is not a two-sided diff', () => {
-    expect(splitDiffSides('no marker here')).toBeNull();
-  });
-
-  it('strips exactly the envelope breaks and nothing else', () => {
-    expect(splitSides(diffBlock('a\nb\n', 'a\nc\n'))).toMatchSnapshot();
   });
 });
 

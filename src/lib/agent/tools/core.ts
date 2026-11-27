@@ -163,10 +163,13 @@ function makeTool(
       );
 
       if (result.ok) {
+        const { data: output, context = {} } = result.data;
         channel.notify({
           loading: false,
-          content: `${basicHighlightFormatting('→')} ${tool.outputToString(result.data.data, channel, result.data.context ?? {}).trim()}`,
-          data: result.data.messageMeta,
+          content: `${basicHighlightFormatting('→')} ${tool
+            .outputToString(output, channel, context)
+            .trim()}`,
+          data: tool.outputToPayload?.(output, channel, context),
         });
       } else {
         channel.notify({
