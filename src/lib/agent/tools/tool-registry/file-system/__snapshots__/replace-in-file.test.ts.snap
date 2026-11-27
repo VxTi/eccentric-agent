@@ -4,6 +4,7 @@ exports[`replace_in_file > applies an exact single-occurrence replacement 1`] = 
 {
   "filePath": "exact-replacement.txt",
   "matchKind": "exact",
+  "occurrences": 1,
   "startLine": 4,
 }
 `;

@@ -264,6 +264,144 @@ describe('replace_in_file', () => {
     expect(await fs.readFile(filePath, 'utf-8')).toBe(before);
   });
 
+  it('replaces every exact occurrence when `replaceAll` is set', async () => {
+    const filePath = await prepareLines('x', 'a', 'x', 'b', 'x', '');
+
+    const result = expectOk(
+      await replaceInFile.handle(
+        { filePath, oldString: 'x', newString: 'Y', replaceAll: true },
+        channel,
+        signal
+      )
+    );
+
+    expect(result.data.occurrences).toBe(3);
+    expect(result.data.startLine).toBe(1);
+    expect(await fs.readFile(filePath, 'utf-8')).toBe('Y\na\nY\nb\nY\n');
+  });
+
+  it('suggests `replaceAll` when rejecting an ambiguous match', async () => {
+    const filePath = await prepareLines('x', 'x', '');
+
+    const error = expectError(
+      await replaceInFile.handle(
+        { filePath, oldString: 'x', newString: 'Y' },
+        channel,
+        signal
+      )
+    );
+
+    expect(error).toContain('set `replaceAll`');
+  });
+
+  it('replaces every whitespace-lenient occurrence when `replaceAll` is set', async () => {
+    const filePath = await prepareLines('\ta', '\tb', 'c', '\ta', '\tb', '');
+
+    const result = expectOk(
+      await replaceInFile.handle(
+        { filePath, oldString: 'a\nb', newString: 'X', replaceAll: true },
+        channel,
+        signal
+      )
+    );
+
+    expect(result.data.matchKind).toBe('whitespace');
+    expect(result.data.occurrences).toBe(2);
+    expect(await fs.readFile(filePath, 'utf-8')).toBe('X\nc\nX\n');
+  });
+
+  it('fuzzy-matches lines edited since the file was read', async () => {
+    const filePath = await prepareLines(
+      'function total(items) {',
+      '  const sum = items.reduce((acc, item) => acc + item.price, 0);',
+      '  return Math.round(sum * 100) / 100;',
+      '}',
+      ''
+    );
+
+    const result = expectOk(
+      await replaceInFile.handle(
+        {
+          filePath,
+          oldString:
+            '  const sum = items.reduce((acc, item) => acc + item.cost, 0);\n' +
+            '  return Math.round(sum * 100) / 100;',
+          newString: '  return sumPrices(items);',
+        },
+        channel,
+        signal
+      )
+    );
+
+    expect(result.data.matchKind).toBe('fuzzy');
+    expect(result.data.startLine).toBe(2);
+    expect(result.data.similarity).toBeGreaterThanOrEqual(0.9);
+    expect(await fs.readFile(filePath, 'utf-8')).toBe(
+      'function total(items) {\n  return sumPrices(items);\n}\n'
+    );
+  });
+
+  it('rejects a fuzzy match that resembles several places', async () => {
+    const filePath = await prepareLines(
+      'const firstValue = compute(alpha);',
+      'other',
+      'const firstValue = compute(alpha);',
+      ''
+    );
+    const before = await fs.readFile(filePath, 'utf-8');
+
+    const error = expectError(
+      await replaceInFile.handle(
+        {
+          filePath,
+          oldString: 'const firstValue = compute(alphb);',
+          newString: 'X',
+        },
+        channel,
+        signal
+      )
+    );
+
+    expect(error).toContain('resembles 2 places (lines 1, 3)');
+    expect(await fs.readFile(filePath, 'utf-8')).toBe(before);
+  });
+
+  it('does not fuzzy-match text that differs too much', async () => {
+    const filePath = await prepareLines('const value = 1;', '');
+
+    const error = expectError(
+      await replaceInFile.handle(
+        { filePath, oldString: 'let other = 2;', newString: 'X' },
+        channel,
+        signal
+      )
+    );
+
+    expect(error).toContain('was not found');
+  });
+
+  it('never fuzzy-matches when `replaceAll` is set', async () => {
+    const filePath = await prepareLines(
+      'const firstValue = compute(alpha);',
+      ''
+    );
+
+    const error = expectError(
+      await replaceInFile.handle(
+        {
+          filePath,
+          oldString: 'const firstValue = compute(alphb);',
+          newString: 'X',
+          replaceAll: true,
+        },
+        channel,
+        signal
+      )
+    );
+
+    expect(error).toContain('fuzzy matching is not applied with `replaceAll`');
+  });
+
   it('rejects an oldString that is not found at all and leaves the file unchanged', async () => {
     const filePath = await prepareFixture();
     const before = await fs.readFile(filePath, 'utf-8');

@@ -31,3 +31,24 @@ export function detectLineEnding(content: string): string {
 export function capitalize(input: string): string {
   return input.charAt(0).toUpperCase() + input.slice(1);
 }
+
+/** Minimum number of single-character insertions, deletions or substitutions turning `a` into `b`. */
+export function levenshteinDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  if (a.length < b.length) return levenshteinDistance(b, a);
+
+  let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    for (let j = 1; j <= b.length; j++) {
+      const substitution = a[i - 1] === b[j - 1] ? 0 : 1;
+      current[j] = Math.min(
+        (previous[j] ?? 0) + 1,
+        (current[j - 1] ?? 0) + 1,
+        (previous[j - 1] ?? 0) + substitution
+      );
+    }
+    previous = current;
+  }
+  return previous[b.length] ?? 0;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Position, ellipsize } from './string-utils';
+import { Position, ellipsize, levenshteinDistance } from './string-utils';
 
 describe('string ellipsizing', () => {
   it('should ellipsize strings in the start correctly', () => {
@@ -19,5 +19,20 @@ describe('string ellipsizing', () => {
 
     expect(result).toEqual('some ...');
     expect(result.length).toEqual(8);
+  });
+});
+
+describe('levenshteinDistance', () => {
+  it('counts single-character edits', () => {
+    expect(levenshteinDistance('kitten', 'sitting')).toBe(3);
+    expect(levenshteinDistance('', 'abc')).toBe(3);
+    expect(levenshteinDistance('abc', '')).toBe(3);
+    expect(levenshteinDistance('same', 'same')).toBe(0);
+  });
+
+  it('is symmetric', () => {
+    expect(levenshteinDistance('flaw', 'lawn')).toBe(
+      levenshteinDistance('lawn', 'flaw')
+    );
   });
 });
