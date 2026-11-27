@@ -13,11 +13,10 @@ vi.mock('../state', () => ({
   setMessages: vi.fn(),
 }));
 import {
-  constructStateReminderMessage,
+  constructSkillStateReminder,
   constructSystemPrompt,
 } from './system-prompt';
 import type { StatefulSkillMap } from './agent-base';
-import type { TaskList } from '../tasks';
 
 function makeSkill(input: {
   name: string;
@@ -76,32 +75,30 @@ describe('constructSystemPrompt', () => {
   });
 });
 
-describe('constructStateReminderMessage', () => {
-  it('includes the name and content of a dynamically activated skill', () => {
-    const reminder = constructStateReminderMessage({
-      taskList: { hasTasks: false, tasks: [] } as unknown as TaskList,
-      skills: makeSkillMap({ ...autoSkill, active: true }),
+describe('constructSkillStateReminder', () => {
+  it('includes the name and content of an activated skill', () => {
+    const reminder = constructSkillStateReminder({
+      activated: [{ ...autoSkill, active: true }],
+      deactivated: [],
     });
 
     expect(reminder).toContain('auto-skill');
     expect(reminder).toContain('Content of auto-skill');
   });
 
-  it('does not repeat always-included skills, which live in the system prompt', () => {
-    const reminder = constructStateReminderMessage({
-      taskList: { hasTasks: false, tasks: [] } as unknown as TaskList,
-      skills: makeSkillMap(alwaysSkill),
+  it('names a deactivated skill without its content', () => {
+    const reminder = constructSkillStateReminder({
+      activated: [],
+      deactivated: ['auto-skill'],
     });
 
-    expect(reminder).toBeNull();
+    expect(reminder).toContain('`auto-skill` has been deactivated');
+    expect(reminder).not.toContain('Content of auto-skill');
   });
 
-  it('returns null when no skill is active', () => {
-    const reminder = constructStateReminderMessage({
-      taskList: { hasTasks: false, tasks: [] } as unknown as TaskList,
-      skills: makeSkillMap(autoSkill),
-    });
-
-    expect(reminder).toBeNull();
+  it('returns null when nothing changed', () => {
+    expect(
+      constructSkillStateReminder({ activated: [], deactivated: [] })
+    ).toBeNull();
   });
 });

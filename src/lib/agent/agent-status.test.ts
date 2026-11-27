@@ -8,7 +8,7 @@ vi.mock('./skills/discovery', () => ({
 
 vi.mock('./system-prompt', () => ({
   constructSystemPrompt: vi.fn(() => Promise.resolve('test system prompt')),
-  constructStateReminderMessage: vi.fn(() => null),
+  constructSkillStateReminder: vi.fn(() => null),
 }));
 
 vi.mock('../state', () => ({

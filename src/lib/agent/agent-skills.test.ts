@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { Agent } from './agent';
 import { AgentEvents } from './agent-base';
-import { constructStateReminderMessage } from './system-prompt';
 import { SkillInclusion, type AgentSkill } from './skills/model';
 
 vi.mock('./skills/discovery', () => ({
@@ -9,11 +8,11 @@ vi.mock('./skills/discovery', () => ({
 }));
 
 let promptCounter = 0;
-vi.mock('./system-prompt', () => ({
+vi.mock('./system-prompt', async importOriginal => ({
+  ...(await importOriginal<typeof import('./system-prompt')>()),
   constructSystemPrompt: vi.fn(() =>
     Promise.resolve(`system prompt #${++promptCounter}`)
   ),
-  constructStateReminderMessage: vi.fn(() => null),
 }));
 
 vi.mock('../state', () => ({
@@ -30,7 +29,7 @@ vi.mock('ai', async importOriginal => {
   return { ...actual, streamText: vi.fn() };
 });
 
-import { streamText } from 'ai';
+import { streamText, type ModelMessage } from 'ai';
 const streamTextMock = streamText as unknown as Mock;
 
 function createAgent(): Agent {
@@ -50,10 +49,10 @@ function makeSkill(input: {
   };
 }
 
-function fakeSuccessfulStream(): unknown {
+function fakeSuccessfulStream(responseMessages: ModelMessage[] = []): unknown {
   return {
     stream: (async function* emptyStream() {})(),
-    steps: Promise.resolve([]),
+    steps: Promise.resolve([{ response: { messages: responseMessages } }]),
     finalStep: Promise.resolve({ usage: {} }),
   };
 }
@@ -67,9 +66,7 @@ function systemPromptOfCall(callIndex: number): string {
 
 afterEach(() => {
   streamTextMock.mockReset();
-  stateReminderMock.mockReset();
   promptCounter = 0;
-  syncCount = 0;
 });
 
 describe('AgentBase.loadSkill', () => {
@@ -169,66 +166,123 @@ describe('Agent system prompt invalidation', () => {
   });
 });
 
-const stateReminderMock = constructStateReminderMessage as unknown as Mock;
-
-let syncCount = 0;
-function remindersPerTurnEnd(...values: (string | null)[]): void {
-  syncCount = 0;
-  stateReminderMock.mockImplementation(() => {
-    const value = values[Math.min(syncCount, values.length - 1)];
-    syncCount++;
-    return value ?? null;
-  });
-}
-
-function reminderContentsOfCall(callIndex: number): string[] {
+function userTextsOfCall(callIndex: number): string[] {
   const [request] = streamTextMock.mock.calls[callIndex] as [
-    { messages: { role: string; content: string }[] },
+    { messages: ModelMessage[] },
   ];
   return request.messages
-    .filter(
-      message =>
-        message.role === 'user' && message.content.startsWith('REMINDER')
-    )
-    .map(message => message.content);
+    .filter(message => message.role === 'user')
+    .map(message => message.content)
+    .filter((content): content is string => typeof content === 'string');
 }
 
-describe('Agent state reminder persistence', () => {
-  it('records the reminder once at the end of a turn instead of on every step', async () => {
-    remindersPerTurnEnd('REMINDER');
+function countUserTextsContaining(callIndex: number, text: string): number {
+  return userTextsOfCall(callIndex).filter(content => content.includes(text))
+    .length;
+}
+
+function useSkillResponse(skill: AgentSkill): ModelMessage[] {
+  return [
+    {
+      role: 'assistant',
+      content: [
+        {
+          type: 'tool-call',
+          toolCallId: 'call-1',
+          toolName: 'use_skill',
+          input: { skill: skill.name },
+        },
+      ],
+    },
+    {
+      role: 'tool',
+      content: [
+        {
+          type: 'tool-result',
+          toolCallId: 'call-1',
+          toolName: 'use_skill',
+          output: {
+            type: 'json',
+            value: {
+              ok: true,
+              data: { skill: skill.name, content: skill.content },
+            },
+          },
+        },
+      ],
+    },
+  ];
+}
+
+describe('Agent skill state in the conversation history', () => {
+  it('records a user-activated skill body once, before the next user message', async () => {
     streamTextMock.mockImplementation(() => fakeSuccessfulStream());
     const agent = createAgent();
+    agent.loadSkill(makeSkill({ name: 'tdd', inclusion: SkillInclusion.AUTO }));
 
-    await agent.submitMessage('first turn');
-    expect(reminderContentsOfCall(0)).toEqual([]);
-
-    await agent.submitMessage('second turn');
-    expect(reminderContentsOfCall(1)).toEqual(['REMINDER']);
-  });
-
-  it('does not duplicate the reminder when the state is unchanged', async () => {
-    remindersPerTurnEnd('REMINDER');
-    streamTextMock.mockImplementation(() => fakeSuccessfulStream());
-    const agent = createAgent();
-
+    agent.activateSkill('tdd');
     await agent.submitMessage('first turn');
     await agent.submitMessage('second turn');
     await agent.submitMessage('third turn');
 
-    expect(reminderContentsOfCall(1)).toEqual(['REMINDER']);
-    expect(reminderContentsOfCall(2)).toEqual(['REMINDER']);
+    expect(countUserTextsContaining(0, 'Content of tdd')).toBe(1);
+    expect(countUserTextsContaining(2, 'Content of tdd')).toBe(1);
+    expect(userTextsOfCall(0).at(-1)).toBe('first turn');
   });
 
-  it('records each new version exactly once, keeping previous versions', async () => {
-    remindersPerTurnEnd('REMINDER V1', 'REMINDER V2');
+  it('records a deactivation note once without repeating the skill body', async () => {
     streamTextMock.mockImplementation(() => fakeSuccessfulStream());
     const agent = createAgent();
+    agent.loadSkill(makeSkill({ name: 'tdd', inclusion: SkillInclusion.AUTO }));
 
+    agent.activateSkill('tdd');
     await agent.submitMessage('first turn');
+    agent.deactivateSkill('tdd');
     await agent.submitMessage('second turn');
     await agent.submitMessage('third turn');
 
-    expect(reminderContentsOfCall(1)).toEqual(['REMINDER V1']);
-    expect(reminderContentsOfCall(2)).toEqual(['REMINDER V1', 'REMINDER V2']);
+    expect(countUserTextsContaining(2, 'Content of tdd')).toBe(1);
+    expect(countUserTextsContaining(2, '`tdd` has been deactivated')).toBe(1);
+  });
+
+  it('does not re-record a skill whose body a use_skill result delivered', async () => {
+    const skill = makeSkill({ name: 'tdd', inclusion: SkillInclusion.AUTO });
+    const agent = createAgent();
+    agent.loadSkill(skill);
+    streamTextMock.mockImplementationOnce(() => {
+      agent.activateSkill('tdd');
+      return fakeSuccessfulStream(useSkillResponse(skill));
+    });
+    streamTextMock.mockImplementation(() => fakeSuccessfulStream());
+
+    await agent.submitMessage('first turn');
+    await agent.submitMessage('second turn');
+
+    expect(countUserTextsContaining(1, 'Content of tdd')).toBe(0);
+  });
+
+  it('records always-included skills nowhere but the system prompt', async () => {
+    streamTextMock.mockImplementation(() => fakeSuccessfulStream());
+    const agent = createAgent();
+    agent.loadSkill(
+      makeSkill({ name: 'builtin', inclusion: SkillInclusion.ALWAYS })
+    );
+
+    await agent.submitMessage('first turn');
+
+    expect(countUserTextsContaining(0, 'Content of builtin')).toBe(0);
+  });
+
+  it('re-records active skills after the context is cleared', async () => {
+    streamTextMock.mockImplementation(() => fakeSuccessfulStream());
+    const agent = createAgent();
+    agent.loadSkill(makeSkill({ name: 'tdd', inclusion: SkillInclusion.AUTO }));
+
+    agent.activateSkill('tdd');
+    await agent.submitMessage('first turn');
+    agent.clear();
+    await agent.submitMessage('second turn');
+
+    expect(countUserTextsContaining(1, 'Content of tdd')).toBe(1);
   });
 });

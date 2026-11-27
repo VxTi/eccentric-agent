@@ -90,6 +90,7 @@ export class Agent extends AgentBase {
       type: MessageType.USER,
       content: message,
     });
+    this.recordSkillStateChanges();
     this._context.pushUser(message);
     store.dispatch(pushEntry(message));
     await this.processRequest();
@@ -155,7 +156,9 @@ export class Agent extends AgentBase {
       }
 
       const steps = await result.steps;
-      this._context.pushResponse(steps.flatMap(step => step.response.messages));
+      this.appendResponseToContext(
+        steps.flatMap(step => step.response.messages)
+      );
       const finalStep = await result.finalStep;
       // The final step's occupancy snapshot was already emitted by
       // `onStepEnd`, which fires for every step including the last one.
@@ -180,9 +183,6 @@ export class Agent extends AgentBase {
       return;
     } finally {
       this._requestController = undefined;
-      // The turn is over: persist the current session state so the reminder
-      // lands in the cached prefix instead of being re-sent every step.
-      this.persistStateReminder();
     }
 
     this.status.clear(StatusFlag.STREAMING);
@@ -226,7 +226,7 @@ export class Agent extends AgentBase {
         this._context.messages,
         signal
       );
-      this._context.clear();
+      this.clearContext();
       this._context.pushUser(this.compactionNotice(summary));
       this.emit(AgentEvents.MESSAGE_DELTA, {
         type: MessageType.GENERIC,

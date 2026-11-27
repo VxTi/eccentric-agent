@@ -1,16 +1,16 @@
-import { type ToolSet } from 'ai';
+import { type ModelMessage, type ToolSet } from 'ai';
 import type { Message } from '../types/messages';
 import { Notifier as NotifierImpl, type Notifier } from '../events/notifier';
 import { FileCache as FileCacheImpl, type FileCache } from '../file-cache';
 import { TaskList as TaskListImpl, type TaskList } from '../tasks';
 import { EventEmitter } from 'node:events';
-import { isNil, type Nullable } from '@vxti/typed';
+import { isNil, isNotNil, type Nullable } from '@vxti/typed';
 import { BitSet } from '../utils/bitset';
 import { ContextCompactor } from './context-compaction';
 import { ContextStore } from './context-store';
 import { DEFAULT_MODEL, type ModelDefinition } from './inference';
 import { loadMcpConfig, type MCP } from './mcp/mcp';
-import { constructStateReminderMessage } from './system-prompt';
+import { constructSkillStateReminder } from './system-prompt';
 import { discoverSkillFiles } from './skills/discovery';
 import {
   SkillInclusion,
@@ -18,6 +18,7 @@ import {
   type SkillName,
 } from './skills/model';
 import { makeToolSet, toolRegistry } from './tools';
+import { getActivatedSkillsFromMessages } from './tools/tool-registry/skill';
 
 export const enum StatusFlag {
   NONE = 0,
@@ -98,8 +99,8 @@ export abstract class AgentBase extends EventEmitter<AgentEventMap> {
   protected _reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM;
   protected _model: ModelDefinition = DEFAULT_MODEL;
   protected _systemPrompt?: string;
-  /** Reminder content already persisted into the history, for change detection. */
-  private _persistedReminder?: string;
+  /** On-demand skills whose body is present in the conversation history. */
+  private readonly _skillsInContext = new Set<SkillName>();
 
   protected invalidateSystemPrompt(): void {
     this._systemPrompt = undefined;
@@ -242,33 +243,48 @@ export abstract class AgentBase extends EventEmitter<AgentEventMap> {
   }
 
   /**
-   * Persists the live session state (active skills, task list) into the
-   * conversation history — once per state change, never per step. Appending
-   * it as a per-request tail re-billed the whole block as uncached input on
-   * every step; persisted once, it rides the provider's cached prefix until
-   * the state changes again.
-   *
-   * Must only run at a turn boundary: pushing it mid-turn would place the
-   * reminder before responses the provider has already cached, breaking
-   * prefix alignment for every later request.
+   * Appends skill activations and deactivations the model has not seen yet,
+   * e.g. ones toggled by the user between turns. Must run at a turn boundary
+   * so the history stays append-only for the provider's prompt cache.
    */
-  protected persistStateReminder(): void {
-    const reminder = constructStateReminderMessage({
-      skills: this._skills,
-      taskList: this._taskList,
-    });
-    if (isNil(reminder)) {
-      this._persistedReminder = undefined;
-      return;
-    }
-    if (reminder === this._persistedReminder) return;
-    this._persistedReminder = reminder;
+  protected recordSkillStateChanges(): void {
+    const activated = this._skills
+      .values()
+      .filter(
+        skill =>
+          isActiveSkill(skill) &&
+          !isAlwaysIncluded(skill) &&
+          !this._skillsInContext.has(skill.name)
+      )
+      .toArray();
+    const deactivated = Array.from(this._skillsInContext).filter(
+      name => !this.isSkillActive(name)
+    );
+
+    const reminder = constructSkillStateReminder({ activated, deactivated });
+    if (isNil(reminder)) return;
+
     this._context.pushUser(reminder);
+    activated.forEach(skill => this._skillsInContext.add(skill.name));
+    deactivated.forEach(name => this._skillsInContext.delete(name));
+  }
+
+  /** Commits a turn's responses, noting skill bodies its `use_skill` calls delivered. */
+  protected appendResponseToContext(messages: readonly ModelMessage[]): void {
+    this._context.pushResponse(messages);
+    getActivatedSkillsFromMessages(messages).forEach(name =>
+      this._skillsInContext.add(name)
+    );
+  }
+
+  private isSkillActive(name: SkillName): boolean {
+    const skill = this._skills.get(name);
+    return isNotNil(skill) && isActiveSkill(skill);
   }
 
   protected clearContext(): void {
     this._context.clear();
-    this._persistedReminder = undefined;
+    this._skillsInContext.clear();
   }
 
   public get status(): BitSet<StatusFlag> {

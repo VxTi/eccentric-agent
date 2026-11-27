@@ -1,11 +1,10 @@
 import {
-  isActiveSkill,
   isAlwaysIncluded,
   type StatefulAgentSkill,
   type StatefulSkillMap,
 } from './agent-base';
 import type { MCP } from './mcp/mcp';
-import { type TaskList, TaskStatus } from '../tasks';
+import type { SkillName } from './skills/model';
 import {
   type Nullable,
   isNil,
@@ -57,9 +56,9 @@ interface StaticPromptProps {
   gitIgnore: Set<string>;
 }
 
-interface StateReminderProps {
-  taskList: TaskList;
-  skills: StatefulSkillMap;
+interface SkillStateChanges {
+  activated: StatefulAgentSkill[];
+  deactivated: SkillName[];
 }
 
 /**
@@ -91,35 +90,25 @@ export async function constructSystemPrompt({
 }
 
 /**
- * Live session state (active skills, task list), recorded into the
- * conversation history once per state change instead of living in the system
- * prompt. The task list changes on nearly every agentic turn; from inside
- * the system prompt that change would invalidate the provider's cache read
- * for the entire conversation history, while an appended message becomes
- * part of the cached prefix after it is recorded.
- *
- * Returns null when there is nothing to report, so no reminder is recorded
- * at all.
+ * Skill state changes the model has not yet seen in the conversation —
+ * activations and deactivations made outside its own `use_skill` calls.
+ * Appended to the history once per change, so each skill body is present
+ * exactly once instead of being repeated with every state update.
  */
-export function constructStateReminderMessage({
-  taskList,
-  skills,
-}: StateReminderProps): Nullable<string> {
+export function constructSkillStateReminder({
+  activated,
+  deactivated,
+}: SkillStateChanges): Nullable<string> {
   const body = compact([
-    constructActiveSkillsReminderFragment(skills),
-    constructTaskListReminderFragment(taskList),
+    isEmptyArray(activated) ? undefined : renderSkillBodies(activated),
+    ...deactivated.map(
+      name =>
+        `The skill \`${name}\` has been deactivated; disregard its instructions from here on.`
+    ),
   ]).join('\n\n');
 
   if (!isNonEmptyString(body)) return null;
-  return [
-    '<system-reminder>',
-    'Live session state, recorded at this point in the conversation.',
-    'Any later system-reminder supersedes this one — never respond to',
-    'this block directly.',
-    '',
-    body,
-    '</system-reminder>',
-  ].join('\n');
+  return ['<system-reminder>', body, '</system-reminder>'].join('\n');
 }
 
 async function describeMcpServers(mcpServers: Set<MCP>): Promise<string> {
@@ -132,20 +121,6 @@ async function describeMcpServers(mcpServers: Set<MCP>): Promise<string> {
     })
   );
   return descriptions.join('\n');
-}
-
-function constructActiveSkillsReminderFragment(
-  skills: StatefulSkillMap
-): string | undefined {
-  const activatedSkills = skills
-    .values()
-    // Always-included skills are embedded in the system prompt; the reminder
-    // carries only skills activated during the session.
-    .filter(skill => isActiveSkill(skill) && !isAlwaysIncluded(skill))
-    .toArray();
-  if (isEmptyArray(activatedSkills)) return undefined;
-
-  return renderSkillBodies(activatedSkills);
 }
 
 function constructAlwaysIncludedSkillsFragment(
@@ -167,7 +142,7 @@ function constructSkillsSystemPromptFragment(
     .values()
     // Lists every on-demand skill regardless of activation state: the
     // catalog must stay stable for prompt caching, while activation is
-    // reported per-request by the state reminder.
+    // recorded in the conversation history.
     .filter(skill => !isAlwaysIncluded(skill))
     .toArray();
   if (isEmptyArray(onDemandSkills)) return undefined;
@@ -186,29 +161,6 @@ function renderSkillBodies(skills: StatefulAgentSkill[]): string {
   return skills
     .map(skill => `# ${skill.name}\n\n${skill.content}`)
     .join('\n\n---\n\n');
-}
-
-function constructTaskListReminderFragment(
-  taskList: TaskList
-): Nullable<string> {
-  if (!taskList.hasTasks) return null;
-
-  const lines = taskList.tasks.map(task => {
-    const mapping: Record<TaskStatus, string> = {
-      [TaskStatus.COMPLETED]: '[x]',
-      [TaskStatus.IN_PROGRESS]: '[~]',
-      [TaskStatus.PENDING]: '[ ]',
-    };
-    return `  ${mapping[task.status]} (${task.id}) ${task.description}`;
-  });
-
-  return [
-    'Current task list (markers: [ ] pending, [~] in_progress, [x] completed):',
-    ...lines,
-    'While any task is not completed you MUST keep working autonomously.' +
-      ' Use `update_task_list` to mark tasks "in_progress" before starting' +
-      ' and "completed" when done. Only stop once every task is completed.',
-  ].join('\n');
 }
 
 async function loadSystemPrompt(globOptions: {
