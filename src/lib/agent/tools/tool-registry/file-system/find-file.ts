@@ -69,7 +69,7 @@ export const findFile = createTool({
     const files = await Array.fromAsync(fs.promises.glob(pattern, { cwd }));
     const results: string[] = files.slice(0, maxResults);
 
-    return Result.Ok({ files: results }, { pattern });
+    return Result.Ok({ data: { files: results }, context: { pattern } });
   },
 
   inputToString: ({ pattern, directoryPath }) =>

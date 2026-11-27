@@ -1,6 +1,6 @@
 import { isEmptyString, isNil, isNotNil, isNonEmptyArray } from '@vxti/typed';
 import { readFile, writeFile } from 'fs/promises';
-import { range, sumBy } from 'lodash-es';
+import { escapeRegExp, range, sumBy } from 'lodash-es';
 import path from 'node:path';
 import * as z from 'zod';
 import { Result } from '../../../../result';
@@ -8,11 +8,11 @@ import { store } from '../../../../state';
 import {
   diffLanguageForFile,
   formatDiffMd,
+  generateSideBySideDiff,
 } from '../../../../utils/diff-utils';
 import {
   detectLineEnding,
   levenshteinDistance,
-  LINE_BREAK,
 } from '../../../../utils/string-utils';
 import { createTool } from '../../tool-definition';
 
@@ -48,7 +48,7 @@ const inputSchema = z.object({
 const outputSchema = z.object({
   filePath: z.string(),
   startLine: z.number(),
-  matchKind: z.enum(['exact', 'whitespace', 'fuzzy']),
+  matchKind: z.enum(['exact', 'whitespace', 'token', 'fuzzy']),
   occurrences: z.number(),
   similarity: z.number().optional(),
 });
@@ -59,8 +59,15 @@ const MAX_SHOWN_LINES = 5;
 const MAX_LISTED_LINES = 5;
 /** Share of the compared characters that must survive unedited for a fuzzy match. */
 const FUZZY_SIMILARITY_THRESHOLD = 0.9;
+/** Below this many non-whitespace characters, a fuzzy match is too likely to be a false positive. */
+const FUZZY_MIN_CONTENT_LENGTH = 10;
+/** Rough cap on character comparisons, keeping a fuzzy search on a large file under a second. */
+const FUZZY_MAX_COMPARISONS = 400_000_000;
 const PERCENT = 100;
-const TRAILING_LINE_BREAK = /\r?\n$/;
+/** Punctuation that may be surrounded by any amount of whitespace in a token match. */
+const TOKEN_DELIMITERS = '()[]{}<>:=,;';
+const LEADING_INDENTATION = /^[ \t]*/;
+const DELIMITER_SPLIT = new RegExp(`([${escapeRegExp(TOKEN_DELIMITERS)}])`);
 /** Errnos that mean the path holds no file, whichever call reported them. */
 const MISSING_FILE_ERRNOS: ReadonlySet<string> = new Set(['ENOENT', 'ENOTDIR']);
 
@@ -77,11 +84,15 @@ export const replaceInFile = createTool({
     ' surrounding lines in `oldString` to make it unique, or set `replaceAll` to' +
     ' replace every occurrence.\n' +
     '  • No exact match: a fallback matches whole lines ignoring leading/trailing' +
-    ' whitespace per line and replaces them with `newString` as sent.\n' +
+    ' whitespace per line.\n' +
+    '  • Still no match: a fallback matches the same tokens with any whitespace, including' +
+    ' line breaks, between them.\n' +
     '  • Still no match (and `replaceAll` unset): a fuzzy fallback replaces the single' +
     ` run of lines at least ${FUZZY_SIMILARITY_THRESHOLD * PERCENT}% similar to` +
     ' `oldString`, tolerating small edits made to the file since it was read.\n' +
+    '  • Fallback matches re-indent `newString` to the indentation of the matched text.\n' +
     '  • Still no match: re-read the file — it has changed on disk.\n' +
+    '  • An edit that would leave the file unchanged is rejected.\n' +
     '  • `newString` may be empty to delete the match. Line endings and content' +
     ' outside the match are preserved.',
   inputSchema,
@@ -124,6 +135,16 @@ export const replaceInFile = createTool({
       diffLanguageForFile(filePath)
     )}${noteBlock}`;
   },
+
+  outputToPayload({ filePath }, __, { previous, current }) {
+    return {
+      kind: 'diff',
+      previous,
+      current,
+      rows: generateSideBySideDiff(previous, current),
+      language: diffLanguageForFile(filePath),
+    };
+  },
 });
 
 function matchKindNote(
@@ -131,7 +152,10 @@ function matchKindNote(
   similarity: number | undefined
 ): string | undefined {
   if (matchKind === 'whitespace') {
-    return 'Matched ignoring per-line indentation; whole lines were replaced.';
+    return 'Matched ignoring per-line indentation; whole lines were replaced and re-indented.';
+  }
+  if (matchKind === 'token') {
+    return 'Matched ignoring whitespace between tokens; the replacement was re-indented.';
   }
   if (matchKind === 'fuzzy') {
     return (
@@ -142,9 +166,9 @@ function matchKindNote(
   return undefined;
 }
 
+/** Matchers see the file, `oldString` and `newString` with `\n` line endings only. */
 interface MatchContext {
-  original: string;
-  newline: string;
+  content: string;
   oldString: string;
   newString: string;
   replaceAll: boolean;
@@ -169,6 +193,7 @@ const UNMATCHED: MatchAttempt = { status: 'unmatched' };
 const MATCHERS: ReadonlyArray<(context: MatchContext) => MatchAttempt> = [
   matchExact,
   matchWhitespaceLenient,
+  matchTokens,
   matchFuzzy,
 ];
 
@@ -198,31 +223,41 @@ async function handleReplaceInFile({
   if (isEmptyString(oldString)) {
     return Result.Error('`oldString` is empty.');
   }
-  if (oldString === newString) {
+
+  // The model cannot know which line endings the file on disk uses, so all
+  // matching happens in `\n` and the file's own endings are restored on write.
+  const context: MatchContext = {
+    content: toUnixLineEndings(original),
+    oldString: toUnixLineEndings(oldString),
+    newString: toUnixLineEndings(newString),
+    replaceAll,
+    filePath,
+  };
+  if (context.oldString === context.newString) {
     return Result.Error(
       '`oldString` and `newString` are identical; nothing to replace.'
     );
   }
 
-  const context: MatchContext = {
-    original,
-    newline: detectLineEnding(original),
-    oldString,
-    newString,
-    replaceAll,
-    filePath,
-  };
-
   for (const matcher of MATCHERS) {
     const attempt = matcher(context);
     if (attempt.status === 'rejected') return Result.Error(attempt.error);
     if (attempt.status === 'applied') {
+      if (attempt.edit.updated === context.content) {
+        return Result.Error(unchanged(filePath, attempt.edit));
+      }
       return writeResult({
         filePath,
         absolutePath,
         fileCache,
         original,
-        edit: attempt.edit,
+        edit: {
+          ...attempt.edit,
+          updated: convertLineEndings(
+            attempt.edit.updated,
+            detectLineEnding(original)
+          ),
+        },
       });
     }
   }
@@ -252,10 +287,10 @@ async function writeResult({
     return Result.Error(describeIoFailure('write to', absolutePath, cause));
   }
 
-  return Result.Ok(
-    { filePath, ...summary },
-    { previous: original, current: updated }
-  );
+  return Result.Ok({
+    data: { filePath, ...summary },
+    context: { previous: original, current: updated },
+  });
 }
 
 function applied(edit: Edit): MatchAttempt {
@@ -267,23 +302,13 @@ function rejected(error: string): MatchAttempt {
 }
 
 function matchExact({
-  original,
-  newline,
+  content,
   oldString,
   newString,
   replaceAll,
   filePath,
 }: MatchContext): MatchAttempt {
-  let matched = oldString;
-  let replacement = newString;
-  let occurrences = countOccurrences(original, oldString);
-  if (occurrences === 0 && newline !== '\n' && oldString.includes('\n')) {
-    // The model cannot know which line endings the file on disk uses, so a
-    // multi-line `oldString` sent with `\n` is retried in the file's endings.
-    matched = convertLineEndings(oldString, newline);
-    replacement = convertLineEndings(newString, newline);
-    occurrences = countOccurrences(original, matched);
-  }
+  const occurrences = countOccurrences(content, oldString);
 
   if (occurrences === 0) return UNMATCHED;
   if (occurrences > 1 && !replaceAll) {
@@ -292,14 +317,14 @@ function matchExact({
         filePath,
         '',
         occurrences,
-        matchLineNumbers(original, matched)
+        matchLineNumbers(content, oldString)
       )
     );
   }
 
   return applied({
-    updated: original.split(matched).join(replacement),
-    startLine: lineNumberAt(original, original.indexOf(matched)),
+    updated: content.split(oldString).join(newString),
+    startLine: lineNumberAt(content, content.indexOf(oldString)),
     occurrences,
     matchKind: 'exact',
   });
@@ -307,18 +332,16 @@ function matchExact({
 
 /**
  * Whole-line fallback: every line of `oldString` must equal a consecutive run
- * of file lines up to leading/trailing whitespace. Each run is replaced by
- * `newString`'s lines verbatim.
+ * of file lines up to leading/trailing whitespace.
  */
 function matchWhitespaceLenient({
-  original,
-  newline,
+  content,
   oldString,
   newString,
   replaceAll,
   filePath,
 }: MatchContext): MatchAttempt {
-  const file = splitFileLines(original);
+  const file = splitFileLines(content);
   const oldLines = contentLines(oldString).map(line => line.trim());
 
   if (oldLines.every(line => isEmptyString(line))) {
@@ -347,11 +370,82 @@ function matchWhitespaceLenient({
   }
 
   return applied({
-    updated: replaceWindows({ file, starts, width, newString, newline }),
+    updated: replaceWindows({ file, starts, width, newString }),
     startLine: firstStart + 1,
     occurrences: starts.length,
     matchKind: 'whitespace',
   });
+}
+
+/**
+ * Token fallback: the tokens of `oldString` in order, starting a line, with any
+ * whitespace between them — so re-wrapped lines and changed spacing around
+ * punctuation still match.
+ */
+function matchTokens({
+  content,
+  oldString,
+  newString,
+  replaceAll,
+  filePath,
+}: MatchContext): MatchAttempt {
+  const pattern = tokenPattern(oldString);
+  if (isNil(pattern)) return UNMATCHED;
+
+  const matches = [...content.matchAll(pattern)];
+  const [firstMatch] = matches;
+  if (isNil(firstMatch)) return UNMATCHED;
+  if (matches.length > 1 && !replaceAll) {
+    return rejected(
+      tooManyMatches(
+        filePath,
+        ' (ignoring whitespace)',
+        matches.length,
+        matches.map(match => lineNumberAt(content, match.index))
+      )
+    );
+  }
+
+  const newLines = replacementLines(newString);
+  let updated = content;
+  for (const match of [...matches].reverse()) {
+    const [matchedText, indentation = ''] = match;
+    updated =
+      updated.slice(0, match.index) +
+      reindent(newLines, indentation).join('\n') +
+      updated.slice(match.index + matchedText.length);
+  }
+
+  return applied({
+    updated,
+    startLine: lineNumberAt(content, firstMatch.index),
+    occurrences: matches.length,
+    matchKind: 'token',
+  });
+}
+
+function tokenPattern(oldString: string): RegExp | undefined {
+  const tokens = oldString
+    .split(/\s+/)
+    .flatMap(word => word.split(DELIMITER_SPLIT))
+    .filter(token => !isEmptyString(token));
+  if (!isNonEmptyArray(tokens)) return undefined;
+
+  const body = tokens
+    .map((token, i) => {
+      const previous = tokens[i - 1];
+      if (isNil(previous)) return escapeRegExp(token);
+      // Two adjacent words were only split because whitespace separated them.
+      const separator =
+        isDelimiter(previous) || isDelimiter(token) ? '\\s*' : '\\s+';
+      return separator + escapeRegExp(token);
+    })
+    .join('');
+  return new RegExp(`^([ \\t]*)${body}`, 'gm');
+}
+
+function isDelimiter(token: string): boolean {
+  return token.length === 1 && TOKEN_DELIMITERS.includes(token);
 }
 
 /**
@@ -360,8 +454,7 @@ function matchWhitespaceLenient({
  * {@link FUZZY_SIMILARITY_THRESHOLD} of it by edit distance.
  */
 function matchFuzzy({
-  original,
-  newline,
+  content,
   oldString,
   newString,
   replaceAll,
@@ -369,9 +462,19 @@ function matchFuzzy({
 }: MatchContext): MatchAttempt {
   if (replaceAll) return UNMATCHED;
 
-  const file = splitFileLines(original);
+  const file = splitFileLines(content);
   const oldLines = contentLines(oldString).map(line => line.trim());
   const width = oldLines.length;
+
+  const contentLength = sumBy(oldLines, line => line.replace(/\s/g, '').length);
+  const comparisons =
+    file.lines.length * sumBy(oldLines, line => line.length ** 2);
+  if (
+    contentLength < FUZZY_MIN_CONTENT_LENGTH ||
+    comparisons > FUZZY_MAX_COMPARISONS
+  ) {
+    return UNMATCHED;
+  }
 
   const candidates = windowStarts(file.lines, width)
     .map(start => ({
@@ -406,13 +509,7 @@ function matchFuzzy({
   }
 
   return applied({
-    updated: replaceWindows({
-      file,
-      starts: [best.start],
-      width,
-      newString,
-      newline,
-    }),
+    updated: replaceWindows({ file, starts: [best.start], width, newString }),
     startLine: best.start + 1,
     occurrences: 1,
     matchKind: 'fuzzy',
@@ -463,17 +560,24 @@ interface FileLines {
   hadTrailingNewline: boolean;
 }
 
-function splitFileLines(original: string): FileLines {
-  const hadTrailingNewline = TRAILING_LINE_BREAK.test(original);
-  const lines = original.split(LINE_BREAK);
+function splitFileLines(content: string): FileLines {
+  const hadTrailingNewline = content.endsWith('\n');
+  const lines = content.split('\n');
   if (hadTrailingNewline) lines.pop();
   return { lines, hadTrailingNewline };
 }
 
 /** Lines of `text`, minus the empty edge lines that only anchor it at line boundaries. */
 function contentLines(text: string): string[] {
-  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const lines = text.split('\n');
   if (lines[0] === '') lines.shift();
+  if (lines.at(-1) === '') lines.pop();
+  return lines;
+}
+
+/** Lines of `newString`; a trailing line break adds no line of its own. */
+function replacementLines(newString: string): string[] {
+  const lines = newString.split('\n');
   if (lines.at(-1) === '') lines.pop();
   return lines;
 }
@@ -497,7 +601,6 @@ interface WindowReplacement {
   starts: number[];
   width: number;
   newString: string;
-  newline: string;
 }
 
 function replaceWindows({
@@ -505,20 +608,40 @@ function replaceWindows({
   starts,
   width,
   newString,
-  newline,
 }: WindowReplacement): string {
-  const newLines = newString.replace(/\r\n/g, '\n').split('\n');
-  if (newLines.at(-1) === '') newLines.pop();
+  const newLines = replacementLines(newString);
 
   const updatedLines = [...lines];
   for (const start of [...starts].reverse()) {
-    updatedLines.splice(start, width, ...newLines);
+    const indentation = indentationOf(lines.slice(start, start + width));
+    updatedLines.splice(start, width, ...reindent(newLines, indentation));
   }
 
-  const updated = updatedLines.join(newline);
+  const updated = updatedLines.join('\n');
   return hadTrailingNewline && isNonEmptyArray(updatedLines)
-    ? updated + newline
+    ? `${updated}\n`
     : updated;
+}
+
+/** Indentation of the first non-blank line. */
+function indentationOf(lines: string[]): string {
+  const firstContentLine = lines.find(line => !isEmptyString(line.trim()));
+  return firstContentLine?.match(LEADING_INDENTATION)?.[0] ?? '';
+}
+
+/**
+ * Moves `lines` to `indentation`, keeping their indentation relative to their
+ * first non-blank line; lines indented less than it are aligned with it.
+ */
+function reindent(lines: string[], indentation: string): string[] {
+  const reference = indentationOf(lines);
+  return lines.map(line => {
+    if (isEmptyString(line.trim())) return '';
+    const body = line.startsWith(reference)
+      ? line.slice(reference.length)
+      : line.trimStart();
+    return indentation + body;
+  });
 }
 
 /** Non-overlapping occurrence count of `needle` in `haystack`. */
@@ -526,8 +649,12 @@ function countOccurrences(haystack: string, needle: string): number {
   return haystack.split(needle).length - 1;
 }
 
+function toUnixLineEndings(text: string): string {
+  return text.replace(/\r\n/g, '\n');
+}
+
 function convertLineEndings(text: string, newline: string): string {
-  return text.replace(/\r\n/g, '\n').replace(/\n/g, newline);
+  return toUnixLineEndings(text).replace(/\n/g, newline);
 }
 
 /** 1-based line number of the character at `index`. */
@@ -536,12 +663,12 @@ function lineNumberAt(text: string, index: number): number {
 }
 
 /** Line numbers of the first {@link MAX_LISTED_LINES} occurrences of `needle`. */
-function matchLineNumbers(original: string, needle: string): number[] {
+function matchLineNumbers(content: string, needle: string): number[] {
   const lineNumbers: number[] = [];
-  let index = original.indexOf(needle);
+  let index = content.indexOf(needle);
   while (index !== -1 && lineNumbers.length < MAX_LISTED_LINES) {
-    lineNumbers.push(lineNumberAt(original, index));
-    index = original.indexOf(needle, index + needle.length);
+    lineNumbers.push(lineNumberAt(content, index));
+    index = content.indexOf(needle, index + needle.length);
   }
   return lineNumbers;
 }
@@ -565,11 +692,19 @@ function tooManyMatches(
 
 function notFound(filePath: string, replaceAll: boolean): string {
   const searched = replaceAll
-    ? 'not even ignoring indentation (fuzzy matching is not applied with `replaceAll`)'
-    : 'not even ignoring indentation or allowing for small edits';
+    ? 'not even ignoring whitespace (fuzzy matching is not applied with `replaceAll`)'
+    : 'not even ignoring whitespace or allowing for small edits';
   return (
     `\`oldString\` was not found in \`${filePath}\`, ${searched}.` +
     ' The file may have changed; re-read it and retry.'
+  );
+}
+
+function unchanged(filePath: string, { matchKind, startLine }: Edit): string {
+  return (
+    `\`oldString\` matched in \`${filePath}\` (line ${startLine}, ${matchKind} match),` +
+    ' but replacing it leaves the file unchanged: the text there already reads as' +
+    ' `newString`. Nothing was written; re-read the file and check the edit is still needed.'
   );
 }
 

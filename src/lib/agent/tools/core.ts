@@ -165,7 +165,8 @@ function makeTool(
       if (result.ok) {
         channel.notify({
           loading: false,
-          content: `${basicHighlightFormatting('→')} ${tool.outputToString(result.data, channel, result.metadata).trim()}`,
+          content: `${basicHighlightFormatting('→')} ${tool.outputToString(result.data.data, channel, result.data.context ?? {}).trim()}`,
+          data: result.data.messageMeta,
         });
       } else {
         channel.notify({
@@ -178,9 +179,9 @@ function makeTool(
 
       // Exclude metadata from result to omit from model context window.
       // Metadata is only present for passing data between functions within the same tool
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const { metadata: _, ...safeResult } = result;
-      return safeResult;
+      if (result.ok) return result.data.data;
+
+      return result;
     },
   });
 }

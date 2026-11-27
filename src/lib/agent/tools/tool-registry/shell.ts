@@ -1,7 +1,6 @@
 import { isNonEmptyArray, isNonEmptyString, isNotNil } from '@vxti/typed';
 import { experimental_decide } from 'ai';
 import { exec } from 'child_process';
-import { type ExecException } from 'node:child_process';
 import * as z from 'zod';
 import { Result } from '../../../result';
 import { ellipsize, Position } from '../../../utils/string-utils';
@@ -36,8 +35,14 @@ const outputSchema = z.object({
     .describe('The exit code of the command. 0 indicates success.'),
 });
 
+/** Decision model used to classify command safety in Auto mode. */
+const DECISION_MODEL = 'typesafe-ai/jev-1.14.0';
+const DECISION_TIMEOUT_MS = 10_000;
+const COMMAND_CONFIDENCE_THRESHOLD = 0.5;
+const ALLOWED_COMMAND_PATTERNS: string[] = [];
 const MAX_SHOWN_OUTPUT_LINES = 5;
 const MAX_BUFFER_10_MB = 10 * 1024 * 1024;
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 const enum Option {
   APPROVE = 'approve',
@@ -59,14 +64,6 @@ export function isAutoApproveEnabled(): boolean {
 export function setAutoApproveEnabled(enabled: boolean): void {
   autoApproveEnabled = enabled;
 }
-
-/** Decision model used to classify command safety in Auto mode. */
-const DECISION_MODEL = 'typesafe-ai/jev-1.14.0';
-const DECISION_TIMEOUT_MS = 10_000;
-
-const COMMAND_CONFIDENCE_THRESHOLD = 0.5;
-
-const ALLOWED_COMMAND_PATTERNS: string[] = [];
 
 /**
  * Asks the decision model whether `command` is safe to run unattended. Fails
@@ -95,8 +92,6 @@ async function isCommandSafe(command: string): Promise<boolean> {
     .catch(() => false);
 }
 
-type Metadata = { command: string };
-
 export const shell = createTool({
   internalName: 'shell',
   name: 'Shell',
@@ -107,47 +102,37 @@ export const shell = createTool({
   outputSchema,
 
   async handle({ command, timeoutMs, cwd }, channel) {
-    try {
-      return new Promise<
-        Result<z.infer<typeof outputSchema>, string, Metadata>
-      >(resolve => {
-        const process = exec(
-          command,
-          { cwd, timeout: timeoutMs ?? 30_000, maxBuffer: MAX_BUFFER_10_MB },
-          (error, stdout, stderr) => {
-            const totalErr = error
-              ? [stderr, error.message].join('\n')
-              : stderr;
-
-            resolve(
-              Result.Ok(
-                {
-                  stdout,
-                  stderr: totalErr,
-                  exitCode: error ? (error.code ?? 1) : 0,
-                },
-                { command }
-              )
-            );
-          }
-        );
-        process.on('message', msg => {
-          channel.notify({ content: JSON.stringify(msg) });
-        });
-      });
-    } catch (err: unknown) {
-      const e = err as ExecException;
-      // It might've just been a command error, but we still deem it as 'ok', as
-      // error results are still processed correctly
-      return Result.Ok(
+    const { stdout, stderr, exitCode } = await new Promise<{
+      stdout: string;
+      stderr: string;
+      exitCode: number;
+    }>(resolve => {
+      const process = exec(
+        command,
         {
-          stdout: e.stdout ?? '',
-          stderr: e.stderr ?? e.message,
-          exitCode: e.code ?? 1,
+          cwd,
+          timeout: timeoutMs ?? DEFAULT_TIMEOUT_MS,
+          maxBuffer: MAX_BUFFER_10_MB,
         },
-        { command }
+        (error, stdout, stderr) => {
+          const totalErr = error ? [stderr, error.message].join('\n') : stderr;
+
+          resolve({
+            stdout,
+            stderr: totalErr,
+            exitCode: error ? (error.code ?? 1) : 0,
+          });
+        }
       );
-    }
+      process.on('message', msg => {
+        channel.notify({ content: JSON.stringify(msg) });
+      });
+    });
+
+    return Result.Ok({
+      data: { stdout, stderr, exitCode },
+      context: { command },
+    });
   },
 
   async requiresApproval({ command }) {

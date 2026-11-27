@@ -241,12 +241,11 @@ export class SubAgent {
           return output;
         }
 
+        const { data, context = {} } = output.data;
+
         this.channel.notify({
-          content: tool.outputToString(
-            output.data,
-            this.channel,
-            output.metadata
-          ),
+          content: tool.outputToString(data, this.channel, context),
+          data: tool.outputToPayload?.(data, this.channel, context),
         });
 
         return output.data;

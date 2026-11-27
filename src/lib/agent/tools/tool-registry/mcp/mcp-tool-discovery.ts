@@ -35,7 +35,6 @@ const outputSchema = z.object({
     .describe('Short explanation of why this tool was selected.'),
   resolvedBy: z.enum(['only-tool', 'exact-name', 'llm', 'none']),
 });
-type McpDiscoveryResult = z.infer<typeof outputSchema>;
 
 const selectionSchema = z.object({
   toolName: z
@@ -89,32 +88,38 @@ export const discoverMcpTool = createTool({
     const tools = await listAllTools(mcpServer);
 
     if (isEmptyArray(tools)) {
-      return Result.Ok<McpDiscoveryResult>({
-        mcpServer,
-        reasoning: `MCP server "${mcpServer}" exposes no tools.`,
-        resolvedBy: 'none' as const,
+      return Result.Ok({
+        data: {
+          mcpServer,
+          reasoning: `MCP server "${mcpServer}" exposes no tools.`,
+          resolvedBy: 'none' as const,
+        },
       });
     }
 
     if (hasArrayLength(tools, 1)) {
       const tool = tools[0];
-      return Result.Ok<McpDiscoveryResult>({
-        mcpServer,
-        toolName: tool.name,
-        description: tool.description,
-        reasoning: 'Only one tool is available on this server.',
-        resolvedBy: 'only-tool' as const,
+      return Result.Ok({
+        data: {
+          mcpServer,
+          toolName: tool.name,
+          description: tool.description,
+          reasoning: 'Only one tool is available on this server.',
+          resolvedBy: 'only-tool' as const,
+        },
       });
     }
 
     const exact = findExactNameMatch(task, tools);
     if (exact) {
-      return Result.Ok<McpDiscoveryResult>({
-        mcpServer,
-        toolName: exact.name,
-        description: exact.description,
-        reasoning: `Task references tool name "${exact.name}" verbatim.`,
-        resolvedBy: 'exact-name' as const,
+      return Result.Ok({
+        data: {
+          mcpServer,
+          toolName: exact.name,
+          description: exact.description,
+          reasoning: `Task references tool name "${exact.name}" verbatim.`,
+          resolvedBy: 'exact-name' as const,
+        },
       });
     }
 
@@ -139,21 +144,25 @@ export const discoverMcpTool = createTool({
       : undefined;
 
     if (!selected) {
-      return Result.Ok<McpDiscoveryResult>({
-        mcpServer,
-        reasoning: isNonEmptyString(reasoning)
-          ? reasoning
-          : 'No tool on this server plausibly matches the task.',
-        resolvedBy: 'none',
+      return Result.Ok({
+        data: {
+          mcpServer,
+          reasoning: isNonEmptyString(reasoning)
+            ? reasoning
+            : 'No tool on this server plausibly matches the task.',
+          resolvedBy: 'none',
+        },
       });
     }
 
-    return Result.Ok<McpDiscoveryResult>({
-      mcpServer,
-      toolName: selected.name,
-      description: selected.description,
-      reasoning,
-      resolvedBy: 'llm',
+    return Result.Ok({
+      data: {
+        mcpServer,
+        toolName: selected.name,
+        description: selected.description,
+        reasoning,
+        resolvedBy: 'llm',
+      },
     });
   },
 

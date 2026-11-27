@@ -65,7 +65,7 @@ export const webFetch = createTool({
       urls.map(url => makeRequest(url, maxBytes))
     );
 
-    return Result.Ok({ websites });
+    return Result.Ok({ data: { websites } });
   },
 
   inputToString(input): string {

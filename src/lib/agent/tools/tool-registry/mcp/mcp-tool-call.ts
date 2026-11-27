@@ -77,9 +77,11 @@ export const callMcpTool = createTool({
     }
 
     return Result.Ok({
-      mcpServer,
-      toolName,
-      result: JSON.stringify(result),
+      data: {
+        mcpServer,
+        toolName,
+        result: JSON.stringify(result),
+      },
     });
   },
 

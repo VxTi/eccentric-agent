@@ -45,7 +45,7 @@ async function matchLocations(
     signal
   );
   if (!result.ok) throw new Error(result.error);
-  return result.data.matches
+  return result.data.data.matches
     .map(m => `${path.relative(tmpDir, m.filePath)}:${m.line}`)
     .sort();
 }
@@ -100,8 +100,8 @@ describe('grep', () => {
       signal
     );
     if (!result.ok) throw new Error(result.error);
-    expect(result.data.matches).toHaveLength(20);
-    expect(result.metadata.truncated).toBe(true);
+    expect(result.data.data.matches).toHaveLength(20);
+    expect(result.data.context?.truncated).toBe(true);
   });
 
   it('flags truncation when maxResults is hit', async () => {
@@ -111,8 +111,8 @@ describe('grep', () => {
       signal
     );
     if (!result.ok) throw new Error(result.error);
-    expect(result.data.matches).toHaveLength(2);
-    expect(result.metadata.truncated).toBe(true);
+    expect(result.data.data.matches).toHaveLength(2);
+    expect(result.data.context?.truncated).toBe(true);
   });
 
   it('lists matching files with outputMode files_with_matches', async () => {
@@ -126,13 +126,13 @@ describe('grep', () => {
       signal
     );
     if (!result.ok) throw new Error(result.error);
-    expect(result.data.matches).toEqual([]);
-    expect(result.data.files.map(f => path.relative(tmpDir, f))).toEqual([
+    expect(result.data.data.matches).toEqual([]);
+    expect(result.data.data.files.map(f => path.relative(tmpDir, f))).toEqual([
       'src/b.md',
       'src/dup.txt',
       'src/many.txt',
       'src/nested/a.ts',
     ]);
-    expect(result.metadata.truncated).toBe(false);
+    expect(result.data.context?.truncated).toBe(false);
   });
 });

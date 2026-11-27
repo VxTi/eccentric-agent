@@ -108,7 +108,7 @@ export const readFile = createTool({
       newline,
       selection ? selection.fromLineNumber - 1 : undefined
     );
-    return Result.Ok({ content, filePath }, { selection });
+    return Result.Ok({ data: { content, filePath }, context: { selection } });
   },
 
   inputToString({ filePath, selection }) {

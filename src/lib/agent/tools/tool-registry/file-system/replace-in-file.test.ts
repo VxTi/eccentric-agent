@@ -2,11 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import {
-  type ErrorResult,
-  type Result,
-  type SuccessResult,
-} from '../../../../result';
+import { type Result, type SuccessResult } from '../../../../result';
 import { store, setCwd } from '../../../../state';
 import { NotifierChannel } from '../../../../events/notifier';
 import type { ToolChannelParams } from '../../tool-definition';
@@ -35,14 +31,14 @@ afterAll(async () => {
  * Unwraps a result after asserting success, so tests stay free of branches.
  * A failed expectation aborts the test before the cast is ever evaluated.
  */
-function expectOk<T, M>(result: Result<T, string, M>): SuccessResult<T, M> {
-  expect(result.ok).toBe(true);
-  return result as SuccessResult<T, M>;
+function expectOk<T>(result: Result<T, string>): SuccessResult<T> {
+  expect.assert(result.ok);
+  return result;
 }
 
-function expectError(result: Result<any, any, any>): string {
-  expect(result.ok).toBe(false);
-  return (result as ErrorResult<string, string>).error;
+function expectError(result: Result<any, string>): string {
+  expect.assert(!result.ok);
+  return result.error;
 }
 
 /** Fresh fixture per test; a read is required first so the file cache is warm. */
@@ -102,9 +98,9 @@ describe('replace_in_file', () => {
       )
     );
 
-    expect(result.data.startLine).toBe(4);
-    expect(result.data.matchKind).toBe('exact');
-    expect(snapshotable(result.data)).toMatchSnapshot();
+    expect(result.data.data.startLine).toBe(4);
+    expect(result.data.data.matchKind).toBe('exact');
+    expect(snapshotable(result.data.data)).toMatchSnapshot();
 
     expect(await fs.readFile(filePath, 'utf-8')).toBe(
       'line 1\nline 2\nline 3\nFOUR\nline 6\nline 7\nline 8\nline 9\nline 10\n'
@@ -126,7 +122,7 @@ describe('replace_in_file', () => {
       )
     );
 
-    expect(result.data.startLine).toBe(5);
+    expect(result.data.data.startLine).toBe(5);
     expect(await readLines(filePath)).toEqual([
       'line 1',
       'line 2',
@@ -159,7 +155,7 @@ describe('replace_in_file', () => {
       )
     );
 
-    expect(result.data.matchKind).toBe('exact');
+    expect(result.data.data.matchKind).toBe('exact');
     expect(await fs.readFile(filePath, 'utf-8')).toBe(
       'line 1\nline 2\nline 3\nline 4\nline 7\nline 8\nline 9\nline 10\n'
     );
@@ -180,7 +176,7 @@ describe('replace_in_file', () => {
       )
     );
 
-    expect(result.data.matchKind).toBe('exact');
+    expect(result.data.data.matchKind).toBe('exact');
     const lines = await readLines(filePath);
     expect(lines[4]).toBe('line 5 (edited)');
     expect(lines.filter(line => line === 'line 5')).toHaveLength(0);
@@ -218,7 +214,7 @@ describe('replace_in_file', () => {
     expect(error).toContain('(lines 1, 2, 3, 4, 5)');
   });
 
-  it('matches whole lines ignoring indentation and replaces them verbatim', async () => {
+  it('matches whole lines ignoring indentation and re-indents the replacement', async () => {
     // Tab-indented on disk so that no indentation variant of `oldString` can
     // match exactly as a substring; only the whole-line fallback can apply.
     const filePath = await prepareLines(
@@ -240,10 +236,10 @@ describe('replace_in_file', () => {
       )
     );
 
-    expect(result.data.matchKind).toBe('whitespace');
-    expect(result.data.startLine).toBe(2);
+    expect(result.data.data.matchKind).toBe('whitespace');
+    expect(result.data.data.startLine).toBe(2);
     expect(await fs.readFile(filePath, 'utf-8')).toBe(
-      'function f() {\n  return 2;\n}\n'
+      'function f() {\n\treturn 2;\n}\n'
     );
   });
 
@@ -275,8 +271,8 @@ describe('replace_in_file', () => {
       )
     );
 
-    expect(result.data.occurrences).toBe(3);
-    expect(result.data.startLine).toBe(1);
+    expect(result.data.data.occurrences).toBe(3);
+    expect(result.data.data.startLine).toBe(1);
     expect(await fs.readFile(filePath, 'utf-8')).toBe('Y\na\nY\nb\nY\n');
   });
 
@@ -305,9 +301,9 @@ describe('replace_in_file', () => {
       )
     );
 
-    expect(result.data.matchKind).toBe('whitespace');
-    expect(result.data.occurrences).toBe(2);
-    expect(await fs.readFile(filePath, 'utf-8')).toBe('X\nc\nX\n');
+    expect(result.data.data.matchKind).toBe('whitespace');
+    expect(result.data.data.occurrences).toBe(2);
+    expect(await fs.readFile(filePath, 'utf-8')).toBe('\tX\nc\n\tX\n');
   });
 
   it('fuzzy-matches lines edited since the file was read', async () => {
@@ -333,9 +329,9 @@ describe('replace_in_file', () => {
       )
     );
 
-    expect(result.data.matchKind).toBe('fuzzy');
-    expect(result.data.startLine).toBe(2);
-    expect(result.data.similarity).toBeGreaterThanOrEqual(0.9);
+    expect(result.data.data.matchKind).toBe('fuzzy');
+    expect(result.data.data.startLine).toBe(2);
+    expect(result.data.data.similarity).toBeGreaterThanOrEqual(0.9);
     expect(await fs.readFile(filePath, 'utf-8')).toBe(
       'function total(items) {\n  return sumPrices(items);\n}\n'
     );
@@ -435,9 +431,137 @@ describe('replace_in_file', () => {
       )
     );
 
-    expect(result.data.matchKind).toBe('exact');
-    expect(result.data.startLine).toBe(2);
+    expect(result.data.data.matchKind).toBe('exact');
+    expect(result.data.data.startLine).toBe(2);
     expect(await fs.readFile(filePath, 'utf-8')).toBe('a\r\nX\r\nY\r\n');
+  });
+
+  it('writes a multi-line newString into a CRLF file with CRLF endings', async () => {
+    const filePath = path.join(tmpDir, `fixture-${++counter}.txt`);
+    await fs.writeFile(filePath, 'a\r\nb\r\nc\r\n', 'utf-8');
+
+    expectOk(
+      await replaceInFile.handle(
+        { filePath, oldString: 'b', newString: 'X\nY' },
+        channel,
+        signal
+      )
+    );
+
+    expect(await fs.readFile(filePath, 'utf-8')).toBe('a\r\nX\r\nY\r\nc\r\n');
+  });
+
+  it('rejects an edit that leaves the file unchanged and writes nothing', async () => {
+    const filePath = await prepareLines(
+      'function f() {',
+      '\treturn 1;',
+      '}',
+      ''
+    );
+    const before = await fs.readFile(filePath, 'utf-8');
+
+    const error = expectError(
+      await replaceInFile.handle(
+        { filePath, oldString: 'return 1; ', newString: 'return 1;' },
+        channel,
+        signal
+      )
+    );
+
+    expect(error).toContain('leaves the file unchanged');
+    expect(await fs.readFile(filePath, 'utf-8')).toBe(before);
+  });
+
+  it('matches tokens across changed spacing and line wrapping', async () => {
+    const filePath = await prepareLines(
+      'function f() {',
+      '    const total = compute(first,',
+      '        second);',
+      '    return total;',
+      '}',
+      ''
+    );
+
+    const result = expectOk(
+      await replaceInFile.handle(
+        {
+          filePath,
+          oldString: 'const total = compute( first, second );',
+          newString: 'const total = sum(first, second);',
+        },
+        channel,
+        signal
+      )
+    );
+
+    expect(result.data.data.matchKind).toBe('token');
+    expect(result.data.data.startLine).toBe(2);
+    expect(await fs.readFile(filePath, 'utf-8')).toBe(
+      'function f() {\n    const total = sum(first, second);\n    return total;\n}\n'
+    );
+  });
+
+  it('does not let a token match join separate words', async () => {
+    const filePath = await prepareLines('constvalue = 1;', '');
+
+    const error = expectError(
+      await replaceInFile.handle(
+        {
+          filePath,
+          oldString: 'const value = 1;',
+          newString: 'X',
+          // Rules out the fuzzy fallback, which would rightly accept one edit.
+          replaceAll: true,
+        },
+        channel,
+        signal
+      )
+    );
+
+    expect(error).toContain('was not found');
+  });
+
+  it('re-indents a fuzzy replacement to the matched lines', async () => {
+    const filePath = await prepareLines(
+      'class A {',
+      '    total(items) {',
+      '        return items.reduce((acc, item) => acc + item.price, 0);',
+      '    }',
+      '}',
+      ''
+    );
+
+    const result = expectOk(
+      await replaceInFile.handle(
+        {
+          filePath,
+          oldString:
+            'total(items) {\n  return items.reduce((acc, item) => acc + item.cost, 0);\n}',
+          newString: 'total(items) {\n  return sumPrices(items);\n}',
+        },
+        channel,
+        signal
+      )
+    );
+
+    expect(result.data.data.matchKind).toBe('fuzzy');
+    expect(await fs.readFile(filePath, 'utf-8')).toBe(
+      'class A {\n    total(items) {\n      return sumPrices(items);\n    }\n}\n'
+    );
+  });
+
+  it('never fuzzy-matches a very short oldString', async () => {
+    const filePath = await prepareLines('let a = 1;', '');
+
+    const error = expectError(
+      await replaceInFile.handle(
+        { filePath, oldString: 'let a = 2;', newString: 'X' },
+        channel,
+        signal
+      )
+    );
+
+    expect(error).toContain('was not found');
   });
 
   it('preserves content outside the match and the trailing-newline state', async () => {
@@ -455,7 +579,7 @@ describe('replace_in_file', () => {
         signal
       )
     );
-    expect(kept.data.matchKind).toBe('exact');
+    expect(kept.data.data.matchKind).toBe('exact');
     expect(await fs.readFile(withTrailing, 'utf-8')).toBe(
       'alpha\nBETA\ngamma\n'
     );
@@ -565,9 +689,9 @@ describe('replace_in_file', () => {
       );
 
       const report = replaceInFile.outputToString(
-        result.data,
+        result.data.data,
         channel,
-        result.metadata
+        result.data.context!
       );
       expect(report).toContain('Edited `render-diff.txt`');
       expect(parseMarkdown(report, 120)).toMatchSnapshot();
@@ -592,12 +716,12 @@ describe('replace_in_file', () => {
       );
 
       const report = replaceInFile.outputToString(
-        result.data,
+        result.data.data,
         channel,
-        result.metadata
+        result.data.context!
       );
       expect(report).toContain(
-        'Matched ignoring per-line indentation; whole lines were replaced.'
+        'Matched ignoring per-line indentation; whole lines were replaced and re-indented.'
       );
       expect(parseMarkdown(report, 120)).toMatchSnapshot();
     });

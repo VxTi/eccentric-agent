@@ -76,7 +76,7 @@ function resultsOf(result: HandleResult): {
   success: boolean;
 }[] {
   if (!result.ok) throw new Error('expected a successful handle result');
-  return result.data.results;
+  return result.data.data.results;
 }
 
 beforeEach(() => {

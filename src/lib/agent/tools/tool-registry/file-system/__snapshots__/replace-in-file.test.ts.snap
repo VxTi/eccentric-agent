@@ -32,10 +32,10 @@ exports[`replace_in_file > rendering > notes when the whitespace-lenient fallbac
  
 
   1   function f() {                                        | 1   function f() {                                       
-  2 - 	return 1;                                            | 2 +   return 2;                                          
+  2 - 	return 1;                                            | 2 + 	return 2;                                           
   3   }                                                     | 3   }                                                    
 
- Matched ignoring per-line indentation; whole lines were replaced.
+ Matched ignoring per-line indentation; whole lines were replaced and re-indented.
 "
 `;
 

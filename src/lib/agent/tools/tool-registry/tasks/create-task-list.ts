@@ -69,8 +69,10 @@ export const createTaskList = createTool({
     taskList.set(newList);
 
     return Result.Ok({
-      tasks: newList,
-      progress: describeTaskProgress(newList),
+      data: {
+        tasks: newList,
+        progress: describeTaskProgress(newList),
+      },
     });
   },
 

@@ -1,40 +1,25 @@
-import { type MaybePromise } from './types/types';
+import type { MaybePromise } from './types/types';
 
-export type ErrorResult<T = undefined, TMeta = object> = {
+export type ErrorResult<T = undefined> = {
   ok: false;
-  error: T;
   data?: never;
-  metadata: TMeta;
+  error: T;
 };
-export type SuccessResult<T, TMeta = object> = {
+export type SuccessResult<T> = {
   ok: true;
   data: T;
-  metadata: TMeta;
+  error?: never;
 };
 
-export type Result<Success, Error = string, TMeta = never> =
-  | SuccessResult<Success, TMeta>
-  | ErrorResult<Error, TMeta>;
+export type Result<Success, Error = string> =
+  | SuccessResult<Success>
+  | ErrorResult<Error>;
 
 export const Result = {
-  Ok: <T = undefined, TMeta = never>(
-    data: T,
-    metadata: TMeta = undefined as never
-  ): SuccessResult<T, TMeta> => ({
-    ok: true,
-    data,
-    metadata,
-  }),
-  Error: <T, TMeta = never>(
-    error: T,
-    metadata: TMeta = undefined as never
-  ): ErrorResult<T, TMeta> => ({
-    ok: false,
-    error,
-    metadata,
-  }),
+  Ok: <T = undefined>(data: T): SuccessResult<T> => ({ ok: true, data }),
+  Error: <T>(error: T): ErrorResult<T> => ({ ok: false, error }),
 
-  trySafe: async <TRes extends Result<any, string, any>>(
+  trySafe: async <TRes extends Result<any>>(
     callback: () => MaybePromise<TRes>
   ): Promise<TRes> => {
     try {

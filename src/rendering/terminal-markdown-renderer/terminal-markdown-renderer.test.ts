@@ -17,7 +17,10 @@ describe('TerminalRenderer', () => {
       const oldContent = 'line 1\nline 2\nline 3';
       const newContent = 'line 1\nline A\nline 3\nline 4';
 
-      const rendered = renderer.renderDiff(oldContent, newContent);
+      const rendered = renderer.renderDiff({
+        oldStr: oldContent,
+        newStr: newContent,
+      });
       expect(rendered).toMatchInlineSnapshot(`
         "1   line 1                             | 1   line 1                            
         2 - line 2                             | 2 + line A                            
@@ -30,7 +33,10 @@ describe('TerminalRenderer', () => {
       const oldContent = 'line 1\nline 2';
       const newContent = 'line 1\nline 2\nline 3\nline 4';
 
-      const rendered = renderer.renderDiff(oldContent, newContent);
+      const rendered = renderer.renderDiff({
+        oldStr: oldContent,
+        newStr: newContent,
+      });
       expect(rendered).toMatchInlineSnapshot(`
         "1   line 1                                                                      
         2   line 2                                                                      
@@ -43,7 +49,10 @@ describe('TerminalRenderer', () => {
       const oldContent = 'line 1\nline 2\nline 3\nline 4';
       const newContent = 'line 1\nline 2';
 
-      const rendered = renderer.renderDiff(oldContent, newContent);
+      const rendered = renderer.renderDiff({
+        oldStr: oldContent,
+        newStr: newContent,
+      });
       expect(rendered).toMatchInlineSnapshot(`
         "1   line 1                                                                      
         2   line 2                                                                      

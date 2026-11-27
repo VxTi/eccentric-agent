@@ -272,9 +272,12 @@ export const delegateTask = createTool({
     }
 
     return Result.Ok({
-      results: results.filter((result): result is TaskResult =>
-        isNotNil(result)
-      ),
+      data: {
+        results: results.filter((result): result is TaskResult =>
+          isNotNil(result)
+        ),
+      },
+      context: {},
     });
   },
 

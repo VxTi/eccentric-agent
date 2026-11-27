@@ -90,5 +90,8 @@ async function createFileImpl({
 
   await writeFile(filePath, content, 'utf-8');
   await fileCache.update(filePath);
-  return Result.Ok({ success: true }, { filePath, newContent: content });
+  return Result.Ok({
+    data: { success: true },
+    context: { filePath, newContent: content },
+  });
 }

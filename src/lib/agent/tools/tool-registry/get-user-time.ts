@@ -31,9 +31,11 @@ export const getUserTime = createTool({
     }).format(now);
 
     return Result.Ok({
-      formatted,
-      timeZone,
-      iso: now.toISOString(),
+      data: {
+        formatted,
+        timeZone,
+        iso: now.toISOString(),
+      },
     });
   },
 

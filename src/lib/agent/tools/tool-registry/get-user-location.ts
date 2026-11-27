@@ -52,7 +52,7 @@ export const getUserLocation = createTool({
       );
     }
 
-    return Result.Ok(result.data.body);
+    return Result.Ok({ data: result.data.body });
   },
 
   inputToString: () => 'Looking up user location',

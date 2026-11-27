@@ -46,7 +46,7 @@ describe('read_file', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const parsed = parseNumberedLines(result.data.content);
+    const parsed = parseNumberedLines(result.data.data.content);
     expect(parsed).toEqual([
       ...FIXTURE_LINES.map((line, i) => [i + 1, line] as [number, string]),
       [FIXTURE_LINES.length + 1, ''],
@@ -63,7 +63,7 @@ describe('read_file', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const parsed = parseNumberedLines(result.data.content);
+    const parsed = parseNumberedLines(result.data.data.content);
     expect(parsed).toEqual([
       [4, 'line 4'],
       [5, 'line 5'],
@@ -79,7 +79,7 @@ describe('read_file', () => {
     );
 
     expect(result.ok).toBe(true);
-    const parsed = parseNumberedLines(result.data!.content);
+    const parsed = parseNumberedLines(result.data!.data.content);
     expect(parsed).toEqual([
       [8, 'line 8'],
       [9, 'line 9'],
@@ -109,7 +109,7 @@ describe('read_file', () => {
     );
     if (!readResult.ok) throw new Error('read_file failed');
 
-    const lineNrs = parseNumberedLines(readResult.data.content);
+    const lineNrs = parseNumberedLines(readResult.data.data.content);
     expect.assert(hasArrayLengthAtLeast(lineNrs, 2));
     const [labeledLine, seenContent] = lineNrs[0];
     const [, nextContent] = lineNrs[1];
@@ -129,8 +129,8 @@ describe('read_file', () => {
     expect(replaceResult.ok).toBe(true);
     if (!replaceResult.ok) return;
     // The exact match pins the edit to the seen content itself.
-    expect(replaceResult.data.startLine).toBe(labeledLine);
-    expect(replaceResult.data.matchKind).toBe('exact');
+    expect(replaceResult.data.data.startLine).toBe(labeledLine);
+    expect(replaceResult.data.data.matchKind).toBe('exact');
 
     const updated = await fs.readFile(filePath, 'utf-8');
     const updatedLines = updated.split('\n');

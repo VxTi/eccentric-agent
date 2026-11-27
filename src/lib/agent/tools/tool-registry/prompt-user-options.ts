@@ -103,10 +103,12 @@ export const promptUserOptions = createTool({
     }
 
     return Result.Ok({
-      selectedOptions: chosen.map(match => ({
-        selectedId: match.value,
-        selectedLabel: match.label,
-      })),
+      data: {
+        selectedOptions: chosen.map(match => ({
+          selectedId: match.value,
+          selectedLabel: match.label,
+        })),
+      },
     });
   },
 

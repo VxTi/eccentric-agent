@@ -14,7 +14,11 @@ export function GenericChatMessage({ message }: BaseProps<GenericMessage>) {
       ) : (
         <Spinner loading={message.loading ?? false} />
       )}
-      <ChatMessageContent content={message.content} uid={message.id} />
+      <ChatMessageContent
+        content={message.content}
+        data={message.data}
+        uid={message.id}
+      />
     </Box>
   );
 }

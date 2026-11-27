@@ -79,7 +79,7 @@ export const webSearch = createTool({
       })
     );
 
-    return Result.Ok({ query, results });
+    return Result.Ok({ data: { query, results } });
   },
 
   inputToString({ query, country }) {

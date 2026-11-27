@@ -154,13 +154,7 @@ export const grep = createTool({
 async function handleGrep(
   params: z.infer<typeof inputSchema>,
   signal: AbortSignal
-): Promise<
-  Result<
-    z.infer<typeof outputSchema>,
-    string,
-    { pattern: string; truncated: boolean }
-  >
-> {
+) {
   const {
     directoryPath,
     pattern,
@@ -190,9 +184,12 @@ async function handleGrep(
     listMatchingFiles,
     signal,
   });
-  return Result.Ok(toToolOutput(result, listMatchingFiles), {
-    pattern,
-    truncated: result.truncated,
+  return Result.Ok({
+    data: toToolOutput(result, listMatchingFiles),
+    context: {
+      pattern,
+      truncated: result.truncated,
+    },
   });
 }
 

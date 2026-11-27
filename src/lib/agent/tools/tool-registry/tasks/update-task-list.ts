@@ -62,7 +62,9 @@ export const updateTaskList = createTool({
 
     const tasks: Task[] = taskList.updateTasks(updates);
 
-    return Result.Ok({ tasks, progress: describeTaskProgress(tasks) });
+    return Result.Ok({
+      data: { tasks, progress: describeTaskProgress(tasks) },
+    });
   },
 
   inputToString({ updates }) {

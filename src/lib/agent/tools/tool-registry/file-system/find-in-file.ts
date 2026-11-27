@@ -91,7 +91,7 @@ export const findInFile = createTool({
       }
     }
 
-    return Result.Ok({ matches }, { pattern, filePath });
+    return Result.Ok({ data: { matches }, context: { pattern, filePath } });
   },
 
   inputToString({ pattern, filePath }) {

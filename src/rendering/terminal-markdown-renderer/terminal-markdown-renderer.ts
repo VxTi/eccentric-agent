@@ -18,10 +18,12 @@ import {
   generateSideBySideDiff,
   splitDiffSides,
   type DiffLine,
+  type SideBySideDiff,
 } from '../../lib/utils/diff-utils';
 import { Position } from '../../lib/utils/string-utils';
 import { githubDark } from './code-highlight-theme';
 import type { TerminalMarked } from './types';
+import type { ToolMessageData } from '../../lib/agent/tools/tool-payload';
 
 const DEFAULT_INDENTATION = 2;
 const DEFAULT_LANG = 'plaintext';
@@ -35,6 +37,9 @@ const ANSI_FRAGMENT_RE = new RegExp(`(${ESC}\\[[0-9;]*m)`);
 
 export const DIFF_LANG = 'diff';
 export const DIFF_SEPARATOR = '---DIFF_SEPARATOR---';
+
+/** Whole-side highlight results kept per `TerminalRenderer` instance. */
+const MAX_HIGHLIGHT_CACHE_ENTRIES = 16;
 
 const DIFF_LANG_PREFIX = `${DIFF_LANG}:`;
 
@@ -158,9 +163,21 @@ const defaultOptions: TerminalMarked.RendererOptions = {
 
 export const HEADINGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const;
 
+interface RenderDiffProps {
+  oldStr: string;
+  newStr: string;
+  lang?: string;
+  availableWidth?: number;
+  precomputedRows?: SideBySideDiff[];
+}
+
 export class TerminalRenderer extends Renderer {
   private readonly config: TerminalMarked.RendererOptions;
   private shellWidth: number;
+  private diffData: ToolMessageData | undefined;
+  /** Whole-side highlight results, reused across re-parses (terminal resizes,
+   *  component remounts). Bounded: the newest entries matter most. */
+  private readonly highlightCache = new Map<string, string[]>();
 
   public constructor(
     options: TerminalMarked.RendererOptions,
@@ -180,6 +197,14 @@ export class TerminalRenderer extends Renderer {
     return input.replace(ANSI_REGEXP, '').length;
   }
 
+  /**
+   * Attach pre-computed rendering data (diff rows) the message's tool built at
+   * emit time. Re-set by every `parseMarkdown` call.
+   */
+  public setDiffData(data: ToolMessageData | undefined): void {
+    this.diffData = data;
+  }
+
   public override code({ text, lang }: Tokens.Code) {
     const contentLang = parseDiffLanguage(lang);
     let renderedContent: string;
@@ -189,14 +214,19 @@ export class TerminalRenderer extends Renderer {
       // the marker; without them the new side gains a phantom leading row and
       // every line number printed beside it shifts by one.
       const sides = splitDiffSides(text);
+      const payloadRows = isNotNil(sides)
+        ? this.payloadRowsFor(sides)
+        : undefined;
 
       renderedContent = isNotNil(sides)
-        ? this.renderDiff(
-            sides[0],
-            sides[1],
-            contentLang,
-            this.width - (this.config.indentation ?? DEFAULT_INDENTATION)
-          )
+        ? this.renderDiff({
+            oldStr: sides[0],
+            newStr: sides[1],
+            lang: contentLang,
+            availableWidth:
+              this.width - (this.config.indentation ?? DEFAULT_INDENTATION),
+            precomputedRows: payloadRows,
+          })
         : this.highlightCode(text, contentLang);
     } else {
       renderedContent = this.highlightCode(text, lang ?? DEFAULT_LANG);
@@ -294,13 +324,14 @@ export class TerminalRenderer extends Renderer {
    * `lang` is the language of the *content*, not of the diff itself; it is
    * what the columns are highlighted as.
    */
-  public renderDiff(
-    oldStr: string,
-    newStr: string,
-    lang: string = DEFAULT_LANG,
-    availableWidth: number = this.width
-  ): string {
-    const rows = generateSideBySideDiff(oldStr, newStr);
+  public renderDiff({
+    oldStr,
+    newStr,
+    lang = DEFAULT_LANG,
+    availableWidth = this.width,
+    precomputedRows,
+  }: RenderDiffProps): string {
+    const rows = precomputedRows ?? generateSideBySideDiff(oldStr, newStr);
     if (!isNonEmptyArray(rows)) return '';
 
     const hasRemoved = rows.some(([left, right]) =>
@@ -336,9 +367,11 @@ export class TerminalRenderer extends Renderer {
     // Highlight each side as a single block, then index it by line number.
     // Highlighting per line loses the state of any token that spans a line
     // break (block comment, template literal, multi-line literal), which is
-    // most of what a diff of real code contains.
-    const oldLines = this.highlightDiffSide(oldStr, lang);
-    const newLines = this.highlightDiffSide(newStr, lang);
+    // most of what a diff of real code contains. Results are cached per side
+    // string: re-parses (terminal resize, remount) re-layout but must not
+    // re-highlight.
+    const oldLines = this.highlightDiffSideCached(oldStr, lang);
+    const newLines = this.highlightDiffSideCached(newStr, lang);
 
     const lines = rows.map(([left, right]) => {
       if (left.collapsed || right.collapsed) {
@@ -511,6 +544,38 @@ export class TerminalRenderer extends Renderer {
     // A highlighter that rewraps or expands would shift every row against its
     // line number. Misaligned colour is worse than no colour.
     return lines.length === plain.length ? lines : plain;
+  }
+
+  /**
+   * {@link highlightDiffSide} memoised on the side's exact content and
+   * language. Sides re-arrive verbatim on every re-parse of the same message
+   * (terminal resize, component remount), so the highlight — the most
+   * expensive step of diff rendering — runs once per message side.
+   */
+  private highlightDiffSideCached(source: string, lang: string): string[] {
+    const key = `${lang}\u0000${source}`;
+    const cached = this.highlightCache.get(key);
+    if (isNotNil(cached)) return cached;
+
+    const lines = this.highlightDiffSide(source, lang);
+    if (this.highlightCache.size >= MAX_HIGHLIGHT_CACHE_ENTRIES) {
+      const oldest = this.highlightCache.keys().next().value;
+      if (isNotNil(oldest)) this.highlightCache.delete(oldest);
+    }
+    this.highlightCache.set(key, lines);
+    return lines;
+  }
+
+  /** The payload's rows when it was built from exactly `sides`' content. */
+  private payloadRowsFor([previous, current]: [string, string]):
+    | SideBySideDiff[]
+    | undefined {
+    const { diffData } = this;
+    if (diffData?.kind !== 'diff') return undefined;
+    if (diffData.previous !== previous || diffData.current !== current) {
+      return undefined;
+    }
+    return diffData.rows;
   }
 
   /**

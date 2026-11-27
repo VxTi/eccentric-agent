@@ -61,28 +61,32 @@ export const listMcpTools = createTool({
     if (isNotNil(toolName)) {
       const tool = allTools.get(toolName);
       return Result.Ok({
-        mcpServer,
-        tools: compact([
-          isNotNil(tool)
-            ? {
-                name: tool.name,
-                description: tool.description,
-                inputSchema: JSON.stringify(tool.inputSchema),
-                outputSchema: tool.outputSchema
-                  ? JSON.stringify(tool.outputSchema)
-                  : undefined,
-              }
-            : undefined,
-        ]),
+        data: {
+          mcpServer,
+          tools: compact([
+            isNotNil(tool)
+              ? {
+                  name: tool.name,
+                  description: tool.description,
+                  inputSchema: JSON.stringify(tool.inputSchema),
+                  outputSchema: tool.outputSchema
+                    ? JSON.stringify(tool.outputSchema)
+                    : undefined,
+                }
+              : undefined,
+          ]),
+        },
       });
     }
 
     return Result.Ok({
-      mcpServer,
-      tools: Array.from(allTools.values()).map(tool => ({
-        name: tool.name,
-        description: tool.description,
-      })),
+      data: {
+        mcpServer,
+        tools: Array.from(allTools.values()).map(tool => ({
+          name: tool.name,
+          description: tool.description,
+        })),
+      },
     });
   },
 

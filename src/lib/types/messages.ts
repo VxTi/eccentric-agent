@@ -1,5 +1,6 @@
 import type { TaskComplexity } from '../agent/inference';
 import type { ToolIdentifier } from '../agent/tools';
+import type { ToolMessageData } from '../agent/tools/tool-payload';
 import type { MakeOptional } from './types';
 
 export enum MessageType {
@@ -39,6 +40,9 @@ export interface GenericMessage extends IMessage, ILoadable {
   /** Present on messages that aggregate (collapse) consecutive completed tool
    *  calls into a single line. */
   collapsed?: CollapsedToolCalls;
+  /** Structured rendering data for the UI, pre-computed by the tool at emit
+   *  time. Absent when the tool defines no `outputToPayload`. */
+  data?: ToolMessageData;
 }
 
 export interface ThoughtMessage extends IMessage, ILoadable {

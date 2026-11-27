@@ -15,7 +15,7 @@ export interface DiffLine {
   lineNumberModified?: number;
   collapsed?: boolean;
 }
-type SideBySideDiff = [DiffLine, DiffLine];
+export type SideBySideDiff = [DiffLine, DiffLine];
 
 const DEFAULT_CONTEXT_LINES = 2;
 
