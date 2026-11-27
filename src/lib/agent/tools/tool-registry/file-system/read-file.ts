@@ -65,8 +65,8 @@ export const readFile = createTool({
   name: 'Read file',
   description:
     'Read one whole UTF-8 file off disk. One string back. Each line prefixed by its 1-based' +
-    ' number and a tab: `<n>\\t<line>`. Feed those numbers to `replace_in_file` to change content' +
-    ' at an exact line.\n' +
+    ' number and a tab: `<n>\\t<line>`. The numbers locate content; for edits, copy the exact' +
+    " text — without these prefixes — into `replace_in_file`'s `oldString`.\n" +
     'Path: absolute, or relative to working dir. What is it for? The full body of one file you' +
     ' already know. See its shape. Pull a fact. Prep an edit. What is it NOT for? Learning *which*' +
     ' files exist — that is `find_file`. Hunting text across many files — that is `find_in_file`.\n' +

@@ -110,26 +110,27 @@ describe('read_file', () => {
     if (!readResult.ok) throw new Error('read_file failed');
 
     const lineNrs = parseNumberedLines(readResult.data.content);
-    expect.assert(hasArrayLengthAtLeast(lineNrs, 1));
-    const [[labeledLine, seenContent]] = lineNrs;
-
+    expect.assert(hasArrayLengthAtLeast(lineNrs, 2));
+    const [labeledLine, seenContent] = lineNrs[0];
+    const [, nextContent] = lineNrs[1];
+    expect(labeledLine).toBe(4);
+    // The seen content alone may be ambiguous in the full file, so the edit
+    // carries the following line the model also saw — a verbatim copy of the
+    // partial read, exactly as the spec requires.
     const replaceResult = await replaceInFile.handle(
       {
         filePath,
-        range: {
-          lineNumber: labeledLine,
-          leadingAnchor: seenContent,
-          count: 1,
-        },
-        replacement: 'REPLACED',
+        oldString: `${seenContent}\n${nextContent}`,
+        newString: `REPLACED\n${nextContent}`,
       },
       channel,
       signal
     );
     expect(replaceResult.ok).toBe(true);
     if (!replaceResult.ok) return;
-    // The anchor would mask a wrong label by relocating, so assert no relocation.
+    // The exact match pins the edit to the seen content itself.
     expect(replaceResult.data.startLine).toBe(labeledLine);
+    expect(replaceResult.data.matchKind).toBe('exact');
 
     const updated = await fs.readFile(filePath, 'utf-8');
     const updatedLines = updated.split('\n');

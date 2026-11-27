@@ -29,19 +29,12 @@ Spend a tool call only when it yields information you do not already have.
     • \`find_in_file\` — search within one file you have already identified.
     • \`read_file\` — read the full body of one file you already know you need.
   Never read a whole file just to locate one symbol; \`grep\` or \`find_in_file\` instead.
-- Editing workflow: \`read_file\` returns every line prefixed with its 1-based number. Feed those
-  numbers to \`replace_in_file\` as \`lineNumber\`, with the first replaced line's content as
-  \`range.leadingAnchor\`, to change existing lines, or use \`create_file\` for new files. The
-  leading anchor relocates an edit when lines shifted; if no line matches it the edit is rejected
-  and you should re-read the file.
-- Endpoints: \`range.trailingAnchor\` (the content of the line the range ends on) is optional
-  additional evidence — the leading anchor is always present on its own — but supplying it is what
-  lets \`replace_in_file\` tell two copies of a repeated line apart and confirm that \`count\`
-  reaches the line you meant. Send it whenever the range spans more than one line, or the leading
-  line repeats in the file: an edit whose two endpoints disagree, or that they cannot decide
-  between, is rejected before anything is written rather than editing the wrong lines.
-  If the anchor instead matches one line either side of the claimed end, \`count\` is
-  corrected by one and the adjustment is reported as \`countAdjustment\`.
+- Editing workflow: \`read_file\` returns every line prefixed with its 1-based number — for
+  locating content, not for addressing edits. To change existing lines, pass the exact current
+  text as \`oldString\`, copied verbatim from \`read_file\` output without the \`<n>\t\` prefixes
+  and including its indentation; use \`create_file\` for new files. \`oldString\` must match the
+  file exactly once: if it matches more than once, widen it with surrounding lines; if it matches
+  nothing, the file may have changed — re-read it.
 - Prefer dedicated tools over \`shell\`. \`shell\` is restricted to an allow-list and needs user
   approval; reach for it only when no dedicated tool fits.
 - Delegate only substantial, independent work to \`delegate_task\`: it runs independent tasks in

@@ -1,45 +1,23 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`replace_in_file > applies a plain replacement without repair 1`] = `
+exports[`replace_in_file > applies an exact single-occurrence replacement 1`] = `
 {
-  "countAdjustment": 0,
-  "duplicatedSeamLines": [],
-  "duplicatesRemoved": 0,
-  "filePath": "plain-replacement.txt",
-  "linesInserted": 1,
-  "linesRemoved": 1,
-  "startLine": 5,
+  "filePath": "exact-replacement.txt",
+  "matchKind": "exact",
+  "startLine": 4,
 }
 `;
 
-exports[`replace_in_file > applies a plain replacement without repair 2`] = `
-"line 1
-line 2
-line 3
-line 4
-REPLACED
+exports[`replace_in_file > rendering > formats long arguments by showing only their tail 1`] = `
+"Editing \`example.ts\`:
+
+\`\`\`
+...line 4
+line 5
 line 6
 line 7
 line 8
-line 9
-line 10
-"
-`;
-
-exports[`replace_in_file > rendering > describes the edit for the approval prompt and the transcript 1`] = `
-"Editing line 5 in \`example.ts\`:
-
-\`\`\`
-REPLACED
-\`\`\`"
-`;
-
-exports[`replace_in_file > rendering > describes the edit for the approval prompt and the transcript 2`] = `"Editing line 5 in \`example.ts\`"`;
-
-exports[`replace_in_file > rendering > formats a long replacement by showing only its tail 1`] = `
-"Editing line 5 in \`example.ts\`:
-
-\`\`\`
+...
 ...line 4
 line 5
 line 6
@@ -48,86 +26,41 @@ line 8
 \`\`\`"
 `;
 
-exports[`replace_in_file > rendering > reports a plain diff when no seam lines were dropped 1`] = `
-"Edited \`render-plain.txt\`
-
-\`\`\`diff
-line 1
-line 2
-line 3
-line 4
-line 5
-line 6
-line 7
-line 8
-line 9
-line 10
-
----DIFF_SEPARATOR---
-line 1
-line 2
-line 3
-line 4
-REPLACED
-line 6
-line 7
-line 8
-line 9
-line 10
-
-\`\`\`
-"
-`;
-
-exports[`replace_in_file > rendering > reports the diff and the dropped seam lines together 1`] = `
-"Edited \`render-seam.txt\`
-
-\`\`\`diff
-line 1
-line 2
-line 3
-line 4
-line 5
-line 6
-line 7
-line 8
-line 9
-line 10
-
----DIFF_SEPARATOR---
-line 1
-line 2
-line 3
-line 4
-NEW
-line 6
-line 7
-line 8
-line 9
-line 10
-
-\`\`\`
-
-
-Dropped 2 duplicated seam line(s) from \`replacement\`:
-\`\`\`
-line 4
-line 6
-\`\`\`
-If these were intentional, re-send the edit with the range adjusted to include them."
-`;
-
-exports[`replace_in_file > reported diff > does not present unchanged lines for a small edit in a long file 1`] = `
-"Edited long-file.md
+exports[`replace_in_file > rendering > notes when the whitespace-lenient fallback was used 1`] = `
+"Edited render-whitespace.txt
  
 
-      ————————————————————————————————————————————————————— |     —————————————————————————————————————————————————————
-    2                                                       |   2                                                      
-    3   \`\`\`ts                                               |   3   \`\`\`ts                                              
-    4 - const a = 1;                                        |   4 + const a = 2;                                       
-    5   \`\`\`                                                 |   5   \`\`\`                                                
-    6                                                       |   6                                                      
-      ————————————————————————————————————————————————————— |     —————————————————————————————————————————————————————
+  1   function f() {                                        | 1   function f() {                                       
+  2 - 	return 1;                                            | 2 +   return 2;                                          
+  3   }                                                     | 3   }                                                    
+
+ Matched ignoring per-line indentation; whole lines were replaced.
+"
+`;
+
+exports[`replace_in_file > rendering > renders the diff through the markdown renderer 1`] = `
+"Edited render-diff.txt
+ 
+
+     —————————————————————————————————————————————————————— |    ——————————————————————————————————————————————————————
+   3   line 3                                               |  3   line 3                                              
+   4   line 4                                               |  4   line 4                                              
+   5 - line 5                                               |  5 + REPLACED                                            
+   6   line 6                                               |  6   line 6                                              
+   7   line 7                                               |  7   line 7                                              
+     —————————————————————————————————————————————————————— |    ——————————————————————————————————————————————————————
 
 "
 `;
+
+exports[`replace_in_file > rendering > shows the old text, an ellipsis, and the new text 1`] = `
+"Editing \`example.ts\`:
+
+\`\`\`
+line 5
+...
+REPLACED
+\`\`\`"
+`;
+
+exports[`replace_in_file > rendering > shows the old text, an ellipsis, and the new text 2`] = `"Editing \`example.ts\`"`;
